@@ -30,6 +30,8 @@ model User {
   photos           Photo[]         @relation("photoAuthor")
   lettersWritten   Letter[]        @relation("letterWriter")
   lettersReceived  Letter[]        @relation("letterReceiver")
+  feedLikes        FeedLike[]
+  feedComments     FeedComment[]   @relation("commentAuthor")
 }
 
 model Couple {
@@ -83,6 +85,30 @@ model Feed {
   type      FeedType @default(DIARY)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  likes     FeedLike[]
+  comments  FeedComment[]
+}
+
+model FeedLike {
+  id        String   @id @default(uuid())
+  feedId    String
+  feed      Feed     @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([feedId, userId])
+}
+
+model FeedComment {
+  id        String   @id @default(uuid())
+  feedId    String
+  feed      Feed     @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation("commentAuthor", fields: [authorId], references: [id])
+  content   String
+  createdAt DateTime @default(now())
 }
 
 enum FeedType {
@@ -148,6 +174,7 @@ model Message {
   content   String?
   imageUrl  String?
   isRead    Boolean  @default(false)
+  isEdited  Boolean  @default(false)
   createdAt DateTime @default(now())
 }
 

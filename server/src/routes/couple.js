@@ -136,6 +136,26 @@ router.delete('/leave', async (req, res) => {
   }
 });
 
+// PATCH /couple/start-date — 사귄 날짜 수정
+router.patch('/start-date', requireCouple, async (req, res) => {
+  try {
+    const { startDate } = req.body;
+    if (!startDate) {
+      return res.status(400).json({ error: '날짜를 입력해주세요.' });
+    }
+
+    const updated = await prisma.couple.update({
+      where: { id: req.user.coupleId },
+      data: { startDate: new Date(startDate) },
+    });
+
+    res.json({ couple: updated });
+  } catch (err) {
+    console.error('Update start date error:', err);
+    res.status(500).json({ error: '날짜 수정에 실패했습니다.' });
+  }
+});
+
 // GET /couple/info
 router.get('/info', requireCouple, async (req, res) => {
   try {
@@ -168,6 +188,9 @@ router.get('/anniversaries', requireCouple, async (req, res) => {
   try {
     const couple = await prisma.couple.findUnique({
       where: { id: req.user.coupleId },
+      include: {
+        users: { select: { id: true, nickname: true, birthDate: true } },
+      },
     });
 
     const start = new Date(couple.startDate);
@@ -185,6 +208,30 @@ router.get('/anniversaries', requireCouple, async (req, res) => {
       const date = new Date(start);
       date.setFullYear(date.getFullYear() + y);
       autoAnniversaries.push({ title: `${y}주년`, date, type: 'auto' });
+    }
+
+    // 생일 (매년 반복)
+    for (const user of couple.users) {
+      if (user.birthDate) {
+        const birth = new Date(user.birthDate);
+        const now = new Date();
+        // 올해 생일
+        let thisYear = new Date(now.getFullYear(), birth.getMonth(), birth.getDate());
+        // 내년 생일도 포함
+        let nextYear = new Date(now.getFullYear() + 1, birth.getMonth(), birth.getDate());
+        autoAnniversaries.push({
+          title: `${user.nickname} 생일`,
+          date: thisYear,
+          type: 'auto',
+          repeatType: 'YEARLY',
+        });
+        autoAnniversaries.push({
+          title: `${user.nickname} 생일`,
+          date: nextYear,
+          type: 'auto',
+          repeatType: 'YEARLY',
+        });
+      }
     }
 
     // 사용자 등록 기념일

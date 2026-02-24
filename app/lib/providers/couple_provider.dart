@@ -140,6 +140,34 @@ class CoupleNotifier extends Notifier<CoupleState> {
     }
   }
 
+  /// Update the couple's start date.
+  Future<bool> updateStartDate(DateTime newDate) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      await _dio.patch('/couple/start-date', data: {
+        'startDate': '${newDate.year}-${newDate.month.toString().padLeft(2, '0')}-${newDate.day.toString().padLeft(2, '0')}T00:00:00.000Z',
+      });
+
+      // Refresh couple info to get updated data
+      await fetchCouple();
+      return true;
+    } on DioException catch (e) {
+      final message = ((e.response?.data is Map)
+              ? (e.response?.data['error'] ?? e.response?.data['message'])
+              : null) as String? ??
+          '날짜 수정에 실패했습니다';
+      state = state.copyWith(isLoading: false, error: message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: '알 수 없는 오류가 발생했습니다',
+      );
+      return false;
+    }
+  }
+
   /// Leave (disconnect) the current couple.
   Future<bool> leaveCouple() async {
     state = state.copyWith(isLoading: true, error: null);

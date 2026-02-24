@@ -172,6 +172,50 @@ io.on('connection', async (socket) => {
     }
   });
 
+  // 메시지 수정
+  socket.on('message:edit', async (data) => {
+    try {
+      if (!socket.coupleId) return;
+      const { messageId, content } = data;
+      if (!messageId || !content) return;
+
+      const message = await prisma.message.findUnique({ where: { id: messageId } });
+      if (!message || message.senderId !== socket.userId) return;
+
+      const updated = await prisma.message.update({
+        where: { id: messageId },
+        data: { content, isEdited: true },
+        include: {
+          sender: { select: { id: true, nickname: true, profileImage: true } },
+        },
+      });
+
+      const room = `couple:${socket.coupleId}`;
+      io.to(room).emit('message:edited', updated);
+    } catch (err) {
+      console.error('Socket message:edit error:', err);
+    }
+  });
+
+  // 메시지 삭제
+  socket.on('message:delete', async (data) => {
+    try {
+      if (!socket.coupleId) return;
+      const { messageId } = data;
+      if (!messageId) return;
+
+      const message = await prisma.message.findUnique({ where: { id: messageId } });
+      if (!message || message.senderId !== socket.userId) return;
+
+      await prisma.message.delete({ where: { id: messageId } });
+
+      const room = `couple:${socket.coupleId}`;
+      io.to(room).emit('message:deleted', { messageId });
+    } catch (err) {
+      console.error('Socket message:delete error:', err);
+    }
+  });
+
   // 타이핑 표시
   socket.on('typing:start', () => {
     if (!socket.coupleId) return;

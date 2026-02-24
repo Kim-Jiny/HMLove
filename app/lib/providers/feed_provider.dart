@@ -13,6 +13,9 @@ class Feed {
   final String authorId;
   final String? authorNickname;
   final String? authorProfileImage;
+  final bool isLiked;
+  final int likeCount;
+  final int commentCount;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -25,38 +28,88 @@ class Feed {
     required this.authorId,
     this.authorNickname,
     this.authorProfileImage,
+    this.isLiked = false,
+    this.likeCount = 0,
+    this.commentCount = 0,
     required this.createdAt,
     required this.updatedAt,
   });
 
   factory Feed.fromJson(Map<String, dynamic> json) {
+    final author = json['author'] as Map<String, dynamic>?;
     return Feed(
       id: json['id'] as String,
-      content: json['content'] as String,
+      content: json['content'] as String? ?? '',
       imageUrl: json['imageUrl'] as String?,
       type: json['type'] as String?,
       coupleId: json['coupleId'] as String,
       authorId: json['authorId'] as String,
-      authorNickname: json['authorNickname'] as String?,
-      authorProfileImage: json['authorProfileImage'] as String?,
+      authorNickname: author?['nickname'] as String? ??
+          json['authorNickname'] as String?,
+      authorProfileImage: author?['profileImage'] as String? ??
+          json['authorProfileImage'] as String?,
+      isLiked: json['isLiked'] as bool? ?? false,
+      likeCount: json['likeCount'] as int? ?? 0,
+      commentCount: json['commentCount'] as int? ?? 0,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'content': content,
-      'imageUrl': imageUrl,
-      'type': type,
-      'coupleId': coupleId,
-      'authorId': authorId,
-      'authorNickname': authorNickname,
-      'authorProfileImage': authorProfileImage,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
-    };
+  Feed copyWith({
+    bool? isLiked,
+    int? likeCount,
+    int? commentCount,
+  }) {
+    return Feed(
+      id: id,
+      content: content,
+      imageUrl: imageUrl,
+      type: type,
+      coupleId: coupleId,
+      authorId: authorId,
+      authorNickname: authorNickname,
+      authorProfileImage: authorProfileImage,
+      isLiked: isLiked ?? this.isLiked,
+      likeCount: likeCount ?? this.likeCount,
+      commentCount: commentCount ?? this.commentCount,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
+}
+
+// Comment model
+class FeedComment {
+  final String id;
+  final String feedId;
+  final String authorId;
+  final String? authorNickname;
+  final String? authorProfileImage;
+  final String content;
+  final DateTime createdAt;
+
+  const FeedComment({
+    required this.id,
+    required this.feedId,
+    required this.authorId,
+    this.authorNickname,
+    this.authorProfileImage,
+    required this.content,
+    required this.createdAt,
+  });
+
+  factory FeedComment.fromJson(Map<String, dynamic> json) {
+    final author = json['author'] as Map<String, dynamic>?;
+    return FeedComment(
+      id: json['id'] as String,
+      feedId: json['feedId'] as String,
+      authorId: json['authorId'] as String,
+      authorNickname: author?['nickname'] as String?,
+      authorProfileImage: author?['profileImage'] as String?,
+      content: json['content'] as String,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+    );
   }
 }
 
@@ -103,8 +156,6 @@ class FeedNotifier extends Notifier<FeedState> {
     return const FeedState();
   }
 
-  /// Fetch feeds with cursor-based pagination.
-  /// If [refresh] is true, resets the list and fetches from the beginning.
   Future<void> fetchFeeds({bool refresh = false}) async {
     if (state.isLoading) return;
     if (!refresh && !state.hasMore) return;
@@ -145,7 +196,6 @@ class FeedNotifier extends Notifier<FeedState> {
     }
   }
 
-  /// Create a new feed post.
   Future<bool> createFeed({
     required String content,
     String? imageUrl,
@@ -160,7 +210,9 @@ class FeedNotifier extends Notifier<FeedState> {
         if (type != null) 'type': type,
       });
 
-      final feed = Feed.fromJson(response.data as Map<String, dynamic>);
+      final data = response.data as Map<String, dynamic>;
+      final feedJson = data['feed'] as Map<String, dynamic>? ?? data;
+      final feed = Feed.fromJson(feedJson);
       state = state.copyWith(
         feeds: [feed, ...state.feeds],
         isLoading: false,
@@ -180,7 +232,6 @@ class FeedNotifier extends Notifier<FeedState> {
     }
   }
 
-  /// Delete a feed post.
   Future<bool> deleteFeed(String id) async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -201,6 +252,47 @@ class FeedNotifier extends Notifier<FeedState> {
       );
       return false;
     }
+  }
+
+  /// Toggle like on a feed
+  Future<void> toggleLike(String feedId) async {
+    // Optimistic update
+    final idx = state.feeds.indexWhere((f) => f.id == feedId);
+    if (idx == -1) return;
+
+    final feed = state.feeds[idx];
+    final newLiked = !feed.isLiked;
+    final newCount = feed.likeCount + (newLiked ? 1 : -1);
+
+    final updatedFeeds = [...state.feeds];
+    updatedFeeds[idx] = feed.copyWith(isLiked: newLiked, likeCount: newCount);
+    state = state.copyWith(feeds: updatedFeeds);
+
+    try {
+      final response = await _dio.post('/feed/$feedId/like');
+      final data = response.data as Map<String, dynamic>;
+      // Sync with server response
+      updatedFeeds[idx] = feed.copyWith(
+        isLiked: data['isLiked'] as bool,
+        likeCount: data['likeCount'] as int,
+      );
+      state = state.copyWith(feeds: updatedFeeds);
+    } catch (_) {
+      // Revert on error
+      updatedFeeds[idx] = feed;
+      state = state.copyWith(feeds: updatedFeeds);
+    }
+  }
+
+  /// Update comment count locally
+  void updateCommentCount(String feedId, int delta) {
+    final idx = state.feeds.indexWhere((f) => f.id == feedId);
+    if (idx == -1) return;
+    final feed = state.feeds[idx];
+    final updatedFeeds = [...state.feeds];
+    updatedFeeds[idx] =
+        feed.copyWith(commentCount: feed.commentCount + delta);
+    state = state.copyWith(feeds: updatedFeeds);
   }
 }
 

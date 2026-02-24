@@ -19,10 +19,18 @@ router.get('/:yearMonth', async (req, res) => {
     const startOfMonth = new Date(year, month - 1, 1);
     const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
 
-    const events = await prisma.calendarEvent.findMany({
+    // DB 이벤트 조회
+    const dbEvents = await prisma.calendarEvent.findMany({
       where: {
         coupleId: req.user.coupleId,
-        date: { gte: startOfMonth, lte: endOfMonth },
+        OR: [
+          // 해당 월 이벤트
+          { date: { gte: startOfMonth, lte: endOfMonth }, repeatType: 'NONE' },
+          // 매년 반복: 같은 월인 것
+          { repeatType: 'YEARLY' },
+          // 매월 반복: 전부
+          { repeatType: 'MONTHLY' },
+        ],
       },
       include: {
         author: { select: { id: true, nickname: true } },
@@ -30,7 +38,91 @@ router.get('/:yearMonth', async (req, res) => {
       orderBy: { date: 'asc' },
     });
 
-    res.json({ events });
+    // 반복 이벤트 처리: 해당 월에 맞게 날짜 조정
+    const events = [];
+    for (const ev of dbEvents) {
+      if (ev.repeatType === 'YEARLY') {
+        if (ev.date.getMonth() === month - 1) {
+          events.push({ ...ev, date: new Date(year, month - 1, ev.date.getDate()) });
+        }
+      } else if (ev.repeatType === 'MONTHLY') {
+        events.push({ ...ev, date: new Date(year, month - 1, ev.date.getDate()) });
+      } else {
+        events.push(ev);
+      }
+    }
+
+    // 자동 기념일 생성 (100일, N주년, 생일)
+    const couple = await prisma.couple.findUnique({
+      where: { id: req.user.coupleId },
+      include: {
+        users: { select: { nickname: true, birthDate: true } },
+      },
+    });
+
+    const autoEvents = [];
+    if (couple) {
+      const start = new Date(couple.startDate);
+
+      // 100일 단위
+      for (let d = 100; d <= 1000; d += 100) {
+        const date = new Date(start);
+        date.setDate(date.getDate() + d - 1);
+        if (date.getFullYear() === year && date.getMonth() === month - 1) {
+          autoEvents.push({
+            id: `auto-${d}`,
+            title: `${d}일`,
+            date,
+            isAnniversary: true,
+            repeatType: 'NONE',
+            description: null,
+            color: null,
+            _auto: true,
+          });
+        }
+      }
+
+      // N주년
+      for (let y = 1; y <= 20; y++) {
+        const date = new Date(start);
+        date.setFullYear(date.getFullYear() + y);
+        if (date.getFullYear() === year && date.getMonth() === month - 1) {
+          autoEvents.push({
+            id: `auto-y${y}`,
+            title: `${y}주년`,
+            date,
+            isAnniversary: true,
+            repeatType: 'NONE',
+            description: null,
+            color: null,
+            _auto: true,
+          });
+        }
+      }
+
+      // 생일
+      for (const user of couple.users) {
+        if (user.birthDate) {
+          const birth = new Date(user.birthDate);
+          if (birth.getMonth() === month - 1) {
+            autoEvents.push({
+              id: `auto-bday-${user.nickname}`,
+              title: `${user.nickname} 생일`,
+              date: new Date(year, month - 1, birth.getDate()),
+              isAnniversary: true,
+              repeatType: 'YEARLY',
+              description: null,
+              color: null,
+              _auto: true,
+            });
+          }
+        }
+      }
+    }
+
+    const allEvents = [...events, ...autoEvents].sort((a, b) => a.date - b.date);
+
+    res.json({ events: allEvents });
   } catch (err) {
     console.error('Get calendar events error:', err);
     res.status(500).json({ error: '일정 조회에 실패했습니다.' });

@@ -30,6 +30,65 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
+  void _showEditStartDate(DateTime? currentDate) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: currentDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+      helpText: '사귄 날짜를 선택하세요',
+      cancelText: '취소',
+      confirmText: '변경',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+                  primary: AppTheme.primaryColor,
+                ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null && mounted) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('사귄 날짜 변경'),
+          content: Text(
+            '${DateFormat('yyyy년 M월 d일').format(picked)}로 변경하시겠습니까?',
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('변경'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true && mounted) {
+        final success =
+            await ref.read(coupleProvider.notifier).updateStartDate(picked);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(success ? '사귄 날짜가 변경되었습니다.' : '날짜 변경에 실패했습니다.'),
+            ),
+          );
+        }
+      }
+    }
+  }
+
   void _showMoodPicker() {
     final moods = [
       {'key': 'happy', 'emoji': '😊', 'label': '행복해'},
@@ -130,12 +189,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 startDate: coupleState.couple?.startDate,
                 user1Name: user?.nickname ?? '나',
                 user2Name: coupleState.couple?.getPartner(user?.id ?? '')?.nickname ?? '상대방',
+                onEditDate: () => _showEditStartDate(coupleState.couple?.startDate),
               ),
               const SizedBox(height: 12),
 
               // Next Anniversary Card
               _AnniversaryCard(
                 startDate: coupleState.couple?.startDate,
+                onTap: () => context.push('/anniversary'),
               ),
               const SizedBox(height: 12),
 
@@ -176,17 +237,22 @@ class _DdayCard extends StatelessWidget {
   final DateTime? startDate;
   final String user1Name;
   final String user2Name;
+  final VoidCallback? onEditDate;
 
   const _DdayCard({
     this.daysTogether,
     this.startDate,
     required this.user1Name,
     required this.user2Name,
+    this.onEditDate,
   });
 
   @override
   Widget build(BuildContext context) {
     return Card(
+      child: InkWell(
+      onTap: onEditDate,
+      borderRadius: BorderRadius.circular(16),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(24),
@@ -247,6 +313,7 @@ class _DdayCard extends StatelessWidget {
           ],
         ),
       ),
+      ),
     );
   }
 }
@@ -254,8 +321,9 @@ class _DdayCard extends StatelessWidget {
 // Next Anniversary Card
 class _AnniversaryCard extends StatelessWidget {
   final DateTime? startDate;
+  final VoidCallback? onTap;
 
-  const _AnniversaryCard({this.startDate});
+  const _AnniversaryCard({this.startDate, this.onTap});
 
   Map<String, dynamic>? _getNextAnniversary() {
     if (startDate == null) return null;
@@ -297,71 +365,77 @@ class _AnniversaryCard extends StatelessWidget {
     final anniversary = _getNextAnniversary();
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryLight.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryLight.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.celebration_outlined,
+                  color: AppTheme.primaryColor,
+                ),
               ),
-              child: const Icon(
-                Icons.celebration_outlined,
-                color: AppTheme.primaryColor,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '다음 기념일',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      anniversary != null
+                          ? anniversary['name'] as String
+                          : '정보 없음',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '다음 기념일',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
+              if (anniversary != null) ...[
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'D-${anniversary['daysLeft']}',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primaryColor,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    anniversary != null
-                        ? anniversary['name'] as String
-                        : '정보 없음',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                    Text(
+                      DateFormat('M월 d일')
+                          .format(anniversary['date'] as DateTime),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            if (anniversary != null) ...[
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'D-${anniversary['daysLeft']}',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryColor,
-                    ),
-                  ),
-                  Text(
-                    DateFormat('M월 d일')
-                        .format(anniversary['date'] as DateTime),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right, color: AppTheme.textHint, size: 20),
             ],
-          ],
+          ),
         ),
       ),
     );

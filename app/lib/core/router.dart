@@ -20,6 +20,7 @@ import '../screens/letter/letter_list_screen.dart';
 import '../screens/letter/letter_write_screen.dart';
 import '../screens/letter/letter_read_screen.dart';
 import '../screens/fortune/fortune_screen.dart';
+import '../screens/home/anniversary_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Use a listenable to trigger redirects when auth changes
@@ -138,6 +139,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/fortune',
         builder: (context, state) => const FortuneScreen(),
+      ),
+
+      // Anniversary
+      GoRoute(
+        path: '/anniversary',
+        builder: (context, state) => const AnniversaryScreen(),
       ),
 
       // Main Shell with bottom navigation

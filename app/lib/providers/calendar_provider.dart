@@ -12,10 +12,11 @@ class CalendarEvent {
   final bool isAnniversary;
   final String? repeatType;
   final String? color;
-  final String coupleId;
-  final String createdBy;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  final String? coupleId;
+  final String? createdBy;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final bool isAuto;
 
   const CalendarEvent({
     required this.id,
@@ -25,10 +26,11 @@ class CalendarEvent {
     this.isAnniversary = false,
     this.repeatType,
     this.color,
-    required this.coupleId,
-    required this.createdBy,
-    required this.createdAt,
-    required this.updatedAt,
+    this.coupleId,
+    this.createdBy,
+    this.createdAt,
+    this.updatedAt,
+    this.isAuto = false,
   });
 
   factory CalendarEvent.fromJson(Map<String, dynamic> json) {
@@ -40,27 +42,16 @@ class CalendarEvent {
       isAnniversary: json['isAnniversary'] as bool? ?? false,
       repeatType: json['repeatType'] as String?,
       color: json['color'] as String?,
-      coupleId: json['coupleId'] as String,
-      createdBy: json['createdBy'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      coupleId: json['coupleId'] as String?,
+      createdBy: json['createdBy'] as String? ?? json['authorId'] as String?,
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : null,
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'] as String)
+          : null,
+      isAuto: json['_auto'] as bool? ?? false,
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'title': title,
-      'date': date.toIso8601String(),
-      'description': description,
-      'isAnniversary': isAnniversary,
-      'repeatType': repeatType,
-      'color': color,
-      'coupleId': coupleId,
-      'createdBy': createdBy,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
-    };
   }
 }
 

@@ -351,31 +351,71 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       itemCount: events.length,
       itemBuilder: (context, index) {
         final event = events[index];
+        final isAutoAnniversary = event.isAuto;
+
+        Color iconBgColor;
+        Color iconColor;
+        IconData icon;
+
+        if (isAutoAnniversary) {
+          iconBgColor = const Color(0xFFFCE4EC);
+          iconColor = const Color(0xFFE91E63);
+          icon = event.title.contains('생일')
+              ? Icons.cake
+              : Icons.celebration;
+        } else if (event.isAnniversary) {
+          iconBgColor = AppTheme.primaryLight.withValues(alpha: 0.2);
+          iconColor = AppTheme.primaryColor;
+          icon = Icons.favorite;
+        } else {
+          iconBgColor = const Color(0xFFE3F2FD);
+          iconColor = const Color(0xFF1976D2);
+          icon = Icons.event;
+        }
+
         return Card(
           child: ListTile(
             leading: Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: event.isAnniversary
-                    ? AppTheme.primaryLight.withValues(alpha: 0.2)
-                    : const Color(0xFFE3F2FD),
+                color: iconBgColor,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(
-                event.isAnniversary ? Icons.favorite : Icons.event,
-                color: event.isAnniversary
-                    ? AppTheme.primaryColor
-                    : const Color(0xFF1976D2),
-                size: 20,
-              ),
+              child: Icon(icon, color: iconColor, size: 20),
             ),
-            title: Text(
-              event.title,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-              ),
+            title: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    event.title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (isAutoAnniversary) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFCE4EC),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      '자동',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: Color(0xFFE91E63),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
             subtitle: event.description != null
                 ? Text(

@@ -15,6 +15,7 @@ class ChatMessage {
   final String? senderNickname;
   final String coupleId;
   final bool isRead;
+  final bool isEdited;
   final DateTime createdAt;
 
   const ChatMessage({
@@ -25,33 +26,22 @@ class ChatMessage {
     this.senderNickname,
     required this.coupleId,
     this.isRead = false,
+    this.isEdited = false,
     required this.createdAt,
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     return ChatMessage(
       id: json['id'] as String,
-      content: json['content'] as String,
+      content: (json['content'] as String?) ?? '',
       imageUrl: json['imageUrl'] as String?,
       senderId: json['senderId'] as String,
       senderNickname: json['senderNickname'] as String?,
       coupleId: json['coupleId'] as String,
       isRead: json['isRead'] as bool? ?? false,
+      isEdited: json['isEdited'] as bool? ?? false,
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'content': content,
-      'imageUrl': imageUrl,
-      'senderId': senderId,
-      'senderNickname': senderNickname,
-      'coupleId': coupleId,
-      'isRead': isRead,
-      'createdAt': createdAt.toIso8601String(),
-    };
   }
 
   ChatMessage copyWith({
@@ -62,6 +52,7 @@ class ChatMessage {
     String? senderNickname,
     String? coupleId,
     bool? isRead,
+    bool? isEdited,
     DateTime? createdAt,
   }) {
     return ChatMessage(
@@ -72,6 +63,7 @@ class ChatMessage {
       senderNickname: senderNickname ?? this.senderNickname,
       coupleId: coupleId ?? this.coupleId,
       isRead: isRead ?? this.isRead,
+      isEdited: isEdited ?? this.isEdited,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -182,6 +174,24 @@ class ChatNotifier extends Notifier<ChatState> {
       state = state.copyWith(messages: updatedMessages);
     });
 
+    _socket!.on('message:edited', (data) {
+      if (data != null) {
+        final edited = ChatMessage.fromJson(data as Map<String, dynamic>);
+        final updated = state.messages.map((msg) {
+          return msg.id == edited.id ? edited : msg;
+        }).toList();
+        state = state.copyWith(messages: updated);
+      }
+    });
+
+    _socket!.on('message:deleted', (data) {
+      if (data != null) {
+        final messageId = (data as Map<String, dynamic>)['messageId'] as String;
+        final updated = state.messages.where((msg) => msg.id != messageId).toList();
+        state = state.copyWith(messages: updated);
+      }
+    });
+
     _socket!.on('typing:start', (_) {
       state = state.copyWith(partnerTyping: true);
     });
@@ -216,6 +226,21 @@ class ChatNotifier extends Notifier<ChatState> {
     _socket?.emit('message:send', {
       'content': content,
       if (imageUrl != null) 'imageUrl': imageUrl,
+    });
+  }
+
+  /// Edit a message via socket.
+  void editMessage({required String messageId, required String content}) {
+    _socket?.emit('message:edit', {
+      'messageId': messageId,
+      'content': content,
+    });
+  }
+
+  /// Delete a message via socket.
+  void deleteMessage({required String messageId}) {
+    _socket?.emit('message:delete', {
+      'messageId': messageId,
     });
   }
 

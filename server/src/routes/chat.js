@@ -1,6 +1,21 @@
 import { Router } from 'express';
+import multer from 'multer';
+import sharp from 'sharp';
+import { mkdirSync, existsSync } from 'fs';
 import { authenticate, requireCouple } from '../middleware/auth.js';
 import prisma from '../utils/prisma.js';
+
+const UPLOAD_DIR = 'uploads/chat';
+if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('이미지 파일만 업로드 가능합니다.'));
+  },
+});
 
 const router = Router();
 router.use(authenticate, requireCouple);
@@ -66,6 +81,93 @@ router.patch('/read', async (req, res) => {
   } catch (err) {
     console.error('Read messages error:', err);
     res.status(500).json({ error: '읽음 처리에 실패했습니다.' });
+  }
+});
+
+// POST /chat/upload — 채팅 이미지 업로드
+router.post('/upload', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: '이미지를 첨부해주세요.' });
+    }
+
+    const fileName = `${Date.now()}_${req.user.id}.webp`;
+    const filePath = `${UPLOAD_DIR}/${fileName}`;
+
+    await sharp(req.file.buffer)
+      .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 80 })
+      .toFile(filePath);
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const imageUrl = `${baseUrl}/${filePath}`;
+
+    res.json({ imageUrl });
+  } catch (err) {
+    console.error('Chat upload error:', err);
+    res.status(500).json({ error: '이미지 업로드에 실패했습니다.' });
+  }
+});
+
+// GET /chat/media?cursor=xxx&limit=20 — 미디어 메시지만
+router.get('/media', async (req, res) => {
+  try {
+    const { cursor, limit = '20' } = req.query;
+    const take = Math.min(parseInt(limit), 50);
+
+    const messages = await prisma.message.findMany({
+      where: {
+        coupleId: req.user.coupleId,
+        imageUrl: { not: null },
+      },
+      take: take + 1,
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, imageUrl: true, senderId: true, createdAt: true },
+    });
+
+    const hasNext = messages.length > take;
+    if (hasNext) messages.pop();
+    const nextCursor = hasNext ? messages[messages.length - 1].id : null;
+
+    res.json({ messages, nextCursor });
+  } catch (err) {
+    console.error('Get media error:', err);
+    res.status(500).json({ error: '미디어 조회에 실패했습니다.' });
+  }
+});
+
+// GET /chat/search?q=keyword&cursor=xxx&limit=20 — 메시지 검색
+router.get('/search', async (req, res) => {
+  try {
+    const { q, cursor, limit = '20' } = req.query;
+    if (!q || q.trim().length === 0) {
+      return res.json({ messages: [], nextCursor: null });
+    }
+
+    const take = Math.min(parseInt(limit), 50);
+
+    const messages = await prisma.message.findMany({
+      where: {
+        coupleId: req.user.coupleId,
+        content: { contains: q.trim(), mode: 'insensitive' },
+      },
+      take: take + 1,
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+      orderBy: { createdAt: 'desc' },
+      include: {
+        sender: { select: { id: true, nickname: true, profileImage: true } },
+      },
+    });
+
+    const hasNext = messages.length > take;
+    if (hasNext) messages.pop();
+    const nextCursor = hasNext ? messages[messages.length - 1].id : null;
+
+    res.json({ messages, nextCursor });
+  } catch (err) {
+    console.error('Search messages error:', err);
+    res.status(500).json({ error: '검색에 실패했습니다.' });
   }
 });
 
