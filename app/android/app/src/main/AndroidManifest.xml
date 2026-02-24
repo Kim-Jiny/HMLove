@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="hmlove"
+        android:label="우리연애"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

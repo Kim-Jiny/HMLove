@@ -1,7 +1,7 @@
 class AppConstants {
   AppConstants._();
 
-  static const String appName = 'HMLove';
+  static const String appName = '우리연애';
   static const String appVersion = '1.0.0';
 
   // API
@@ -18,6 +18,9 @@ class AppConstants {
   static const String refreshTokenKey = 'refresh_token';
   static const String userIdKey = 'user_id';
   static const String coupleIdKey = 'couple_id';
+
+  // Push
+  static const String fcmTokenKey = 'fcm_token';
 
   // Date Formats
   static const String dateFormat = 'yyyy-MM-dd';

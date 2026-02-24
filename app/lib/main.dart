@@ -9,7 +9,6 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'core/constants.dart';
-import 'core/push_notification_service.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
 import 'firebase_options.dart';
@@ -34,9 +33,6 @@ void main() async {
 
   // Initialize Korean locale data
   await initializeDateFormatting('ko_KR', null);
-
-  // 푸시 알림 초기화 (이미 로그인된 유저용)
-  PushNotificationService.initialize();
 
   runApp(
     const ProviderScope(

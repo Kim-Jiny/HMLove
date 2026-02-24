@@ -31,7 +31,9 @@ class _MainShellState extends ConsumerState<MainShell> {
       if (token != null) {
         ref.read(chatProvider.notifier).connect(token);
       }
-      // 푸시 알림 초기화
+    });
+    // 푸시 알림 초기화 - UI가 완전히 빌드된 후 실행
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       PushNotificationService.initialize();
     });
   }
