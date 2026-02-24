@@ -1,0 +1,22 @@
+# Server
+server/.env
+server/firebase-service-account.json
+server/node_modules/
+server/uploads/
+server/src/generated/prisma
+
+# App
+app/.dart_tool/
+app/.packages
+app/build/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+
+# Claude
+.claude/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.DS_Store

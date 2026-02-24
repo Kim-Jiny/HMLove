@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "533381747710",
+    "project_id": "hmlove-251115",
+    "storage_bucket": "hmlove-251115.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:533381747710:android:4f520562743cbf3d42a6af",
+        "android_client_info": {
+          "package_name": "com.jiny.hmlove"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDC80HRDz6RmUhfWzzYj5q9YN7EDLt7cZM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

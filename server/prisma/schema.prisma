@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  password       String
+  nickname       String
+  profileImage   String?
+  birthDate      DateTime?
+  zodiacSign     String?   // 별자리
+  chineseZodiac  String?   // 띠
+  fcmToken       String?
+  coupleId       String?
+  couple         Couple?   @relation(fields: [coupleId], references: [id])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sentMessages     Message[]       @relation("sender")
+  calendarEvents   CalendarEvent[] @relation("eventAuthor")
+  feeds            Feed[]          @relation("feedAuthor")
+  moods            Mood[]
+  fights           Fight[]         @relation("fightAuthor")
+  photos           Photo[]         @relation("photoAuthor")
+  lettersWritten   Letter[]        @relation("letterWriter")
+  lettersReceived  Letter[]        @relation("letterReceiver")
+}
+
+model Couple {
+  id          String    @id @default(uuid())
+  inviteCode  String    @unique
+  startDate   DateTime
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  users           User[]
+  calendarEvents  CalendarEvent[]
+  feeds           Feed[]
+  moods           Mood[]
+  fights          Fight[]
+  fortunes        Fortune[]
+  messages        Message[]
+  photos          Photo[]
+  letters         Letter[]
+}
+
+model CalendarEvent {
+  id          String   @id @default(uuid())
+  coupleId    String
+  couple      Couple   @relation(fields: [coupleId], references: [id])
+  authorId    String
+  author      User     @relation("eventAuthor", fields: [authorId], references: [id])
+  title       String
+  description String?
+  date        DateTime
+  isAnniversary Boolean @default(false)
+  repeatType  RepeatType @default(NONE)
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum RepeatType {
+  NONE
+  YEARLY
+  MONTHLY
+}
+
+model Feed {
+  id        String   @id @default(uuid())
+  coupleId  String
+  couple    Couple   @relation(fields: [coupleId], references: [id])
+  authorId  String
+  author    User     @relation("feedAuthor", fields: [authorId], references: [id])
+  content   String
+  imageUrl  String?
+  type      FeedType @default(DIARY)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum FeedType {
+  DIARY
+  PHOTO
+  MILESTONE
+}
+
+model Mood {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  coupleId  String
+  couple    Couple   @relation(fields: [coupleId], references: [id])
+  emoji     String
+  message   String?
+  date      DateTime @db.Date
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
+}
+
+model Fight {
+  id         String   @id @default(uuid())
+  coupleId   String
+  couple     Couple   @relation(fields: [coupleId], references: [id])
+  authorId   String
+  author     User     @relation("fightAuthor", fields: [authorId], references: [id])
+  date       DateTime
+  reason     String
+  resolution String?
+  reflection String?
+  isResolved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Fortune {
+  id          String   @id @default(uuid())
+  coupleId    String
+  couple      Couple   @relation(fields: [coupleId], references: [id])
+  date        DateTime @db.Date
+  generalLuck String
+  coupleLuck  String
+  dateTip     String
+  caution     String
+  luckyScore  Int
+  user1Id     String?
+  user1Luck   String?
+  user2Id     String?
+  user2Luck   String?
+  createdAt   DateTime @default(now())
+
+  @@unique([coupleId, date])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  coupleId  String
+  couple    Couple   @relation(fields: [coupleId], references: [id])
+  senderId  String
+  sender    User     @relation("sender", fields: [senderId], references: [id])
+  content   String?
+  imageUrl  String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Photo {
+  id           String   @id @default(uuid())
+  coupleId     String
+  couple       Couple   @relation(fields: [coupleId], references: [id])
+  authorId     String
+  author       User     @relation("photoAuthor", fields: [authorId], references: [id])
+  imageUrl     String
+  thumbnailUrl String?
+  caption      String?
+  latitude     Float?
+  longitude    Float?
+  address      String?
+  takenAt      DateTime?
+  createdAt    DateTime @default(now())
+}
+
+model Letter {
+  id           String       @id @default(uuid())
+  coupleId     String
+  couple       Couple       @relation(fields: [coupleId], references: [id])
+  writerId     String
+  writer       User         @relation("letterWriter", fields: [writerId], references: [id])
+  receiverId   String
+  receiver     User         @relation("letterReceiver", fields: [receiverId], references: [id])
+  title        String
+  content      String
+  deliveryDate DateTime     @db.Date
+  status       LetterStatus @default(DRAFT)
+  isRead       Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+enum LetterStatus {
+  DRAFT
+  SCHEDULED
+  DELIVERED
+}

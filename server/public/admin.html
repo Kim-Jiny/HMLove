@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HMLove Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { brand: { 50:'#fff1f2',100:'#ffe4e6',200:'#fecdd3',300:'#fda4af',400:'#fb7185',500:'#f43f5e',600:'#e11d48',700:'#be123c' } }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    .fade-in { animation: fadeIn .4s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- Login -->
+  <div id="loginScreen" class="min-h-screen flex items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm fade-in">
+      <div class="text-center mb-6">
+        <div class="text-4xl mb-2">&#x1F491;</div>
+        <h1 class="text-2xl font-bold text-gray-800">HMLove Admin</h1>
+        <p class="text-gray-500 text-sm mt-1">관리자 대시보드</p>
+      </div>
+      <form id="loginForm" class="space-y-4">
+        <input id="passwordInput" type="password" placeholder="관리자 비밀번호"
+          class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition">
+        <button type="submit"
+          class="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-medium transition">
+          로그인
+        </button>
+        <p id="loginError" class="text-red-500 text-sm text-center hidden">비밀번호가 올바르지 않습니다.</p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="hidden">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="text-2xl">&#x1F491;</span>
+          <h1 class="text-xl font-bold text-gray-800">HMLove Admin</h1>
+        </div>
+        <div class="flex items-center gap-3">
+          <span id="lastUpdated" class="text-xs text-gray-400"></span>
+          <button onclick="loadStats()" class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+            &#x21BB; 새로고침
+          </button>
+          <button onclick="logout()" class="px-3 py-1.5 text-sm text-red-500 hover:bg-red-50 rounded-lg transition">
+            로그아웃
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <!-- Overview Cards -->
+      <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3" id="overviewCards"></section>
+
+      <!-- Today's Activity -->
+      <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">&#x1F4C5; 오늘의 활동</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="todayCards"></div>
+      </section>
+
+      <!-- Charts -->
+      <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">&#x1F4AC; 일별 메시지 (14일)</h2>
+          <canvas id="messagesChart" height="200"></canvas>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">&#x1F464; 일별 가입자 (14일)</h2>
+          <canvas id="usersChart" height="200"></canvas>
+        </div>
+      </section>
+
+      <!-- Fight Stats + Summary -->
+      <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">&#x1F91D; 다툼 해결률</h2>
+          <div class="flex items-center justify-center" style="height:180px">
+            <canvas id="fightChart"></canvas>
+          </div>
+          <div id="fightSummary" class="text-center text-sm text-gray-500 mt-2"></div>
+        </div>
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">&#x1F465; 최근 가입 유저</h2>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead><tr class="text-left text-gray-400 border-b">
+                <th class="pb-2 font-medium">닉네임</th>
+                <th class="pb-2 font-medium">이메일</th>
+                <th class="pb-2 font-medium">가입일</th>
+                <th class="pb-2 font-medium">커플</th>
+              </tr></thead>
+              <tbody id="usersTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Couples -->
+      <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">&#x1F48F; 커플 현황</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead><tr class="text-left text-gray-400 border-b">
+              <th class="pb-2 font-medium">유저 1</th>
+              <th class="pb-2 font-medium">유저 2</th>
+              <th class="pb-2 font-medium text-center">메시지</th>
+              <th class="pb-2 font-medium text-center">피드</th>
+              <th class="pb-2 font-medium text-center">사진</th>
+              <th class="pb-2 font-medium text-center">편지</th>
+            </tr></thead>
+            <tbody id="couplesTable"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+<script>
+let adminKey = localStorage.getItem('hmlove_admin_key') || '';
+let msgChart, userChart, fightChartInstance;
+
+// Login
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  adminKey = document.getElementById('passwordInput').value;
+  const ok = await testAuth();
+  if (ok) {
+    localStorage.setItem('hmlove_admin_key', adminKey);
+    showDashboard();
+  } else {
+    document.getElementById('loginError').classList.remove('hidden');
+  }
+});
+
+async function testAuth() {
+  try {
+    const res = await fetch('/api/admin/stats', { headers: { 'x-admin-key': adminKey } });
+    return res.ok;
+  } catch { return false; }
+}
+
+function logout() {
+  localStorage.removeItem('hmlove_admin_key');
+  adminKey = '';
+  document.getElementById('dashboard').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('passwordInput').value = '';
+}
+
+// Init
+(async () => {
+  if (adminKey && await testAuth()) {
+    showDashboard();
+  }
+})();
+
+function showDashboard() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+  loadStats();
+}
+
+async function loadStats() {
+  try {
+    const res = await fetch('/api/admin/stats', { headers: { 'x-admin-key': adminKey } });
+    if (!res.ok) { logout(); return; }
+    const data = await res.json();
+    render(data);
+    document.getElementById('lastUpdated').textContent = '업데이트: ' + new Date().toLocaleTimeString('ko-KR');
+  } catch (err) {
+    console.error('Failed to load stats:', err);
+  }
+}
+
+function render(data) {
+  renderOverview(data.overview);
+  renderToday(data.today);
+  renderCharts(data.charts);
+  renderFights(data.fights);
+  renderUsers(data.recentUsers);
+  renderCouples(data.couples);
+}
+
+function renderOverview(o) {
+  const items = [
+    { label: '유저', value: o.totalUsers, icon: '&#x1F464;', color: 'blue' },
+    { label: '커플', value: o.totalCouples, icon: '&#x1F491;', color: 'pink' },
+    { label: '메시지', value: o.totalMessages, icon: '&#x1F4AC;', color: 'green' },
+    { label: '피드', value: o.totalFeeds, icon: '&#x1F4DD;', color: 'yellow' },
+    { label: '사진', value: o.totalPhotos, icon: '&#x1F4F7;', color: 'purple' },
+    { label: '편지', value: o.totalLetters, icon: '&#x1F48C;', color: 'red' },
+    { label: '운세', value: o.totalFortunes, icon: '&#x1F52E;', color: 'indigo' },
+  ];
+  const colors = {
+    blue:'from-blue-500 to-blue-600', pink:'from-pink-500 to-pink-600',
+    green:'from-emerald-500 to-emerald-600', yellow:'from-amber-500 to-amber-600',
+    purple:'from-purple-500 to-purple-600', red:'from-rose-500 to-rose-600',
+    indigo:'from-indigo-500 to-indigo-600',
+  };
+  document.getElementById('overviewCards').innerHTML = items.map(i => `
+    <div class="bg-gradient-to-br ${colors[i.color]} rounded-xl p-4 text-white fade-in">
+      <div class="text-2xl">${i.icon}</div>
+      <div class="text-2xl font-bold mt-1">${i.value.toLocaleString()}</div>
+      <div class="text-xs opacity-80">${i.label}</div>
+    </div>
+  `).join('');
+}
+
+function renderToday(t) {
+  const items = [
+    { label: '신규 가입', value: t.newUsers, icon: '&#x1F195;' },
+    { label: '메시지', value: t.newMessages, icon: '&#x1F4AC;' },
+    { label: '피드', value: t.newFeeds, icon: '&#x1F4DD;' },
+    { label: '기분 기록', value: t.moods, icon: '&#x1F60A;' },
+  ];
+  document.getElementById('todayCards').innerHTML = items.map(i => `
+    <div class="bg-gray-50 rounded-lg p-3 text-center fade-in">
+      <div class="text-xl">${i.icon}</div>
+      <div class="text-xl font-bold text-gray-800">${i.value}</div>
+      <div class="text-xs text-gray-500">${i.label}</div>
+    </div>
+  `).join('');
+}
+
+function fillDates(data, days) {
+  const map = {};
+  data.forEach(d => {
+    const key = new Date(d.date).toISOString().slice(0, 10);
+    map[key] = d.count;
+  });
+  const result = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    result.push({ date: key, count: map[key] || 0 });
+  }
+  return result;
+}
+
+function renderCharts(charts) {
+  const msgData = fillDates(charts.dailyMessages, 14);
+  const userData = fillDates(charts.dailyUsers, 14);
+  const labels = msgData.map(d => d.date.slice(5));
+
+  if (msgChart) msgChart.destroy();
+  msgChart = new Chart(document.getElementById('messagesChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '메시지',
+        data: msgData.map(d => d.count),
+        borderColor: '#f43f5e',
+        backgroundColor: 'rgba(244,63,94,0.1)',
+        fill: true,
+        tension: 0.4,
+        pointRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+    }
+  });
+
+  if (userChart) userChart.destroy();
+  userChart = new Chart(document.getElementById('usersChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: '신규 가입',
+        data: userData.map(d => d.count),
+        backgroundColor: 'rgba(99,102,241,0.7)',
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+    }
+  });
+}
+
+function renderFights(f) {
+  if (fightChartInstance) fightChartInstance.destroy();
+
+  if (f.total === 0) {
+    document.getElementById('fightChart').style.display = 'none';
+    document.getElementById('fightSummary').textContent = '기록된 다툼이 없습니다';
+    return;
+  }
+
+  document.getElementById('fightChart').style.display = '';
+  fightChartInstance = new Chart(document.getElementById('fightChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['해결', '미해결'],
+      datasets: [{
+        data: [f.resolved, f.unresolved],
+        backgroundColor: ['#10b981', '#f43f5e'],
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+    }
+  });
+
+  const rate = f.total > 0 ? Math.round((f.resolved / f.total) * 100) : 0;
+  document.getElementById('fightSummary').textContent =
+    `총 ${f.total}건 | 해결 ${f.resolved}건 | 해결률 ${rate}%`;
+}
+
+function renderUsers(users) {
+  document.getElementById('usersTable').innerHTML = users.map(u => `
+    <tr class="border-b border-gray-50 hover:bg-gray-50">
+      <td class="py-2 font-medium text-gray-800">${esc(u.nickname)}</td>
+      <td class="py-2 text-gray-500">${esc(u.email)}</td>
+      <td class="py-2 text-gray-400">${new Date(u.createdAt).toLocaleDateString('ko-KR')}</td>
+      <td class="py-2">${u.coupleId
+        ? '<span class="inline-block px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs">연결됨</span>'
+        : '<span class="inline-block px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs">미연결</span>'
+      }</td>
+    </tr>
+  `).join('');
+}
+
+function renderCouples(couples) {
+  document.getElementById('couplesTable').innerHTML = couples.map(c => {
+    const u1 = c.users[0]; const u2 = c.users[1];
+    return `
+    <tr class="border-b border-gray-50 hover:bg-gray-50">
+      <td class="py-2 font-medium text-gray-800">${u1 ? esc(u1.nickname) : '-'}</td>
+      <td class="py-2 font-medium text-gray-800">${u2 ? esc(u2.nickname) : '-'}</td>
+      <td class="py-2 text-center text-gray-600">${c._count.messages.toLocaleString()}</td>
+      <td class="py-2 text-center text-gray-600">${c._count.feeds}</td>
+      <td class="py-2 text-center text-gray-600">${c._count.photos}</td>
+      <td class="py-2 text-center text-gray-600">${c._count.letters}</td>
+    </tr>`;
+  }).join('');
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+// 30초마다 자동 갱신
+setInterval(() => {
+  if (!document.getElementById('dashboard').classList.contains('hidden')) {
+    loadStats();
+  }
+}, 30000);
+</script>
+</body>
+</html>
