@@ -137,6 +137,62 @@ router.get('/media', async (req, res) => {
   }
 });
 
+// GET /chat/messages/around/:messageId — 특정 메시지 주변 메시지 조회
+router.get('/messages/around/:messageId', async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const half = 15;
+
+    const target = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        sender: { select: { id: true, nickname: true, profileImage: true } },
+      },
+    });
+
+    if (!target || target.coupleId !== req.user.coupleId) {
+      return res.status(404).json({ error: '메시지를 찾을 수 없습니다.' });
+    }
+
+    const [newer, older] = await Promise.all([
+      prisma.message.findMany({
+        where: {
+          coupleId: req.user.coupleId,
+          createdAt: { gt: target.createdAt },
+        },
+        take: half,
+        orderBy: { createdAt: 'asc' },
+        include: {
+          sender: { select: { id: true, nickname: true, profileImage: true } },
+        },
+      }),
+      prisma.message.findMany({
+        where: {
+          coupleId: req.user.coupleId,
+          createdAt: { lt: target.createdAt },
+        },
+        take: half + 1,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          sender: { select: { id: true, nickname: true, profileImage: true } },
+        },
+      }),
+    ]);
+
+    const hasMore = older.length > half;
+    if (hasMore) older.pop();
+
+    // newest first: [...newer reversed, target, ...older]
+    const messages = [...newer.reverse(), target, ...older];
+    const nextCursor = hasMore ? older[older.length - 1].id : null;
+
+    res.json({ messages, nextCursor, hasMore, targetIndex: newer.length });
+  } catch (err) {
+    console.error('Get messages around error:', err);
+    res.status(500).json({ error: '메시지 조회에 실패했습니다.' });
+  }
+});
+
 // GET /chat/search?q=keyword&cursor=xxx&limit=20 — 메시지 검색
 router.get('/search', async (req, res) => {
   try {

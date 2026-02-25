@@ -2,6 +2,7 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import { authenticate, requireCouple } from '../middleware/auth.js';
 import prisma from '../utils/prisma.js';
+import { sendPushNotification } from '../utils/firebase.js';
 
 const router = Router();
 router.use(authenticate);
@@ -100,7 +101,26 @@ router.post('/join', async (req, res) => {
   }
 });
 
-// DELETE /couple/leave — 커플 해제 (혼자만 있는 커플이면 커플도 삭제)
+// GET /couple/members — 현재 커플 멤버 수 확인
+router.get('/members', async (req, res) => {
+  try {
+    const { coupleId } = req.user;
+    if (!coupleId) {
+      return res.json({ memberCount: 0 });
+    }
+
+    const couple = await prisma.couple.findUnique({
+      where: { id: coupleId },
+      include: { users: { select: { id: true, nickname: true } } },
+    });
+
+    res.json({ memberCount: couple?.users.length ?? 0 });
+  } catch (err) {
+    res.json({ memberCount: 0 });
+  }
+});
+
+// DELETE /couple/leave — 커플 해제
 router.delete('/leave', async (req, res) => {
   try {
     const { coupleId } = req.user;
@@ -123,13 +143,49 @@ router.delete('/leave', async (req, res) => {
       data: { coupleId: null },
     });
 
-    // 남은 멤버가 없으면 커플 자체를 삭제
+    // 남은 멤버 확인
     const remaining = couple.users.filter(u => u.id !== req.user.id);
-    if (remaining.length === 0) {
-      await prisma.couple.delete({ where: { id: coupleId } });
-    }
 
-    res.json({ message: '커플이 해제되었습니다.' });
+    if (remaining.length === 0) {
+      // 마지막 멤버가 나감 → 모든 커플 데이터 삭제
+      await prisma.$transaction([
+        prisma.feedLike.deleteMany({ where: { feed: { coupleId } } }),
+        prisma.feedComment.deleteMany({ where: { feed: { coupleId } } }),
+        prisma.feed.deleteMany({ where: { coupleId } }),
+        prisma.message.deleteMany({ where: { coupleId } }),
+        prisma.calendarEvent.deleteMany({ where: { coupleId } }),
+        prisma.mood.deleteMany({ where: { coupleId } }),
+        prisma.photo.deleteMany({ where: { coupleId } }),
+        prisma.letter.deleteMany({ where: { coupleId } }),
+        prisma.fight.deleteMany({ where: { coupleId } }),
+        prisma.fortune.deleteMany({ where: { coupleId } }),
+        prisma.couple.delete({ where: { id: coupleId } }),
+      ]);
+
+      res.json({ message: '커플이 해제되었습니다. 모든 데이터가 삭제되었습니다.', dataDeleted: true });
+    } else {
+      // 남은 상대에게 알림
+      try {
+        const partner = await prisma.user.findFirst({
+          where: { coupleId, id: { not: req.user.id } },
+          select: { id: true, fcmToken: true },
+        });
+        console.log('[Couple] Leave - partner:', partner?.id, 'fcmToken:', partner?.fcmToken ? 'exists' : 'null');
+        if (partner?.fcmToken) {
+          await sendPushNotification({
+            token: partner.fcmToken,
+            title: '커플 해제',
+            body: `${req.user.nickname || '상대방'}님이 커플을 해제했습니다.`,
+            data: { type: 'couple_left' },
+          });
+          console.log('[Couple] Push notification sent to partner');
+        }
+      } catch (pushErr) {
+        console.error('[Couple] Push notification error:', pushErr);
+      }
+
+      res.json({ message: '커플이 해제되었습니다.', dataDeleted: false });
+    }
   } catch (err) {
     console.error('Leave couple error:', err);
     res.status(500).json({ error: '커플 해제에 실패했습니다.' });

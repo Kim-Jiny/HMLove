@@ -6,6 +6,9 @@ import '../core/api_client.dart';
 import '../core/constants.dart';
 import 'badge_provider.dart';
 
+// Message send status
+enum MessageStatus { sending, sent, failed }
+
 // Chat Message model
 class ChatMessage {
   final String id;
@@ -17,6 +20,7 @@ class ChatMessage {
   final bool isRead;
   final bool isEdited;
   final DateTime createdAt;
+  final MessageStatus status;
 
   const ChatMessage({
     required this.id,
@@ -28,6 +32,7 @@ class ChatMessage {
     this.isRead = false,
     this.isEdited = false,
     required this.createdAt,
+    this.status = MessageStatus.sent,
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
@@ -41,6 +46,7 @@ class ChatMessage {
       isRead: json['isRead'] as bool? ?? false,
       isEdited: json['isEdited'] as bool? ?? false,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      status: MessageStatus.sent,
     );
   }
 
@@ -54,6 +60,7 @@ class ChatMessage {
     bool? isRead,
     bool? isEdited,
     DateTime? createdAt,
+    MessageStatus? status,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -65,6 +72,7 @@ class ChatMessage {
       isRead: isRead ?? this.isRead,
       isEdited: isEdited ?? this.isEdited,
       createdAt: createdAt ?? this.createdAt,
+      status: status ?? this.status,
     );
   }
 }
@@ -79,6 +87,12 @@ class ChatState {
   final bool hasMore;
   final String? nextCursor;
   final String? error;
+  // Search
+  final bool isSearchMode;
+  final List<ChatMessage> searchResults;
+  final int currentSearchIndex;
+  final String? highlightedMessageId;
+  final bool isSearching;
 
   const ChatState({
     this.messages = const [],
@@ -89,6 +103,11 @@ class ChatState {
     this.hasMore = true,
     this.nextCursor,
     this.error,
+    this.isSearchMode = false,
+    this.searchResults = const [],
+    this.currentSearchIndex = -1,
+    this.highlightedMessageId,
+    this.isSearching = false,
   });
 
   ChatState copyWith({
@@ -100,6 +119,11 @@ class ChatState {
     bool? hasMore,
     String? nextCursor,
     String? error,
+    bool? isSearchMode,
+    List<ChatMessage>? searchResults,
+    int? currentSearchIndex,
+    String? highlightedMessageId,
+    bool? isSearching,
   }) {
     return ChatState(
       messages: messages ?? this.messages,
@@ -110,6 +134,11 @@ class ChatState {
       hasMore: hasMore ?? this.hasMore,
       nextCursor: nextCursor ?? this.nextCursor,
       error: error,
+      isSearchMode: isSearchMode ?? this.isSearchMode,
+      searchResults: searchResults ?? this.searchResults,
+      currentSearchIndex: currentSearchIndex ?? this.currentSearchIndex,
+      highlightedMessageId: highlightedMessageId ?? this.highlightedMessageId,
+      isSearching: isSearching ?? this.isSearching,
     );
   }
 }
@@ -154,11 +183,22 @@ class ChatNotifier extends Notifier<ChatState> {
 
     _socket!.on('message:new', (data) {
       if (data != null) {
-        final message =
-            ChatMessage.fromJson(data as Map<String, dynamic>);
-        state = state.copyWith(
-          messages: [message, ...state.messages],
-        );
+        final map = data as Map<String, dynamic>;
+        final message = ChatMessage.fromJson(map);
+        final tempId = map['_tempId'] as String?;
+
+        if (tempId != null) {
+          // 내가 보낸 메시지 → 임시 메시지를 서버 메시지로 교체
+          final updated = state.messages.map((msg) {
+            return msg.id == tempId ? message : msg;
+          }).toList();
+          state = state.copyWith(messages: updated);
+        } else {
+          // 상대방 메시지 → 앞에 추가
+          state = state.copyWith(
+            messages: [message, ...state.messages],
+          );
+        }
         // 상대방 메시지면 뱃지 갱신
         final myId = ApiClient.getUserId();
         if (message.senderId != myId) {
@@ -218,15 +258,57 @@ class ChatNotifier extends Notifier<ChatState> {
     state = state.copyWith(isConnected: false);
   }
 
-  /// Send a chat message via socket.
+  /// Send a chat message via socket with optimistic UI.
   void sendMessage({
     required String content,
     String? imageUrl,
   }) {
+    final myId = ApiClient.getUserId() ?? '';
+    final tempId = 'temp-${DateTime.now().millisecondsSinceEpoch}';
+
+    // 즉시 UI에 표시 (sending 상태)
+    final optimistic = ChatMessage(
+      id: tempId,
+      content: content,
+      imageUrl: imageUrl,
+      senderId: myId,
+      coupleId: '',
+      createdAt: DateTime.now(),
+      status: MessageStatus.sending,
+    );
+    state = state.copyWith(messages: [optimistic, ...state.messages]);
+
+    // 소켓 전송
     _socket?.emit('message:send', {
       'content': content,
       if (imageUrl != null) 'imageUrl': imageUrl,
+      '_tempId': tempId,
     });
+
+    // 3초 내 서버 응답 없으면 실패 처리
+    Future.delayed(const Duration(seconds: 5), () {
+      final idx = state.messages.indexWhere((m) => m.id == tempId);
+      if (idx != -1 && state.messages[idx].status == MessageStatus.sending) {
+        final updated = [...state.messages];
+        updated[idx] = updated[idx].copyWith(status: MessageStatus.failed);
+        state = state.copyWith(messages: updated);
+      }
+    });
+  }
+
+  /// Retry sending a failed message.
+  void retryMessage(String tempId) {
+    final idx = state.messages.indexWhere((m) => m.id == tempId);
+    if (idx == -1) return;
+
+    final msg = state.messages[idx];
+    // 실패 메시지 제거
+    final updated = [...state.messages];
+    updated.removeAt(idx);
+    state = state.copyWith(messages: updated);
+
+    // 재전송
+    sendMessage(content: msg.content, imageUrl: msg.imageUrl);
   }
 
   /// Edit a message via socket.
@@ -257,6 +339,107 @@ class ChatNotifier extends Notifier<ChatState> {
   /// Mark messages as read via socket.
   void markAsRead() {
     _socket?.emit('message:read');
+  }
+
+  /// Enter search mode.
+  void enterSearchMode() {
+    state = state.copyWith(isSearchMode: true);
+  }
+
+  /// Exit search mode and reload latest messages.
+  Future<void> exitSearchMode() async {
+    state = ChatState(
+      isConnected: state.isConnected,
+      partnerTyping: state.partnerTyping,
+      partnerOnline: state.partnerOnline,
+    );
+    await fetchHistory();
+  }
+
+  /// Search messages by keyword.
+  Future<void> searchMessages(String query) async {
+    if (query.trim().isEmpty) {
+      state = state.copyWith(
+        searchResults: const [],
+        currentSearchIndex: -1,
+        isSearching: false,
+      );
+      return;
+    }
+
+    state = state.copyWith(isSearching: true);
+
+    try {
+      final response = await _dio.get('/chat/search', queryParameters: {
+        'q': query.trim(),
+        'limit': 50,
+      });
+      final data = response.data as Map<String, dynamic>;
+      final messages = (data['messages'] as List)
+          .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
+          .toList();
+
+      state = state.copyWith(
+        searchResults: messages,
+        currentSearchIndex: messages.isEmpty ? -1 : 0,
+        isSearching: false,
+      );
+    } catch (e) {
+      state = state.copyWith(isSearching: false);
+    }
+  }
+
+  /// Jump to a specific message, loading surrounding context.
+  /// Returns the target index in the loaded messages list.
+  Future<int> jumpToMessage(String messageId) async {
+    try {
+      final response =
+          await _dio.get('/chat/messages/around/$messageId');
+      final data = response.data as Map<String, dynamic>;
+      final messages = (data['messages'] as List)
+          .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
+          .toList();
+      final newCursor = data['nextCursor'] as String?;
+      final hasMore = data['hasMore'] as bool? ?? false;
+      final targetIndex = data['targetIndex'] as int? ?? 0;
+
+      state = ChatState(
+        messages: messages,
+        isConnected: state.isConnected,
+        partnerTyping: state.partnerTyping,
+        partnerOnline: state.partnerOnline,
+        hasMore: hasMore,
+        nextCursor: newCursor,
+        isSearchMode: state.isSearchMode,
+        searchResults: state.searchResults,
+        currentSearchIndex: state.currentSearchIndex,
+        highlightedMessageId: messageId,
+      );
+
+      return targetIndex;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /// Navigate to next (older) search result.
+  Future<int> nextSearchResult() async {
+    if (state.searchResults.isEmpty) return 0;
+    final next = state.currentSearchIndex + 1 < state.searchResults.length
+        ? state.currentSearchIndex + 1
+        : 0;
+    state = state.copyWith(currentSearchIndex: next);
+    return jumpToMessage(state.searchResults[next].id);
+  }
+
+  /// Navigate to previous (newer) search result.
+  Future<int> prevSearchResult() async {
+    if (state.searchResults.isEmpty) return 0;
+    final prev = state.currentSearchIndex > 0
+        ? state.currentSearchIndex - 1
+        : state.searchResults.length - 1;
+    state = state.copyWith(currentSearchIndex: prev);
+    return jumpToMessage(state.searchResults[prev].id);
   }
 
   /// Fetch message history with cursor-based pagination.

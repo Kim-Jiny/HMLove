@@ -99,6 +99,22 @@ router.post('/login', async (req, res) => {
     const isCoupleComplete = user.couple ? user.couple._count.users >= 2 : false;
     const pendingInviteCode = (user.couple && !isCoupleComplete) ? user.couple.inviteCode : null;
 
+    // 커플이 있지만 상대가 나간 경우, 기존 데이터 존재 여부 확인
+    let hasExistingCoupleData = false;
+    if (user.coupleId && !isCoupleComplete) {
+      const dataCheck = await prisma.feed.findFirst({
+        where: { coupleId: user.coupleId },
+        select: { id: true },
+      }) || await prisma.message.findFirst({
+        where: { coupleId: user.coupleId },
+        select: { id: true },
+      }) || await prisma.calendarEvent.findFirst({
+        where: { coupleId: user.coupleId },
+        select: { id: true },
+      });
+      hasExistingCoupleData = !!dataCheck;
+    }
+
     res.json({
       user: {
         id: user.id,
@@ -110,6 +126,7 @@ router.post('/login', async (req, res) => {
         zodiacSign: user.zodiacSign,
         chineseZodiac: user.chineseZodiac,
         isCoupleComplete,
+        hasExistingCoupleData,
         pendingInviteCode,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
@@ -159,7 +176,23 @@ router.get('/me', async (req, res) => {
     const isCoupleComplete = couple ? couple._count.users >= 2 : false;
     const pendingInviteCode = (couple && !isCoupleComplete) ? couple.inviteCode : null;
 
-    res.json({ ...userData, isCoupleComplete, pendingInviteCode });
+    // 커플이 있지만 상대가 나간 경우, 기존 데이터 존재 여부 확인
+    let hasExistingCoupleData = false;
+    if (user.coupleId && !isCoupleComplete) {
+      const dataCheck = await prisma.feed.findFirst({
+        where: { coupleId: user.coupleId },
+        select: { id: true },
+      }) || await prisma.message.findFirst({
+        where: { coupleId: user.coupleId },
+        select: { id: true },
+      }) || await prisma.calendarEvent.findFirst({
+        where: { coupleId: user.coupleId },
+        select: { id: true },
+      });
+      hasExistingCoupleData = !!dataCheck;
+    }
+
+    res.json({ ...userData, isCoupleComplete, hasExistingCoupleData, pendingInviteCode });
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: '토큰이 만료되었습니다.' });

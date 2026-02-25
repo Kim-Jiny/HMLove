@@ -7,7 +7,7 @@ import '../core/api_client.dart';
 class Feed {
   final String id;
   final String content;
-  final String? imageUrl;
+  final List<String> imageUrls;
   final String? type;
   final String coupleId;
   final String authorId;
@@ -16,13 +16,14 @@ class Feed {
   final bool isLiked;
   final int likeCount;
   final int commentCount;
+  final List<FeedComment> recentComments;
   final DateTime createdAt;
   final DateTime updatedAt;
 
   const Feed({
     required this.id,
     required this.content,
-    this.imageUrl,
+    this.imageUrls = const [],
     this.type,
     required this.coupleId,
     required this.authorId,
@@ -31,16 +32,22 @@ class Feed {
     this.isLiked = false,
     this.likeCount = 0,
     this.commentCount = 0,
+    this.recentComments = const [],
     required this.createdAt,
     required this.updatedAt,
   });
+
+  bool get hasImages => imageUrls.isNotEmpty;
 
   factory Feed.fromJson(Map<String, dynamic> json) {
     final author = json['author'] as Map<String, dynamic>?;
     return Feed(
       id: json['id'] as String,
       content: json['content'] as String? ?? '',
-      imageUrl: json['imageUrl'] as String?,
+      imageUrls: (json['imageUrls'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
       type: json['type'] as String?,
       coupleId: json['coupleId'] as String,
       authorId: json['authorId'] as String,
@@ -51,6 +58,10 @@ class Feed {
       isLiked: json['isLiked'] as bool? ?? false,
       likeCount: json['likeCount'] as int? ?? 0,
       commentCount: json['commentCount'] as int? ?? 0,
+      recentComments: (json['recentComments'] as List<dynamic>?)
+              ?.map((e) => FeedComment.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
@@ -60,11 +71,12 @@ class Feed {
     bool? isLiked,
     int? likeCount,
     int? commentCount,
+    List<FeedComment>? recentComments,
   }) {
     return Feed(
       id: id,
       content: content,
-      imageUrl: imageUrl,
+      imageUrls: imageUrls,
       type: type,
       coupleId: coupleId,
       authorId: authorId,
@@ -73,6 +85,7 @@ class Feed {
       isLiked: isLiked ?? this.isLiked,
       likeCount: likeCount ?? this.likeCount,
       commentCount: commentCount ?? this.commentCount,
+      recentComments: recentComments ?? this.recentComments,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );
@@ -198,7 +211,7 @@ class FeedNotifier extends Notifier<FeedState> {
 
   Future<bool> createFeed({
     required String content,
-    String? imageUrl,
+    List<String> imageUrls = const [],
     String? type,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
@@ -206,7 +219,7 @@ class FeedNotifier extends Notifier<FeedState> {
     try {
       final response = await _dio.post('/feed', data: {
         'content': content,
-        if (imageUrl != null) 'imageUrl': imageUrl,
+        if (imageUrls.isNotEmpty) 'imageUrls': imageUrls,
         if (type != null) 'type': type,
       });
 

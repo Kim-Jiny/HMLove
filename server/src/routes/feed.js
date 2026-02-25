@@ -25,6 +25,11 @@ const feedInclude = (userId) => ({
   author: { select: { id: true, nickname: true, profileImage: true } },
   _count: { select: { likes: true, comments: true } },
   likes: { where: { userId }, select: { id: true } },
+  comments: {
+    take: 3,
+    orderBy: { createdAt: 'desc' },
+    include: { author: { select: { id: true, nickname: true, profileImage: true } } },
+  },
 });
 
 // GET /feed/unread-count?since=ISO_DATE
@@ -63,14 +68,16 @@ router.get('/', async (req, res) => {
     if (hasNext) feeds.pop();
     const nextCursor = hasNext ? feeds[feeds.length - 1].id : null;
 
-    // Transform: add isLiked, likeCount, commentCount
+    // Transform: add isLiked, likeCount, commentCount, recentComments
     const result = feeds.map(f => ({
       ...f,
       isLiked: f.likes.length > 0,
       likeCount: f._count.likes,
       commentCount: f._count.comments,
+      recentComments: [...f.comments].reverse(),
       likes: undefined,
       _count: undefined,
+      comments: undefined,
     }));
 
     res.json({ feeds: result, nextCursor });
@@ -80,25 +87,29 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /feed/upload — 피드 이미지 업로드
-router.post('/upload', upload.single('image'), async (req, res) => {
+// POST /feed/upload — 피드 이미지 업로드 (최대 5장)
+router.post('/upload', upload.array('images', 5), async (req, res) => {
   try {
-    if (!req.file) {
+    if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: '이미지를 첨부해주세요.' });
     }
 
-    const fileName = `${Date.now()}_${req.user.id}.webp`;
-    const filePath = `${UPLOAD_DIR}/${fileName}`;
-
-    await sharp(req.file.buffer)
-      .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 80 })
-      .toFile(filePath);
-
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const imageUrl = `${baseUrl}/${filePath}`;
+    const imageUrls = [];
 
-    res.json({ imageUrl });
+    for (let i = 0; i < req.files.length; i++) {
+      const fileName = `${Date.now()}_${req.user.id}_${i}.webp`;
+      const filePath = `${UPLOAD_DIR}/${fileName}`;
+
+      await sharp(req.files[i].buffer)
+        .resize(1080, 1080, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 75 })
+        .toFile(filePath);
+
+      imageUrls.push(`${baseUrl}/${filePath}`);
+    }
+
+    res.json({ imageUrls });
   } catch (err) {
     console.error('Feed upload error:', err);
     res.status(500).json({ error: '이미지 업로드에 실패했습니다.' });
@@ -108,9 +119,9 @@ router.post('/upload', upload.single('image'), async (req, res) => {
 // POST /feed
 router.post('/', async (req, res) => {
   try {
-    const { content, imageUrl, type } = req.body;
+    const { content, imageUrls, type } = req.body;
 
-    if (!content && !imageUrl) {
+    if (!content && (!imageUrls || imageUrls.length === 0)) {
       return res.status(400).json({ error: '내용 또는 이미지를 입력해주세요.' });
     }
 
@@ -119,8 +130,8 @@ router.post('/', async (req, res) => {
         coupleId: req.user.coupleId,
         authorId: req.user.id,
         content: content || '',
-        imageUrl,
-        type: type || (imageUrl ? 'PHOTO' : 'DIARY'),
+        imageUrls: imageUrls || [],
+        type: type || (imageUrls?.length > 0 ? 'PHOTO' : 'DIARY'),
       },
       include: feedInclude(req.user.id),
     });
@@ -130,8 +141,10 @@ router.post('/', async (req, res) => {
       isLiked: false,
       likeCount: 0,
       commentCount: 0,
+      recentComments: [],
       likes: undefined,
       _count: undefined,
+      comments: undefined,
     };
 
     notifyPartner({

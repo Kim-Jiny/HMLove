@@ -5,8 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../core/api_client.dart';
 import '../core/push_notification_service.dart';
 import '../core/theme.dart';
+import '../providers/auth_provider.dart';
 import '../providers/badge_provider.dart';
 import '../providers/chat_provider.dart';
+import '../providers/couple_provider.dart';
+import '../providers/letter_provider.dart';
 
 class MainShell extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -26,6 +29,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     super.initState();
     Future.microtask(() {
       ref.read(badgeProvider.notifier).fetchBadges();
+      ref.read(letterProvider.notifier).fetchLetters();
       // 소켓 연결 (채팅 실시간 수신을 위해)
       final token = ApiClient.getAccessToken();
       if (token != null) {
@@ -34,8 +38,50 @@ class _MainShellState extends ConsumerState<MainShell> {
     });
     // 푸시 알림 초기화 - UI가 완전히 빌드된 후 실행
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      PushNotificationService.onCoupleLeft = _onCoupleLeft;
       PushNotificationService.initialize();
     });
+  }
+
+  @override
+  void dispose() {
+    PushNotificationService.onCoupleLeft = null;
+    super.dispose();
+  }
+
+  void _onCoupleLeft() {
+    // auth 상태 갱신 (isCoupleComplete → false, hasExistingCoupleData 확인)
+    ref.read(authProvider.notifier).checkAuthStatus();
+    // couple 정보 갱신
+    ref.read(coupleProvider.notifier).fetchCouple();
+    // 알림 다이얼로그
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.orange, size: 24),
+              SizedBox(width: 8),
+              Text('커플 해제 알림'),
+            ],
+          ),
+          content: const Text(
+            '상대방이 커플을 해제했습니다.\n'
+            '기존 데이터는 계속 확인할 수 있으며,\n'
+            '더보기 탭에서 초대 코드를 확인할 수 있습니다.',
+            style: TextStyle(height: 1.5),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   @override

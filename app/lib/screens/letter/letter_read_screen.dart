@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../providers/letter_provider.dart';
 
@@ -58,16 +60,16 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
       );
     }
 
-    // Check if letter is delivered
-    final isDelivered = letter.isDelivered;
-    final deliveryDate = letter.deliveryDate;
+    final currentUserId = ApiClient.getUserId();
+    final isWriter = letter.writerId == currentUserId;
 
-    if (!isDelivered && deliveryDate != null) {
-      return _buildLockedView(deliveryDate);
+    // 수신자이고 아직 배달 전이면 잠금 화면
+    if (!isWriter && !letter.isDelivered) {
+      return _buildLockedView(letter.deliveryDate);
     }
 
-    // Mark as read
-    if (letter.isRead != true) {
+    // 수신자이고 배달 완료되었으면 읽음 처리
+    if (!isWriter && !letter.isRead) {
       Future.microtask(() {
         ref.read(letterProvider.notifier).markAsRead(widget.letterId);
       });
@@ -78,7 +80,7 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
       _fadeController.forward();
     }
 
-    return _buildLetterView(letter);
+    return _buildLetterView(letter, isWriter: isWriter);
   }
 
   Widget _buildLockedView(DateTime deliveryDate) {
@@ -130,7 +132,7 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
             ),
             const SizedBox(height: 12),
             Text(
-              '${DateFormat('yyyy년 M월 d일').format(deliveryDate)}에 전달 예정',
+              '${DateFormat('yyyy년 M월 d일 HH:mm').format(deliveryDate.toLocal())}에 전달 예정',
               style: const TextStyle(
                 fontSize: 14,
                 color: AppTheme.textSecondary,
@@ -199,10 +201,53 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
     );
   }
 
-  Widget _buildLetterView(dynamic letter) {
+  Widget _buildLetterView(Letter letter, {required bool isWriter}) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('편지'),
+        actions: [
+          if (isWriter && !letter.isDelivered) ...[
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.warningColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.schedule_send_outlined,
+                      size: 14,
+                      color: AppTheme.warningColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${DateFormat('M/d HH:mm').format(letter.deliveryDate.toLocal())} 발송 예정',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.warningColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: '수정',
+              onPressed: () {
+                context.push('/letter/write', extra: letter);
+              },
+            ),
+          ],
+        ],
       ),
       body: Container(
         width: double.infinity,
@@ -243,7 +288,7 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // From
-                  if (letter.writerName != null) ...[
+                  if (letter.writerNickname != null) ...[
                     Row(
                       children: [
                         Container(
@@ -256,8 +301,8 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
                           ),
                           child: Center(
                             child: Text(
-                              letter.writerName!.isNotEmpty
-                                  ? letter.writerName![0]
+                              letter.writerNickname!.isNotEmpty
+                                  ? letter.writerNickname![0]
                                   : '?',
                               style: const TextStyle(
                                 fontSize: 16,
@@ -272,7 +317,7 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              letter.writerName!,
+                              letter.writerNickname!,
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
@@ -295,7 +340,7 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
 
                   // Title
                   Text(
-                    letter.title ?? '제목 없음',
+                    letter.title,
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
@@ -305,14 +350,14 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
                   const SizedBox(height: 8),
 
                   // Delivery date
-                  if (letter.deliveryDate != null)
-                    Text(
-                      DateFormat('yyyy년 M월 d일').format(letter.deliveryDate!),
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppTheme.textSecondary,
-                      ),
+                  Text(
+                    DateFormat('yyyy년 M월 d일 HH:mm')
+                        .format(letter.deliveryDate.toLocal()),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.textSecondary,
                     ),
+                  ),
 
                   const Divider(
                     color: Color(0xFFE8DDD0),

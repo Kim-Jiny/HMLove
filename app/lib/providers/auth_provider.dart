@@ -210,5 +210,7 @@ final currentUserProvider = Provider<User?>((ref) {
 });
 
 final hasCoupleProvider = Provider<bool>((ref) {
-  return ref.watch(authProvider).user?.isCoupleComplete ?? false;
+  final user = ref.watch(authProvider).user;
+  return (user?.isCoupleComplete ?? false) ||
+      (user?.hasExistingCoupleData ?? false);
 });

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../core/top_snackbar.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/feed_provider.dart';
 
@@ -46,10 +47,66 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
     super.dispose();
   }
 
+  Future<void> _pickAndUploadImages(
+    ImageSource source,
+    List<String> imageUrls,
+    void Function(void Function()) setModalState,
+  ) async {
+    final picker = ImagePicker();
+    List<XFile> picked = [];
+
+    if (source == ImageSource.gallery) {
+      final remaining = 5 - imageUrls.length;
+      if (remaining <= 0) return;
+      picked = await picker.pickMultiImage(
+        maxWidth: 1080,
+        maxHeight: 1080,
+        imageQuality: 70,
+        limit: remaining,
+      );
+    } else {
+      final single = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1080,
+        maxHeight: 1080,
+        imageQuality: 70,
+      );
+      if (single != null) picked = [single];
+    }
+    if (picked.isEmpty) return;
+
+    setModalState(() => _isUploadingImages = true);
+    try {
+      final dio = ref.read(dioProvider);
+      final formData = FormData();
+      for (final file in picked) {
+        formData.files.add(MapEntry(
+          'images',
+          await MultipartFile.fromFile(file.path, filename: file.name),
+        ));
+      }
+      final res = await dio.post('/feed/upload', data: formData);
+      final urls = (res.data['imageUrls'] as List<dynamic>)
+          .map((e) => e as String)
+          .toList();
+      setModalState(() {
+        imageUrls.addAll(urls);
+        _isUploadingImages = false;
+      });
+    } catch (e) {
+      setModalState(() => _isUploadingImages = false);
+      if (mounted) {
+        showTopSnackBar(context, '이미지 업로드에 실패했습니다', isError: true);
+      }
+    }
+  }
+
+  bool _isUploadingImages = false;
+
   void _showCreatePostSheet() {
     final contentController = TextEditingController();
-    String? selectedImageUrl;
-    bool isUploading = false;
+    final imageUrls = <String>[];
+    _isUploadingImages = false;
 
     showModalBottomSheet(
       context: context,
@@ -91,28 +148,24 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                     ),
                   ),
                   TextButton(
-                    onPressed: isUploading
+                    onPressed: _isUploadingImages
                         ? null
                         : () async {
                             final text = contentController.text.trim();
-                            if (text.isEmpty && selectedImageUrl == null) return;
+                            if (text.isEmpty && imageUrls.isEmpty) return;
 
                             final success = await ref
                                 .read(feedProvider.notifier)
                                 .createFeed(
                                   content: text,
-                                  imageUrl: selectedImageUrl,
+                                  imageUrls: imageUrls,
                                 );
 
                             if (context.mounted) {
                               Navigator.pop(context);
                               if (!success) {
                                 final error = ref.read(feedProvider).error;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                      content:
-                                          Text(error ?? '피드 작성에 실패했습니다')),
-                                );
+                                showTopSnackBar(context, error ?? '피드 작성에 실패했습니다', isError: true);
                               }
                             }
                           },
@@ -128,40 +181,52 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              // Image preview
-              if (selectedImageUrl != null)
-                Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        selectedImageUrl!,
-                        height: 200,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: GestureDetector(
-                        onTap: () =>
-                            setModalState(() => selectedImageUrl = null),
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.black54,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.close,
-                              color: Colors.white, size: 18),
+              // Image previews
+              if (imageUrls.isNotEmpty)
+                SizedBox(
+                  height: 100,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: imageUrls.length,
+                    itemBuilder: (context, index) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                imageUrls[index],
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: GestureDetector(
+                                onTap: () => setModalState(
+                                    () => imageUrls.removeAt(index)),
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.close,
+                                      color: Colors.white, size: 14),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ),
-                  ],
+                      );
+                    },
+                  ),
                 ),
-              if (selectedImageUrl != null) const SizedBox(height: 12),
-              if (isUploading)
+              if (imageUrls.isNotEmpty) const SizedBox(height: 12),
+              if (_isUploadingImages)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
                   child: LinearProgressIndicator(
@@ -183,78 +248,34 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
                   IconButton(
                     icon: const Icon(Icons.photo_library_outlined,
                         color: AppTheme.primaryColor),
-                    onPressed: isUploading
+                    onPressed: _isUploadingImages || imageUrls.length >= 5
                         ? null
-                        : () async {
-                            final picker = ImagePicker();
-                            final picked = await picker.pickImage(
-                              source: ImageSource.gallery,
-                              maxWidth: 1200,
-                              maxHeight: 1200,
-                              imageQuality: 80,
-                            );
-                            if (picked == null) return;
-
-                            setModalState(() => isUploading = true);
-                            try {
-                              final dio = ref.read(dioProvider);
-                              final formData = FormData.fromMap({
-                                'image': await MultipartFile.fromFile(
-                                    picked.path,
-                                    filename: picked.name),
-                              });
-                              final res = await dio.post('/feed/upload',
-                                  data: formData);
-                              setModalState(() {
-                                selectedImageUrl =
-                                    res.data['imageUrl'] as String;
-                                isUploading = false;
-                              });
-                            } catch (e) {
-                              setModalState(() => isUploading = false);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text('이미지 업로드에 실패했습니다')),
-                                );
-                              }
-                            }
-                          },
+                        : () => _pickAndUploadImages(
+                              ImageSource.gallery,
+                              imageUrls,
+                              setModalState,
+                            ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.camera_alt_outlined,
                         color: AppTheme.primaryColor),
-                    onPressed: isUploading
+                    onPressed: _isUploadingImages || imageUrls.length >= 5
                         ? null
-                        : () async {
-                            final picker = ImagePicker();
-                            final picked = await picker.pickImage(
-                              source: ImageSource.camera,
-                              maxWidth: 1200,
-                              maxHeight: 1200,
-                              imageQuality: 80,
-                            );
-                            if (picked == null) return;
-
-                            setModalState(() => isUploading = true);
-                            try {
-                              final dio = ref.read(dioProvider);
-                              final formData = FormData.fromMap({
-                                'image': await MultipartFile.fromFile(
-                                    picked.path,
-                                    filename: picked.name),
-                              });
-                              final res = await dio.post('/feed/upload',
-                                  data: formData);
-                              setModalState(() {
-                                selectedImageUrl =
-                                    res.data['imageUrl'] as String;
-                                isUploading = false;
-                              });
-                            } catch (e) {
-                              setModalState(() => isUploading = false);
-                            }
-                          },
+                        : () => _pickAndUploadImages(
+                              ImageSource.camera,
+                              imageUrls,
+                              setModalState,
+                            ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${imageUrls.length}/5',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: imageUrls.length >= 5
+                          ? Colors.red
+                          : AppTheme.textHint,
+                    ),
                   ),
                 ],
               ),
@@ -474,7 +495,6 @@ class _FeedCard extends StatelessWidget {
     final authorImage = feed.authorProfileImage;
     final currentUserId = ApiClient.getUserId() ?? '';
     final isMyFeed = feed.authorId == currentUserId;
-    final hasImage = feed.imageUrl != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -522,24 +542,9 @@ class _FeedCard extends StatelessWidget {
           ),
         ),
 
-        // Image or text card
-        if (hasImage)
-          GestureDetector(
-            onDoubleTap: onLike,
-            child: Image.network(
-              feed.imageUrl!,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                height: 300,
-                color: Colors.grey.shade100,
-                child: const Center(
-                  child: Icon(Icons.image_not_supported_outlined,
-                      color: AppTheme.textHint, size: 48),
-                ),
-              ),
-            ),
-          )
+        // Image carousel or text card
+        if (feed.hasImages)
+          _ImageCarousel(imageUrls: feed.imageUrls, onDoubleTap: onLike)
         else
           // Text-only card with styled background
           GestureDetector(
@@ -589,9 +594,39 @@ class _FeedCard extends StatelessWidget {
                 ),
                 onPressed: onLike,
               ),
-              IconButton(
-                icon: const Icon(Icons.chat_bubble_outline),
-                onPressed: onComment,
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chat_bubble_outline),
+                    onPressed: onComment,
+                  ),
+                  if (feed.commentCount > 0)
+                    Positioned(
+                      right: 2,
+                      top: 2,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16),
+                        child: Text(
+                          feed.commentCount > 99
+                              ? '99+'
+                              : '${feed.commentCount}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
@@ -611,7 +646,7 @@ class _FeedCard extends StatelessWidget {
           ),
 
         // Content (shown below image, or skip if text-only since it's already shown)
-        if (hasImage && feed.content.isNotEmpty)
+        if (feed.hasImages && feed.content.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: RichText(
@@ -631,10 +666,45 @@ class _FeedCard extends StatelessWidget {
             ),
           ),
 
-        // Comment count
-        if (feed.commentCount > 0)
+        // Recent comments preview
+        if (feed.recentComments.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final comment in feed.recentComments)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: RichText(
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      text: TextSpan(
+                        style: DefaultTextStyle.of(context).style,
+                        children: [
+                          TextSpan(
+                            text: '${comment.authorNickname ?? '알 수 없음'} ',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          TextSpan(
+                            text: comment.content,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+        // Comment count - view all
+        if (feed.commentCount > 3)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
             child: GestureDetector(
               onTap: onComment,
               child: Text(
@@ -661,6 +731,118 @@ class _FeedCard extends StatelessWidget {
 
         const Divider(height: 1),
       ],
+    );
+  }
+}
+
+// ─── Image Carousel ───
+
+class _ImageCarousel extends StatefulWidget {
+  final List<String> imageUrls;
+  final VoidCallback onDoubleTap;
+
+  const _ImageCarousel({
+    required this.imageUrls,
+    required this.onDoubleTap,
+  });
+
+  @override
+  State<_ImageCarousel> createState() => _ImageCarouselState();
+}
+
+class _ImageCarouselState extends State<_ImageCarousel> {
+  int _currentPage = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.imageUrls.length == 1) {
+      return GestureDetector(
+        onDoubleTap: widget.onDoubleTap,
+        child: Image.network(
+          widget.imageUrls.first,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            height: 300,
+            color: Colors.grey.shade100,
+            child: const Center(
+              child: Icon(Icons.image_not_supported_outlined,
+                  color: AppTheme.textHint, size: 48),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onDoubleTap: widget.onDoubleTap,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          AspectRatio(
+            aspectRatio: 1,
+            child: PageView.builder(
+              itemCount: widget.imageUrls.length,
+              onPageChanged: (page) => setState(() => _currentPage = page),
+              itemBuilder: (context, index) {
+                return Image.network(
+                  widget.imageUrls[index],
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: Colors.grey.shade100,
+                    child: const Center(
+                      child: Icon(Icons.image_not_supported_outlined,
+                          color: AppTheme.textHint, size: 48),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          // Page indicator
+          Positioned(
+            bottom: 12,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: List.generate(
+                widget.imageUrls.length,
+                (index) => Container(
+                  width: 6,
+                  height: 6,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _currentPage == index
+                        ? AppTheme.primaryColor
+                        : Colors.white.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Counter
+          Positioned(
+            top: 12,
+            right: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${_currentPage + 1}/${widget.imageUrls.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -733,9 +915,7 @@ class _CommentsScreenState extends State<_CommentsScreen> {
       widget.onCommentCountChanged(1);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('댓글 작성에 실패했습니다')),
-        );
+        showTopSnackBar(context, '댓글 작성에 실패했습니다', isError: true);
       }
     }
   }
@@ -748,9 +928,7 @@ class _CommentsScreenState extends State<_CommentsScreen> {
       widget.onCommentCountChanged(-1);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('댓글 삭제에 실패했습니다')),
-        );
+        showTopSnackBar(context, '댓글 삭제에 실패했습니다', isError: true);
       }
     }
   }
@@ -928,14 +1106,64 @@ class _GridTile extends StatelessWidget {
 
   const _GridTile({required this.feed});
 
+  Widget _buildOverlay() {
+    if (feed.likeCount == 0 && feed.commentCount == 0) {
+      return const SizedBox.shrink();
+    }
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [Colors.black54, Colors.transparent],
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (feed.likeCount > 0) ...[
+              const Icon(Icons.favorite, color: Colors.white, size: 12),
+              const SizedBox(width: 3),
+              Text(
+                '${feed.likeCount}',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600),
+              ),
+            ],
+            if (feed.likeCount > 0 && feed.commentCount > 0)
+              const SizedBox(width: 10),
+            if (feed.commentCount > 0) ...[
+              const Icon(Icons.chat_bubble, color: Colors.white, size: 11),
+              const SizedBox(width: 3),
+              Text(
+                '${feed.commentCount}',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (feed.imageUrl != null) {
+    if (feed.hasImages) {
       return Stack(
         fit: StackFit.expand,
         children: [
           Image.network(
-            feed.imageUrl!,
+            feed.imageUrls.first,
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Container(
               color: Colors.grey.shade200,
@@ -943,77 +1171,49 @@ class _GridTile extends StatelessWidget {
                   color: AppTheme.textHint),
             ),
           ),
-          // Like/comment indicators
-          if (feed.likeCount > 0 || feed.commentCount > 0)
-            Positioned(
-              bottom: 4,
-              right: 4,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black45,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (feed.likeCount > 0) ...[
-                      const Icon(Icons.favorite,
-                          color: Colors.white, size: 10),
-                      const SizedBox(width: 2),
-                      Text(
-                        '${feed.likeCount}',
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 9),
-                      ),
-                    ],
-                    if (feed.likeCount > 0 && feed.commentCount > 0)
-                      const SizedBox(width: 4),
-                    if (feed.commentCount > 0) ...[
-                      const Icon(Icons.chat_bubble,
-                          color: Colors.white, size: 10),
-                      const SizedBox(width: 2),
-                      Text(
-                        '${feed.commentCount}',
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 9),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+          if (feed.imageUrls.length > 1)
+            const Positioned(
+              top: 6,
+              right: 6,
+              child: Icon(Icons.collections, color: Colors.white, size: 16),
             ),
+          _buildOverlay(),
         ],
       );
     }
 
     // Text-only post
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppTheme.primaryColor.withValues(alpha: 0.08),
-            AppTheme.primaryLight.withValues(alpha: 0.18),
-          ],
-        ),
-      ),
-      padding: const EdgeInsets.all(8),
-      child: Center(
-        child: Text(
-          feed.content,
-          textAlign: TextAlign.center,
-          maxLines: 4,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            height: 1.4,
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppTheme.primaryColor.withValues(alpha: 0.08),
+                AppTheme.primaryLight.withValues(alpha: 0.18),
+              ],
+            ),
+          ),
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 20),
+          child: Center(
+            child: Text(
+              feed.content,
+              textAlign: TextAlign.center,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                height: 1.4,
+              ),
+            ),
           ),
         ),
-      ),
+        _buildOverlay(),
+      ],
     );
   }
 }

@@ -4,374 +4,795 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HMLove Admin</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: { brand: { 50:'#fff1f2',100:'#ffe4e6',200:'#fecdd3',300:'#fda4af',400:'#fb7185',500:'#f43f5e',600:'#e11d48',700:'#be123c' } }
-        }
-      }
-    }
-  </script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <!-- Chart.js loaded dynamically after login -->
   <style>
-    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
-    .fade-in { animation: fadeIn .4s ease; }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    :root { --brand: #f43f5e; --brand-light: #fff1f2; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all .15s; border: none; }
+    .btn-brand { background: var(--brand); color: #fff; }
+    .btn-brand:hover { background: #e11d48; }
+    .btn-outline { background: #fff; color: #374151; border: 1px solid #e5e7eb; }
+    .btn-outline:hover { background: #f9fafb; }
+    .btn-danger { background: #fee2e2; color: #dc2626; }
+    .btn-danger:hover { background: #fecaca; }
+    .btn-sm { padding: 4px 10px; font-size: 12px; border-radius: 6px; }
+    .card { background: #fff; border-radius: 12px; border: 1px solid #f1f5f9; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+    .stat-card { padding: 16px; border-radius: 12px; color: #fff; }
+    .tab { padding: 10px 16px; font-size: 14px; font-weight: 500; color: #9ca3af; cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s; background: none; border-top: none; border-left: none; border-right: none; }
+    .tab:hover { color: #374151; }
+    .tab.active { color: var(--brand); border-bottom-color: var(--brand); }
+    .table-wrap { overflow-x: auto; }
+    .table-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .table-wrap th { padding: 10px 14px; text-align: left; color: #9ca3af; font-weight: 500; background: #f8fafc; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
+    .table-wrap td { padding: 10px 14px; border-bottom: 1px solid #f8fafc; white-space: nowrap; }
+    .table-wrap tr:hover td { background: #fafbfc; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 500; }
+    .badge-green { background: #dcfce7; color: #16a34a; }
+    .badge-gray { background: #f3f4f6; color: #9ca3af; }
+    .modal-bg { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.35); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; }
+    .modal-bg.open { display: flex; }
+    .modal-box { background: #fff; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.15); width: 100%; max-width: 480px; margin: 16px; max-height: 90vh; overflow-y: auto; animation: modalIn .2s ease; }
+  .modal-box.wide { max-width: 680px; }
+  .mtab { padding: 8px 14px; font-size: 13px; font-weight: 500; color: #9ca3af; cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; }
+  .mtab:hover { color: #374151; }
+  .mtab.active { color: var(--brand); border-bottom-color: var(--brand); }
+  .msg-bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.5; word-break: break-word; }
+  .msg-mine { background: #fff1f2; margin-left: auto; border-bottom-right-radius: 4px; }
+  .msg-other { background: #f1f5f9; margin-right: auto; border-bottom-left-radius: 4px; }
+  .feed-card { background: #f8fafc; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .feed-img { width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px; margin-top: 8px; }
+    @keyframes modalIn { from { opacity:0; transform: scale(.96) translateY(8px); } to { opacity:1; transform: scale(1) translateY(0); } }
+    .input { width: 100%; padding: 10px 14px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 14px; outline: none; transition: border-color .15s; }
+    .input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(244,63,94,.1); }
+    .pagination { display: flex; align-items: center; gap: 4px; }
+    .pagination button { padding: 4px 10px; border-radius: 6px; font-size: 12px; border: 1px solid #e5e7eb; background: #fff; cursor: pointer; transition: all .15s; }
+    .pagination button:hover:not(:disabled) { background: #f9fafb; }
+    .pagination button:disabled { opacity: .4; cursor: default; }
+    .pagination button.current { background: var(--brand); color: #fff; border-color: var(--brand); }
+    .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .info-box { background: #f8fafc; border-radius: 8px; padding: 10px; }
+    .info-box .label { font-size: 11px; color: #9ca3af; margin-bottom: 2px; }
+    .info-box .value { font-size: 14px; font-weight: 600; color: #1f2937; }
+    .stat-mini { text-align: center; background: #f8fafc; border-radius: 8px; padding: 8px 4px; }
+    .stat-mini .num { font-size: 16px; font-weight: 700; color: #1f2937; }
+    .stat-mini .lbl { font-size: 10px; color: #9ca3af; }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body>
 
-  <!-- Login -->
-  <div id="loginScreen" class="min-h-screen flex items-center justify-center">
-    <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-sm fade-in">
-      <div class="text-center mb-6">
-        <div class="text-4xl mb-2">&#x1F491;</div>
-        <h1 class="text-2xl font-bold text-gray-800">HMLove Admin</h1>
-        <p class="text-gray-500 text-sm mt-1">관리자 대시보드</p>
-      </div>
-      <form id="loginForm" class="space-y-4">
-        <input id="passwordInput" type="password" placeholder="관리자 비밀번호"
-          class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent outline-none transition">
-        <button type="submit"
-          class="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-medium transition">
-          로그인
-        </button>
-        <p id="loginError" class="text-red-500 text-sm text-center hidden">비밀번호가 올바르지 않습니다.</p>
-      </form>
+<!-- ===== LOGIN ===== -->
+<div id="loginScreen" style="min-height:100vh;display:flex;align-items:center;justify-content:center;">
+  <div class="card" style="padding:40px;width:100%;max-width:380px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:40px;margin-bottom:8px;">&#x1F491;</div>
+      <h1 style="font-size:22px;font-weight:700;color:#1f2937;">HMLove Admin</h1>
+      <p style="font-size:13px;color:#9ca3af;margin-top:4px;">관리자 로그인</p>
     </div>
+    <form id="loginForm" style="display:flex;flex-direction:column;gap:12px;">
+      <input id="loginUsername" class="input" type="text" placeholder="아이디" autocomplete="username">
+      <input id="loginPassword" class="input" type="password" placeholder="비밀번호" autocomplete="current-password">
+      <button type="submit" class="btn btn-brand" style="width:100%;padding:12px;">로그인</button>
+      <p id="loginError" style="color:#dc2626;font-size:13px;text-align:center;display:none;"></p>
+    </form>
   </div>
+</div>
 
-  <!-- Dashboard -->
-  <div id="dashboard" class="hidden">
-    <!-- Header -->
-    <header class="bg-white border-b border-gray-200 sticky top-0 z-10">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <span class="text-2xl">&#x1F491;</span>
-          <h1 class="text-xl font-bold text-gray-800">HMLove Admin</h1>
+<!-- ===== DASHBOARD ===== -->
+<div id="dashboard" style="display:none;">
+  <!-- Header -->
+  <header style="background:#fff;border-bottom:1px solid #f1f5f9;position:sticky;top:0;z-index:50;">
+    <div style="max-width:1200px;margin:0 auto;padding:0 20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;height:56px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:22px;">&#x1F491;</span>
+          <span style="font-size:16px;font-weight:700;color:#1f2937;">HMLove Admin</span>
         </div>
-        <div class="flex items-center gap-3">
-          <span id="lastUpdated" class="text-xs text-gray-400"></span>
-          <button onclick="loadStats()" class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition">
-            &#x21BB; 새로고침
-          </button>
-          <button onclick="logout()" class="px-3 py-1.5 text-sm text-red-500 hover:bg-red-50 rounded-lg transition">
-            로그아웃
-          </button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span id="adminName" style="font-size:12px;color:#9ca3af;"></span>
+          <button onclick="doLogout()" class="btn btn-outline btn-sm">로그아웃</button>
         </div>
       </div>
-    </header>
+      <!-- Tabs -->
+      <div style="display:flex;gap:0;">
+        <button class="tab active" data-tab="overview">대시보드</button>
+        <button class="tab" data-tab="users">유저 관리</button>
+        <button class="tab" data-tab="couples">커플 관리</button>
+        <button class="tab" data-tab="fights">다툼 관리</button>
+      </div>
+    </div>
+  </header>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-      <!-- Overview Cards -->
-      <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3" id="overviewCards"></section>
+  <main style="max-width:1200px;margin:0 auto;padding:20px;">
 
-      <!-- Today's Activity -->
-      <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">&#x1F4C5; 오늘의 활동</h2>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="todayCards"></div>
-      </section>
+    <!-- ===== TAB: OVERVIEW ===== -->
+    <div id="page-overview">
+      <!-- Stat Cards -->
+      <div id="overviewCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:16px;"></div>
+
+      <!-- Activity Row -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px;">
+        <div class="card" style="padding:14px;text-align:center;">
+          <div style="font-size:11px;color:#9ca3af;">오늘 활성 유저</div>
+          <div id="s-dau" style="font-size:24px;font-weight:700;color:#f43f5e;">-</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;">
+          <div style="font-size:11px;color:#9ca3af;">주간 활성 (WAU)</div>
+          <div id="s-wau" style="font-size:24px;font-weight:700;color:#6366f1;">-</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;">
+          <div style="font-size:11px;color:#9ca3af;">오늘 신규 가입</div>
+          <div id="s-newu" style="font-size:24px;font-weight:700;color:#10b981;">-</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;">
+          <div style="font-size:11px;color:#9ca3af;">오늘 메시지</div>
+          <div id="s-newm" style="font-size:24px;font-weight:700;color:#3b82f6;">-</div>
+        </div>
+        <div class="card" style="padding:14px;text-align:center;">
+          <div style="font-size:11px;color:#9ca3af;">커플당 평균 메시지</div>
+          <div id="s-avgm" style="font-size:24px;font-weight:700;color:#f59e0b;">-</div>
+        </div>
+      </div>
 
       <!-- Charts -->
-      <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">&#x1F4AC; 일별 메시지 (14일)</h2>
-          <canvas id="messagesChart" height="200"></canvas>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+        <div class="card" style="padding:20px;">
+          <h3 style="font-size:13px;font-weight:600;color:#6b7280;margin-bottom:12px;">일별 메시지 (14일)</h3>
+          <canvas id="chartMessages" height="170"></canvas>
         </div>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">&#x1F464; 일별 가입자 (14일)</h2>
-          <canvas id="usersChart" height="200"></canvas>
+        <div class="card" style="padding:20px;">
+          <h3 style="font-size:13px;font-weight:600;color:#6b7280;margin-bottom:12px;">일별 가입 &middot; 피드 (14일)</h3>
+          <canvas id="chartUsersFeed" height="170"></canvas>
         </div>
-      </section>
+      </div>
 
-      <!-- Fight Stats + Summary -->
-      <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">&#x1F91D; 다툼 해결률</h2>
-          <div class="flex items-center justify-center" style="height:180px">
-            <canvas id="fightChart"></canvas>
+      <!-- Fight + Recent -->
+      <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;">
+        <div class="card" style="padding:20px;">
+          <h3 style="font-size:13px;font-weight:600;color:#6b7280;margin-bottom:12px;">다툼 해결률</h3>
+          <div style="height:150px;display:flex;align-items:center;justify-content:center;">
+            <canvas id="chartFight"></canvas>
           </div>
-          <div id="fightSummary" class="text-center text-sm text-gray-500 mt-2"></div>
+          <div id="fightText" style="text-align:center;font-size:12px;color:#9ca3af;margin-top:8px;"></div>
         </div>
-        <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">&#x1F465; 최근 가입 유저</h2>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead><tr class="text-left text-gray-400 border-b">
-                <th class="pb-2 font-medium">닉네임</th>
-                <th class="pb-2 font-medium">이메일</th>
-                <th class="pb-2 font-medium">가입일</th>
-                <th class="pb-2 font-medium">커플</th>
-              </tr></thead>
-              <tbody id="usersTable"></tbody>
+        <div class="card" style="padding:20px;">
+          <h3 style="font-size:13px;font-weight:600;color:#6b7280;margin-bottom:12px;">최근 가입</h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>닉네임</th><th>이메일</th><th>가입일</th><th>커플</th></tr></thead>
+              <tbody id="recentBody"></tbody>
             </table>
           </div>
         </div>
-      </section>
+      </div>
+    </div>
 
-      <!-- Couples -->
-      <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">&#x1F48F; 커플 현황</h2>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead><tr class="text-left text-gray-400 border-b">
-              <th class="pb-2 font-medium">유저 1</th>
-              <th class="pb-2 font-medium">유저 2</th>
-              <th class="pb-2 font-medium text-center">메시지</th>
-              <th class="pb-2 font-medium text-center">피드</th>
-              <th class="pb-2 font-medium text-center">사진</th>
-              <th class="pb-2 font-medium text-center">편지</th>
+    <!-- ===== TAB: USERS ===== -->
+    <div id="page-users" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <h2 style="font-size:18px;font-weight:700;color:#1f2937;">유저 관리 <span id="usersTotal" style="font-size:13px;font-weight:400;color:#9ca3af;"></span></h2>
+        <div style="display:flex;gap:8px;">
+          <input id="userSearchInput" class="input" style="width:220px;" placeholder="이름 / 이메일 검색" onkeydown="if(event.key==='Enter')searchUsers()">
+          <button class="btn btn-brand btn-sm" onclick="searchUsers()">검색</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>닉네임</th><th>이메일</th><th style="text-align:center;">메시지</th><th style="text-align:center;">피드</th><th style="text-align:center;">사진</th><th>가입일</th><th>커플</th><th style="text-align:center;">액션</th>
             </tr></thead>
-            <tbody id="couplesTable"></tbody>
+            <tbody id="usersBody"></tbody>
           </table>
         </div>
-      </section>
-    </main>
-  </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-top:1px solid #f1f5f9;">
+          <span id="usersPageInfo" style="font-size:12px;color:#9ca3af;"></span>
+          <div class="pagination" id="usersPaging"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== TAB: COUPLES ===== -->
+    <div id="page-couples" style="display:none;">
+      <div style="margin-bottom:16px;">
+        <h2 style="font-size:18px;font-weight:700;color:#1f2937;">커플 관리 <span id="couplesTotal" style="font-size:13px;font-weight:400;color:#9ca3af;"></span></h2>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>유저 1</th><th>유저 2</th><th>시작일</th><th style="text-align:center;">메시지</th><th style="text-align:center;">피드</th><th style="text-align:center;">사진</th><th style="text-align:center;">편지</th><th style="text-align:center;">일정</th><th style="text-align:center;">액션</th>
+            </tr></thead>
+            <tbody id="couplesBody"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-top:1px solid #f1f5f9;">
+          <span id="couplesPageInfo" style="font-size:12px;color:#9ca3af;"></span>
+          <div class="pagination" id="couplesPaging"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== TAB: FIGHTS ===== -->
+    <div id="page-fights" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <h2 style="font-size:18px;font-weight:700;color:#1f2937;">다툼 관리 <span id="fightsTotal" style="font-size:13px;font-weight:400;color:#9ca3af;"></span></h2>
+        <div style="display:flex;gap:8px;">
+          <select id="fightFilter" class="input" style="width:140px;padding:6px 10px;" onchange="fightsPage=1;loadFights()">
+            <option value="">전체</option>
+            <option value="unresolved">미해결</option>
+            <option value="resolved">해결됨</option>
+          </select>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>커플</th><th>작성자</th><th>날짜</th><th>사유</th><th style="text-align:center;">상태</th><th style="text-align:center;">액션</th>
+            </tr></thead>
+            <tbody id="fightsBody"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-top:1px solid #f1f5f9;">
+          <span id="fightsPageInfo" style="font-size:12px;color:#9ca3af;"></span>
+          <div class="pagination" id="fightsPaging"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ===== MODAL ===== -->
+<div id="modal" class="modal-bg" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box" id="modalBox"></div>
+</div>
 
 <script>
-let adminKey = localStorage.getItem('hmlove_admin_key') || '';
-let msgChart, userChart, fightChartInstance;
+// ===== STATE =====
+let token = localStorage.getItem('hmlove_admin_token') || '';
+let currentTab = 'overview';
+let usersPage = 1, usersSearch = '';
+let couplesPage = 1;
+let chart1, chart2, chart3;
 
-// Login
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
+// ===== AUTH =====
+document.getElementById('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
-  adminKey = document.getElementById('passwordInput').value;
-  const ok = await testAuth();
-  if (ok) {
-    localStorage.setItem('hmlove_admin_key', adminKey);
-    showDashboard();
-  } else {
-    document.getElementById('loginError').classList.remove('hidden');
+  const username = document.getElementById('loginUsername').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error; errEl.style.display = 'block'; return; }
+    token = data.token;
+    localStorage.setItem('hmlove_admin_token', token);
+    localStorage.setItem('hmlove_admin_name', data.username);
+    enterDashboard();
+  } catch {
+    errEl.textContent = '서버 연결에 실패했습니다.'; errEl.style.display = 'block';
   }
 });
 
-async function testAuth() {
-  try {
-    const res = await fetch('/api/admin/stats', { headers: { 'x-admin-key': adminKey } });
-    return res.ok;
-  } catch { return false; }
+function doLogout() {
+  token = '';
+  localStorage.removeItem('hmlove_admin_token');
+  localStorage.removeItem('hmlove_admin_name');
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
 }
 
-function logout() {
-  localStorage.removeItem('hmlove_admin_key');
-  adminKey = '';
-  document.getElementById('dashboard').classList.add('hidden');
-  document.getElementById('loginScreen').classList.remove('hidden');
-  document.getElementById('passwordInput').value = '';
+function enterDashboard() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('adminName').textContent = localStorage.getItem('hmlove_admin_name') || '';
+  if (typeof Chart === 'undefined') {
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4';
+    s.onload = function() { loadOverview(); };
+    s.onerror = function() { console.warn('Chart.js 로드 실패'); loadOverview(); };
+    document.head.appendChild(s);
+  } else {
+    loadOverview();
+  }
 }
 
-// Init
+// Auto-login
 (async () => {
-  if (adminKey && await testAuth()) {
-    showDashboard();
+  if (token) {
+    try {
+      const res = await fetch('/api/admin/stats', { headers: { Authorization: 'Bearer ' + token } });
+      if (res.ok) { enterDashboard(); return; }
+    } catch {}
+    doLogout();
   }
 })();
 
-function showDashboard() {
-  document.getElementById('loginScreen').classList.add('hidden');
-  document.getElementById('dashboard').classList.remove('hidden');
-  loadStats();
+// ===== API =====
+async function api(path) {
+  const res = await fetch('/api/admin' + path, { headers: { Authorization: 'Bearer ' + token } });
+  if (res.status === 401) { doLogout(); return null; }
+  if (!res.ok) return null;
+  return res.json();
+}
+async function apiDel(path) {
+  const res = await fetch('/api/admin' + path, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+  if (res.status === 401) { doLogout(); return null; }
+  return res.json();
 }
 
-async function loadStats() {
-  try {
-    const res = await fetch('/api/admin/stats', { headers: { 'x-admin-key': adminKey } });
-    if (!res.ok) { logout(); return; }
-    const data = await res.json();
-    render(data);
-    document.getElementById('lastUpdated').textContent = '업데이트: ' + new Date().toLocaleTimeString('ko-KR');
-  } catch (err) {
-    console.error('Failed to load stats:', err);
-  }
-}
-
-function render(data) {
-  renderOverview(data.overview);
-  renderToday(data.today);
-  renderCharts(data.charts);
-  renderFights(data.fights);
-  renderUsers(data.recentUsers);
-  renderCouples(data.couples);
-}
-
-function renderOverview(o) {
-  const items = [
-    { label: '유저', value: o.totalUsers, icon: '&#x1F464;', color: 'blue' },
-    { label: '커플', value: o.totalCouples, icon: '&#x1F491;', color: 'pink' },
-    { label: '메시지', value: o.totalMessages, icon: '&#x1F4AC;', color: 'green' },
-    { label: '피드', value: o.totalFeeds, icon: '&#x1F4DD;', color: 'yellow' },
-    { label: '사진', value: o.totalPhotos, icon: '&#x1F4F7;', color: 'purple' },
-    { label: '편지', value: o.totalLetters, icon: '&#x1F48C;', color: 'red' },
-    { label: '운세', value: o.totalFortunes, icon: '&#x1F52E;', color: 'indigo' },
-  ];
-  const colors = {
-    blue:'from-blue-500 to-blue-600', pink:'from-pink-500 to-pink-600',
-    green:'from-emerald-500 to-emerald-600', yellow:'from-amber-500 to-amber-600',
-    purple:'from-purple-500 to-purple-600', red:'from-rose-500 to-rose-600',
-    indigo:'from-indigo-500 to-indigo-600',
-  };
-  document.getElementById('overviewCards').innerHTML = items.map(i => `
-    <div class="bg-gradient-to-br ${colors[i.color]} rounded-xl p-4 text-white fade-in">
-      <div class="text-2xl">${i.icon}</div>
-      <div class="text-2xl font-bold mt-1">${i.value.toLocaleString()}</div>
-      <div class="text-xs opacity-80">${i.label}</div>
-    </div>
-  `).join('');
-}
-
-function renderToday(t) {
-  const items = [
-    { label: '신규 가입', value: t.newUsers, icon: '&#x1F195;' },
-    { label: '메시지', value: t.newMessages, icon: '&#x1F4AC;' },
-    { label: '피드', value: t.newFeeds, icon: '&#x1F4DD;' },
-    { label: '기분 기록', value: t.moods, icon: '&#x1F60A;' },
-  ];
-  document.getElementById('todayCards').innerHTML = items.map(i => `
-    <div class="bg-gray-50 rounded-lg p-3 text-center fade-in">
-      <div class="text-xl">${i.icon}</div>
-      <div class="text-xl font-bold text-gray-800">${i.value}</div>
-      <div class="text-xs text-gray-500">${i.label}</div>
-    </div>
-  `).join('');
-}
-
-function fillDates(data, days) {
-  const map = {};
-  data.forEach(d => {
-    const key = new Date(d.date).toISOString().slice(0, 10);
-    map[key] = d.count;
+// ===== TABS =====
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    currentTab = tab;
+    ['overview','users','couples','fights'].forEach(function(t) {
+      document.getElementById('page-'+t).style.display = t === tab ? '' : 'none';
+    });
+    if (tab === 'overview') loadOverview();
+    else if (tab === 'users') loadUsers();
+    else if (tab === 'couples') loadCouples();
+    else if (tab === 'fights') loadFights();
   });
-  const result = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    result.push({ date: key, count: map[key] || 0 });
-  }
-  return result;
+});
+
+// ===== OVERVIEW =====
+async function loadOverview() {
+  const d = await api('/stats');
+  if (!d) return;
+  const o = d.overview;
+
+  // Cards
+  const cards = [
+    ['유저', o.totalUsers, '#3b82f6'], ['커플', o.totalCouples, '#ec4899'],
+    ['메시지', o.totalMessages, '#10b981'], ['피드', o.totalFeeds, '#f59e0b'],
+    ['사진', o.totalPhotos, '#8b5cf6'], ['편지', o.totalLetters, '#ef4444'],
+    ['일정', o.totalCalendarEvents, '#06b6d4'], ['기분', o.totalMoods, '#14b8a6'],
+    ['운세', o.totalFortunes, '#6366f1'],
+  ];
+  document.getElementById('overviewCards').innerHTML = cards.map(([l, v, c]) =>
+    '<div class="stat-card" style="background:' + c + ';">' +
+      '<div style="font-size:20px;font-weight:700;">' + v.toLocaleString() + '</div>' +
+      '<div style="font-size:11px;opacity:.85;">' + l + '</div>' +
+    '</div>'
+  ).join('');
+
+  // Activity
+  document.getElementById('s-dau').textContent = d.today.activeUsers;
+  document.getElementById('s-wau').textContent = d.activity.weeklyActiveUsers;
+  document.getElementById('s-newu').textContent = d.today.newUsers;
+  document.getElementById('s-newm').textContent = d.today.newMessages.toLocaleString();
+  document.getElementById('s-avgm').textContent = d.activity.avgMessagesPerCouple.toLocaleString();
+
+  renderCharts(d.charts);
+  renderFight(d.fights);
+  renderRecent(d.recentUsers);
 }
 
-function renderCharts(charts) {
-  const msgData = fillDates(charts.dailyMessages, 14);
-  const userData = fillDates(charts.dailyUsers, 14);
-  const labels = msgData.map(d => d.date.slice(5));
+function fill14(data) {
+  const map = {}; data.forEach(r => { map[new Date(r.date).toISOString().slice(0,10)] = r.count; });
+  const out = [];
+  for (let i = 13; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate()-i); const k = d.toISOString().slice(0,10); out.push({ date:k, count: map[k]||0 }); }
+  return out;
+}
 
-  if (msgChart) msgChart.destroy();
-  msgChart = new Chart(document.getElementById('messagesChart'), {
+function renderCharts(c) {
+  if (typeof Chart === 'undefined') return;
+  const msgs = fill14(c.dailyMessages), users = fill14(c.dailyUsers), feeds = fill14(c.dailyFeeds);
+  const labels = msgs.map(d => d.date.slice(5));
+
+  if (chart1) chart1.destroy();
+  chart1 = new Chart(document.getElementById('chartMessages'), {
     type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: '메시지',
-        data: msgData.map(d => d.count),
-        borderColor: '#f43f5e',
-        backgroundColor: 'rgba(244,63,94,0.1)',
-        fill: true,
-        tension: 0.4,
-        pointRadius: 3,
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
-    }
+    data: { labels, datasets: [{ label:'메시지', data: msgs.map(d=>d.count), borderColor:'#f43f5e', backgroundColor:'rgba(244,63,94,.08)', fill:true, tension:.4, pointRadius:3, borderWidth:2 }] },
+    options: { responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, ticks:{stepSize:1}}} }
   });
 
-  if (userChart) userChart.destroy();
-  userChart = new Chart(document.getElementById('usersChart'), {
+  if (chart2) chart2.destroy();
+  chart2 = new Chart(document.getElementById('chartUsersFeed'), {
     type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: '신규 가입',
-        data: userData.map(d => d.count),
-        backgroundColor: 'rgba(99,102,241,0.7)',
-        borderRadius: 6,
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
-    }
+    data: { labels, datasets: [
+      { label:'가입', data:users.map(d=>d.count), backgroundColor:'rgba(99,102,241,.7)', borderRadius:4 },
+      { label:'피드', data:feeds.map(d=>d.count), backgroundColor:'rgba(245,158,11,.7)', borderRadius:4 },
+    ]},
+    options: { responsive:true, plugins:{legend:{position:'top',labels:{boxWidth:10,font:{size:11}}}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} }
   });
 }
 
-function renderFights(f) {
-  if (fightChartInstance) fightChartInstance.destroy();
-
-  if (f.total === 0) {
-    document.getElementById('fightChart').style.display = 'none';
-    document.getElementById('fightSummary').textContent = '기록된 다툼이 없습니다';
-    return;
-  }
-
-  document.getElementById('fightChart').style.display = '';
-  fightChartInstance = new Chart(document.getElementById('fightChart'), {
-    type: 'doughnut',
-    data: {
-      labels: ['해결', '미해결'],
-      datasets: [{
-        data: [f.resolved, f.unresolved],
-        backgroundColor: ['#10b981', '#f43f5e'],
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom' } },
-    }
+function renderFight(f) {
+  if (typeof Chart === 'undefined') { document.getElementById('fightText').textContent = '총 '+f.total+'건'; return; }
+  if (chart3) chart3.destroy();
+  const el = document.getElementById('chartFight');
+  if (f.total === 0) { el.style.display='none'; document.getElementById('fightText').textContent='기록 없음'; return; }
+  el.style.display='';
+  chart3 = new Chart(el, {
+    type:'doughnut',
+    data:{ labels:['해결','미해결'], datasets:[{data:[f.resolved,f.unresolved], backgroundColor:['#10b981','#f43f5e']}] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{font:{size:11}}}} }
   });
-
-  const rate = f.total > 0 ? Math.round((f.resolved / f.total) * 100) : 0;
-  document.getElementById('fightSummary').textContent =
-    `총 ${f.total}건 | 해결 ${f.resolved}건 | 해결률 ${rate}%`;
+  document.getElementById('fightText').textContent = '총 '+f.total+'건 | 해결률 '+Math.round(f.resolved/f.total*100)+'%';
 }
 
-function renderUsers(users) {
-  document.getElementById('usersTable').innerHTML = users.map(u => `
-    <tr class="border-b border-gray-50 hover:bg-gray-50">
-      <td class="py-2 font-medium text-gray-800">${esc(u.nickname)}</td>
-      <td class="py-2 text-gray-500">${esc(u.email)}</td>
-      <td class="py-2 text-gray-400">${new Date(u.createdAt).toLocaleDateString('ko-KR')}</td>
-      <td class="py-2">${u.coupleId
-        ? '<span class="inline-block px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs">연결됨</span>'
-        : '<span class="inline-block px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs">미연결</span>'
-      }</td>
-    </tr>
-  `).join('');
+function renderRecent(users) {
+  document.getElementById('recentBody').innerHTML = users.map(u =>
+    '<tr><td style="font-weight:500;">'+esc(u.nickname)+'</td><td style="color:#6b7280;font-size:12px;">'+esc(u.email)+'</td><td style="color:#9ca3af;font-size:12px;">'+fmtD(u.createdAt)+'</td><td>'+(u.coupleId?'<span class="badge badge-green">O</span>':'<span class="badge badge-gray">-</span>')+'</td></tr>'
+  ).join('');
 }
 
-function renderCouples(couples) {
-  document.getElementById('couplesTable').innerHTML = couples.map(c => {
-    const u1 = c.users[0]; const u2 = c.users[1];
-    return `
-    <tr class="border-b border-gray-50 hover:bg-gray-50">
-      <td class="py-2 font-medium text-gray-800">${u1 ? esc(u1.nickname) : '-'}</td>
-      <td class="py-2 font-medium text-gray-800">${u2 ? esc(u2.nickname) : '-'}</td>
-      <td class="py-2 text-center text-gray-600">${c._count.messages.toLocaleString()}</td>
-      <td class="py-2 text-center text-gray-600">${c._count.feeds}</td>
-      <td class="py-2 text-center text-gray-600">${c._count.photos}</td>
-      <td class="py-2 text-center text-gray-600">${c._count.letters}</td>
-    </tr>`;
+// ===== USERS =====
+async function loadUsers() {
+  const d = await api('/users?page='+usersPage+'&limit=20&search='+encodeURIComponent(usersSearch));
+  if (!d) return;
+  document.getElementById('usersTotal').textContent = '('+d.total+'명)';
+  document.getElementById('usersBody').innerHTML = d.users.map(u => {
+    const c = u._count;
+    return '<tr>'+
+      '<td style="font-weight:500;">'+esc(u.nickname)+'</td>'+
+      '<td style="color:#6b7280;font-size:12px;">'+esc(u.email)+'</td>'+
+      '<td style="text-align:center;">'+c.sentMessages.toLocaleString()+'</td>'+
+      '<td style="text-align:center;">'+c.feeds+'</td>'+
+      '<td style="text-align:center;">'+c.photos+'</td>'+
+      '<td style="color:#9ca3af;font-size:12px;">'+fmtD(u.createdAt)+'</td>'+
+      '<td>'+(u.coupleId?'<span class="badge badge-green">연결</span>':'<span class="badge badge-gray">미연결</span>')+'</td>'+
+      '<td style="text-align:center;"><button class="btn btn-outline btn-sm" onclick="userDetail(\''+u.id+'\')">상세</button> <button class="btn btn-danger btn-sm" onclick="confirmDelUser(\''+u.id+'\',\''+esc(u.nickname)+'\')">삭제</button></td>'+
+    '</tr>';
   }).join('');
+  document.getElementById('usersPageInfo').textContent = d.totalPages > 0 ? d.page+' / '+d.totalPages+' 페이지' : '';
+  renderPaging('usersPaging', d.page, d.totalPages, p => { usersPage=p; loadUsers(); });
 }
 
-function esc(s) {
-  const d = document.createElement('div');
-  d.textContent = s || '';
-  return d.innerHTML;
+function searchUsers() { usersSearch = document.getElementById('userSearchInput').value; usersPage=1; loadUsers(); }
+
+async function userDetail(id) {
+  const d = await api('/users/'+id);
+  if (!d) return;
+  const u = d.user, c = u._count;
+  const partner = u.couple?.users?.find(x => x.id !== u.id);
+  const stats = [['메시지',c.sentMessages],['피드',c.feeds],['사진',c.photos],['편지(발)',c.lettersWritten],['편지(수)',c.lettersReceived],['기분',c.moods],['일정',c.calendarEvents],['다툼',c.fights],['좋아요',c.feedLikes],['댓글',c.feedComments]];
+
+  openModal(
+    '<div style="padding:24px;">'+
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">'+
+        (u.profileImage ? '<img src="'+u.profileImage+'" style="width:52px;height:52px;border-radius:50%;object-fit:cover;">' : '<div style="width:52px;height:52px;border-radius:50%;background:#fff1f2;display:flex;align-items:center;justify-content:center;color:#f43f5e;font-weight:700;font-size:18px;">'+esc(u.nickname?.[0]||'?')+'</div>')+
+        '<div><div style="font-size:17px;font-weight:700;">'+esc(u.nickname)+'</div><div style="font-size:13px;color:#9ca3af;">'+esc(u.email)+'</div></div>'+
+      '</div>'+
+      '<div class="info-grid" style="margin-bottom:16px;">'+
+        '<div class="info-box"><div class="label">가입일</div><div class="value">'+fmtD(u.createdAt)+'</div></div>'+
+        '<div class="info-box"><div class="label">생년월일</div><div class="value">'+(u.birthDate?fmtD(u.birthDate):'-')+'</div></div>'+
+        '<div class="info-box"><div class="label">별자리 / 띠</div><div class="value">'+(u.zodiacSign||'-')+' / '+(u.chineseZodiac||'-')+'</div></div>'+
+        '<div class="info-box"><div class="label">커플</div><div class="value">'+(partner?esc(partner.nickname)+' 연결':'미연결')+'</div></div>'+
+      '</div>'+
+      '<div style="font-size:13px;font-weight:600;color:#4b5563;margin-bottom:8px;">활동 통계</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:20px;">'+
+        stats.map(([l,v]) => '<div class="stat-mini"><div class="num">'+v+'</div><div class="lbl">'+l+'</div></div>').join('')+
+      '</div>'+
+      '<div style="display:flex;justify-content:flex-end;gap:8px;">'+
+        '<button class="btn btn-outline btn-sm" onclick="closeModal()">닫기</button>'+
+        '<button class="btn btn-danger btn-sm" onclick="closeModal();confirmDelUser(\''+u.id+'\',\''+esc(u.nickname)+'\')">삭제</button>'+
+      '</div>'+
+    '</div>'
+  );
 }
 
-// 30초마다 자동 갱신
-setInterval(() => {
-  if (!document.getElementById('dashboard').classList.contains('hidden')) {
-    loadStats();
+function confirmDelUser(id, name) {
+  openModal(
+    '<div style="padding:32px;text-align:center;">'+
+      '<div style="font-size:36px;margin-bottom:12px;">&#x26A0;&#xFE0F;</div>'+
+      '<h3 style="font-size:17px;font-weight:700;margin-bottom:8px;">유저 삭제</h3>'+
+      '<p style="font-size:13px;color:#6b7280;margin-bottom:20px;"><strong>'+name+'</strong>를 삭제하시겠습니까?<br>모든 관련 데이터가 삭제됩니다.</p>'+
+      '<div style="display:flex;justify-content:center;gap:8px;">'+
+        '<button class="btn btn-outline" onclick="closeModal()">취소</button>'+
+        '<button class="btn btn-brand" onclick="delUser(\''+id+'\')">삭제</button>'+
+      '</div>'+
+    '</div>'
+  );
+}
+async function delUser(id) { await apiDel('/users/'+id); closeModal(); loadUsers(); }
+
+// ===== COUPLES =====
+async function loadCouples() {
+  const d = await api('/couples?page='+couplesPage+'&limit=20');
+  if (!d) return;
+  document.getElementById('couplesTotal').textContent = '('+d.total+'쌍)';
+  document.getElementById('couplesBody').innerHTML = d.couples.map(c => {
+    const u1=c.users[0], u2=c.users[1], n=c._count;
+    return '<tr>'+
+      '<td style="font-weight:500;">'+(u1?esc(u1.nickname):'<span style="color:#d1d5db;">-</span>')+'</td>'+
+      '<td style="font-weight:500;">'+(u2?esc(u2.nickname):'<span style="color:#d1d5db;">-</span>')+'</td>'+
+      '<td style="color:#9ca3af;font-size:12px;">'+fmtD(c.startDate)+'</td>'+
+      '<td style="text-align:center;">'+n.messages.toLocaleString()+'</td>'+
+      '<td style="text-align:center;">'+n.feeds+'</td>'+
+      '<td style="text-align:center;">'+n.photos+'</td>'+
+      '<td style="text-align:center;">'+n.letters+'</td>'+
+      '<td style="text-align:center;">'+n.calendarEvents+'</td>'+
+      '<td style="text-align:center;"><button class="btn btn-outline btn-sm" onclick="coupleDetail(\''+c.id+'\')">상세</button> <button class="btn btn-danger btn-sm" onclick="confirmDelCouple(\''+c.id+'\',\''+(u1?esc(u1.nickname):'')+'\',\''+(u2?esc(u2.nickname):'')+'\')">삭제</button></td>'+
+    '</tr>';
+  }).join('');
+  document.getElementById('couplesPageInfo').textContent = d.totalPages > 0 ? d.page+' / '+d.totalPages+' 페이지' : '';
+  renderPaging('couplesPaging', d.page, d.totalPages, p => { couplesPage=p; loadCouples(); });
+}
+
+let coupleModalId = '';
+let coupleModalUsers = {};
+let msgPage = 1, feedPage = 1;
+
+async function coupleDetail(id) {
+  const d = await api('/couples/'+id);
+  if (!d) return;
+  coupleModalId = id;
+  const c=d.couple, n=c._count;
+  coupleModalUsers = {};
+  c.users.forEach(u => { coupleModalUsers[u.id] = u; });
+  const stats = [['메시지',n.messages],['피드',n.feeds],['사진',n.photos],['편지',n.letters],['일정',n.calendarEvents],['기분',n.moods],['다툼',n.fights],['운세',n.fortunes]];
+
+  openModal(
+    '<div style="padding:24px;">'+
+      '<h3 style="font-size:17px;font-weight:700;margin-bottom:16px;">커플 상세</h3>'+
+      '<div style="display:flex;gap:10px;margin-bottom:16px;">'+
+        c.users.map(u =>
+          '<div style="flex:1;background:#f8fafc;border-radius:10px;padding:12px;text-align:center;">'+
+            (u.profileImage?'<img src="'+u.profileImage+'" style="width:44px;height:44px;border-radius:50%;object-fit:cover;margin:0 auto 6px;">':'<div style="width:44px;height:44px;border-radius:50%;background:#fff1f2;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;color:#f43f5e;font-weight:700;">'+esc(u.nickname?.[0]||'?')+'</div>')+
+            '<div style="font-size:14px;font-weight:600;">'+esc(u.nickname)+'</div>'+
+            '<div style="font-size:11px;color:#9ca3af;">'+esc(u.email)+'</div>'+
+          '</div>'
+        ).join('')+
+      '</div>'+
+      '<!-- Modal Tabs -->'+
+      '<div style="display:flex;gap:0;border-bottom:1px solid #f1f5f9;margin-bottom:16px;">'+
+        '<button class="mtab active" onclick="switchCoupleTab(this,\'cd-info\')">정보</button>'+
+        '<button class="mtab" onclick="switchCoupleTab(this,\'cd-msgs\')">메시지 ('+n.messages.toLocaleString()+')</button>'+
+        '<button class="mtab" onclick="switchCoupleTab(this,\'cd-feeds\')">피드 ('+n.feeds+')</button>'+
+      '</div>'+
+      '<!-- Info Tab -->'+
+      '<div id="cd-info">'+
+        '<div class="info-grid" style="margin-bottom:16px;">'+
+          '<div class="info-box"><div class="label">시작일</div><div class="value">'+fmtD(c.startDate)+'</div></div>'+
+          '<div class="info-box"><div class="label">함께한 일수</div><div class="value">'+d.daysTogether+'일</div></div>'+
+          '<div class="info-box"><div class="label">초대 코드</div><div class="value" style="font-family:monospace;">'+c.inviteCode+'</div></div>'+
+          '<div class="info-box"><div class="label">마지막 활동</div><div class="value">'+(d.lastActivity?fmtDT(d.lastActivity):'-')+'</div></div>'+
+        '</div>'+
+        '<div style="font-size:13px;font-weight:600;color:#4b5563;margin-bottom:8px;">콘텐츠 통계</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:20px;">'+
+          stats.map(([l,v]) => '<div class="stat-mini"><div class="num">'+v.toLocaleString()+'</div><div class="lbl">'+l+'</div></div>').join('')+
+        '</div>'+
+      '</div>'+
+      '<!-- Messages Tab -->'+
+      '<div id="cd-msgs" style="display:none;"><div id="cd-msgs-list" style="min-height:100px;"></div><div id="cd-msgs-paging" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;"><span id="cd-msgs-info" style="font-size:12px;color:#9ca3af;"></span><div class="pagination" id="cd-msgs-pages"></div></div></div>'+
+      '<!-- Feeds Tab -->'+
+      '<div id="cd-feeds" style="display:none;"><div id="cd-feeds-list" style="min-height:100px;"></div><div id="cd-feeds-paging" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;"><span id="cd-feeds-info" style="font-size:12px;color:#9ca3af;"></span><div class="pagination" id="cd-feeds-pages"></div></div></div>'+
+      '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">'+
+        '<button class="btn btn-outline btn-sm" onclick="closeModal()">닫기</button>'+
+        '<button class="btn btn-danger btn-sm" onclick="closeModal();confirmDelCouple(\''+c.id+'\',\''+esc(c.users[0]?.nickname||'')+'\',\''+esc(c.users[1]?.nickname||'')+'\')">삭제</button>'+
+      '</div>'+
+    '</div>'
+  );
+  document.getElementById('modalBox').classList.add('wide');
+}
+
+function switchCoupleTab(btn, tabId) {
+  document.querySelectorAll('.mtab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  ['cd-info','cd-msgs','cd-feeds'].forEach(id => {
+    document.getElementById(id).style.display = id === tabId ? '' : 'none';
+  });
+  if (tabId === 'cd-msgs') { msgPage = 1; loadCoupleMessages(); }
+  if (tabId === 'cd-feeds') { feedPage = 1; loadCoupleFeeds(); }
+}
+
+async function loadCoupleMessages() {
+  var list = document.getElementById('cd-msgs-list');
+  list.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:20px;">로딩중...</div>';
+  var d = await api('/couples/'+coupleModalId+'/messages?page='+msgPage+'&limit=30');
+  if (!d) { list.innerHTML = '<div style="text-align:center;color:#dc2626;">로드 실패</div>'; return; }
+  if (d.messages.length === 0) { list.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:20px;">메시지가 없습니다.</div>'; return; }
+
+  var msgs = d.messages.slice().reverse();
+  var html = '<div style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;padding:4px;">';
+  var prevDate = '';
+  msgs.forEach(function(m) {
+    var dateStr = fmtD(m.createdAt);
+    if (dateStr !== prevDate) {
+      html += '<div style="text-align:center;font-size:11px;color:#9ca3af;margin:8px 0 4px;">' + dateStr + '</div>';
+      prevDate = dateStr;
+    }
+    var isImg = !!m.imageUrl;
+    var senderName = m.sender ? esc(m.sender.nickname) : '?';
+    var time = new Date(m.createdAt).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+    html += '<div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;">';
+    html += '<div style="font-size:10px;color:#9ca3af;">'+senderName+' &middot; '+time+(m.isEdited?' (수정)':'')+'</div>';
+    html += '<div class="msg-bubble msg-other">';
+    if (isImg) html += '<img src="'+esc(m.imageUrl)+'" style="max-width:200px;max-height:150px;border-radius:6px;display:block;margin-bottom:4px;" onerror="this.style.display=\'none\'">';
+    if (m.content) html += esc(m.content);
+    html += '</div></div>';
+  });
+  html += '</div>';
+  list.innerHTML = html;
+
+  document.getElementById('cd-msgs-info').textContent = d.totalPages > 0 ? d.page+' / '+d.totalPages+' 페이지 (총 '+d.total+'건)' : '';
+  renderPaging('cd-msgs-pages', d.page, d.totalPages, function(p) { msgPage=p; loadCoupleMessages(); });
+}
+
+async function loadCoupleFeeds() {
+  var list = document.getElementById('cd-feeds-list');
+  list.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:20px;">로딩중...</div>';
+  var d = await api('/couples/'+coupleModalId+'/feeds?page='+feedPage+'&limit=20');
+  if (!d) { list.innerHTML = '<div style="text-align:center;color:#dc2626;">로드 실패</div>'; return; }
+  if (d.feeds.length === 0) { list.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:20px;">피드가 없습니다.</div>'; return; }
+
+  var html = '<div style="max-height:400px;overflow-y:auto;">';
+  d.feeds.forEach(function(f) {
+    var authorName = f.author ? esc(f.author.nickname) : '?';
+    var typeLabel = f.type === 'PHOTO' ? '사진' : f.type === 'MILESTONE' ? '마일스톤' : '일기';
+    html += '<div class="feed-card">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">';
+    html += '<div style="display:flex;align-items:center;gap:6px;">';
+    html += (f.author?.profileImage ? '<img src="'+f.author.profileImage+'" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">' : '<div style="width:28px;height:28px;border-radius:50%;background:#fff1f2;display:flex;align-items:center;justify-content:center;color:#f43f5e;font-weight:700;font-size:11px;">'+authorName[0]+'</div>');
+    html += '<span style="font-size:13px;font-weight:600;">'+authorName+'</span>';
+    html += '<span class="badge badge-gray">'+typeLabel+'</span>';
+    html += '</div>';
+    html += '<span style="font-size:11px;color:#9ca3af;">'+fmtDT(f.createdAt)+'</span>';
+    html += '</div>';
+    html += '<div style="font-size:13px;line-height:1.6;color:#374151;">'+esc(f.content)+'</div>';
+    if (f.imageUrls && f.imageUrls.length > 0) {
+      html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">';
+      f.imageUrls.forEach(function(url) {
+        html += '<img src="'+esc(url)+'" class="feed-img" style="max-width:180px;" onerror="this.style.display=\'none\'">';
+      });
+      html += '</div>';
+    }
+    var likes = f._count ? f._count.likes : 0;
+    var comments = f._count ? f._count.comments : 0;
+    html += '<div style="display:flex;gap:12px;margin-top:8px;font-size:11px;color:#9ca3af;">';
+    html += '<span>&#x2764; '+likes+'</span>';
+    html += '<span>&#x1F4AC; '+comments+'</span>';
+    html += '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  list.innerHTML = html;
+
+  document.getElementById('cd-feeds-info').textContent = d.totalPages > 0 ? d.page+' / '+d.totalPages+' 페이지 (총 '+d.total+'건)' : '';
+  renderPaging('cd-feeds-pages', d.page, d.totalPages, function(p) { feedPage=p; loadCoupleFeeds(); });
+}
+
+function confirmDelCouple(id, n1, n2) {
+  const names = [n1,n2].filter(Boolean).join(' & ') || '이 커플';
+  openModal(
+    '<div style="padding:32px;text-align:center;">'+
+      '<div style="font-size:36px;margin-bottom:12px;">&#x26A0;&#xFE0F;</div>'+
+      '<h3 style="font-size:17px;font-weight:700;margin-bottom:8px;">커플 삭제</h3>'+
+      '<p style="font-size:13px;color:#6b7280;margin-bottom:20px;"><strong>'+names+'</strong> 커플을 삭제하시겠습니까?<br>모든 데이터가 삭제됩니다.</p>'+
+      '<div style="display:flex;justify-content:center;gap:8px;">'+
+        '<button class="btn btn-outline" onclick="closeModal()">취소</button>'+
+        '<button class="btn btn-brand" onclick="delCouple(\''+id+'\')">삭제</button>'+
+      '</div>'+
+    '</div>'
+  );
+}
+async function delCouple(id) { await apiDel('/couples/'+id); closeModal(); loadCouples(); }
+
+// ===== FIGHTS =====
+var fightsPage = 1;
+
+async function loadFights() {
+  var filter = document.getElementById('fightFilter').value;
+  var d = await api('/fights?page='+fightsPage+'&limit=20'+(filter?'&status='+filter:''));
+  if (!d) return;
+  document.getElementById('fightsTotal').textContent = '('+d.total+'건)';
+  document.getElementById('fightsBody').innerHTML = d.fights.map(function(f) {
+    var coupleNames = f.couple.users.map(function(u){ return esc(u.nickname); }).join(' & ');
+    var authorName = f.author ? esc(f.author.nickname) : '?';
+    var reasonShort = f.reason.length > 30 ? esc(f.reason.slice(0,30))+'...' : esc(f.reason);
+    var statusBadge = f.isResolved ? '<span class="badge badge-green">해결</span>' : '<span class="badge" style="background:#fee2e2;color:#dc2626;">미해결</span>';
+    return '<tr>'+
+      '<td style="font-weight:500;">'+coupleNames+'</td>'+
+      '<td>'+authorName+'</td>'+
+      '<td style="color:#9ca3af;font-size:12px;">'+fmtD(f.date)+'</td>'+
+      '<td style="font-size:12px;color:#6b7280;max-width:200px;overflow:hidden;text-overflow:ellipsis;">'+reasonShort+'</td>'+
+      '<td style="text-align:center;">'+statusBadge+'</td>'+
+      '<td style="text-align:center;"><button class="btn btn-outline btn-sm" onclick="fightDetail(\''+f.id+'\')">상세</button></td>'+
+    '</tr>';
+  }).join('');
+  document.getElementById('fightsPageInfo').textContent = d.totalPages > 0 ? d.page+' / '+d.totalPages+' 페이지' : '';
+  renderPaging('fightsPaging', d.page, d.totalPages, function(p) { fightsPage=p; loadFights(); });
+}
+
+async function fightDetail(id) {
+  var d = await api('/fights/'+id);
+  if (!d) return;
+  var f = d.fight;
+  var authorName = f.author ? esc(f.author.nickname) : '?';
+  var partner = f.couple.users.find(function(u){ return u.id !== f.authorId; });
+  var partnerName = partner ? esc(partner.nickname) : '-';
+  var statusBadge = f.isResolved ? '<span class="badge badge-green">해결됨</span>' : '<span class="badge" style="background:#fee2e2;color:#dc2626;">미해결</span>';
+
+  openModal(
+    '<div style="padding:24px;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">'+
+        '<h3 style="font-size:17px;font-weight:700;">다툼 상세</h3>'+
+        statusBadge+
+      '</div>'+
+      '<!-- 커플 정보 -->'+
+      '<div style="display:flex;gap:10px;margin-bottom:16px;">'+
+        f.couple.users.map(function(u) {
+          var isAuthor = u.id === f.authorId;
+          return '<div style="flex:1;background:'+(isAuthor?'#fff1f2':'#f8fafc')+';border-radius:10px;padding:12px;text-align:center;'+(isAuthor?'border:1.5px solid #fda4af;':'border:1px solid #f1f5f9;')+'">'+
+            (u.profileImage?'<img src="'+u.profileImage+'" style="width:40px;height:40px;border-radius:50%;object-fit:cover;margin:0 auto 6px;">':'<div style="width:40px;height:40px;border-radius:50%;background:'+(isAuthor?'#fecdd3':'#e2e8f0')+';margin:0 auto 6px;display:flex;align-items:center;justify-content:center;color:'+(isAuthor?'#e11d48':'#64748b')+';font-weight:700;">'+esc(u.nickname?.[0]||'?')+'</div>')+
+            '<div style="font-size:13px;font-weight:600;">'+esc(u.nickname)+'</div>'+
+            (isAuthor?'<div style="font-size:10px;color:#f43f5e;margin-top:2px;">작성자</div>':'')+
+          '</div>';
+        }).join('')+
+      '</div>'+
+      '<!-- 상세 정보 -->'+
+      '<div class="info-grid" style="margin-bottom:16px;">'+
+        '<div class="info-box"><div class="label">다툼 날짜</div><div class="value">'+fmtD(f.date)+'</div></div>'+
+        '<div class="info-box"><div class="label">기록일</div><div class="value">'+fmtDT(f.createdAt)+'</div></div>'+
+      '</div>'+
+      '<!-- 사유 -->'+
+      '<div style="margin-bottom:14px;">'+
+        '<div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:6px;">사유</div>'+
+        '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px;font-size:13px;line-height:1.6;color:#991b1b;">'+esc(f.reason)+'</div>'+
+      '</div>'+
+      '<!-- 해결 방법 -->'+
+      (f.resolution ?
+        '<div style="margin-bottom:14px;">'+
+          '<div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:6px;">해결 방법</div>'+
+          '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;font-size:13px;line-height:1.6;color:#166534;">'+esc(f.resolution)+'</div>'+
+        '</div>' : '')+
+      '<!-- 반성 / 느낀점 -->'+
+      (f.reflection ?
+        '<div style="margin-bottom:14px;">'+
+          '<div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:6px;">반성 / 느낀점</div>'+
+          '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px;font-size:13px;line-height:1.6;color:#1e40af;">'+esc(f.reflection)+'</div>'+
+        '</div>' : '')+
+      '<div style="display:flex;justify-content:flex-end;margin-top:16px;">'+
+        '<button class="btn btn-outline btn-sm" onclick="closeModal()">닫기</button>'+
+      '</div>'+
+    '</div>'
+  );
+  document.getElementById('modalBox').classList.add('wide');
+}
+
+// ===== PAGINATION =====
+function renderPaging(elId, cur, total, cb) {
+  const el = document.getElementById(elId);
+  if (total <= 1) { el.innerHTML = ''; return; }
+  let html = '<button '+(cur<=1?'disabled':'')+' data-p="'+(cur-1)+'">이전</button>';
+  for (let i=1; i<=total; i++) {
+    if (i===1||i===total||Math.abs(i-cur)<=1) {
+      html += '<button class="'+(i===cur?'current':'')+'" data-p="'+i+'">'+i+'</button>';
+    } else if (html.slice(-3) !== '...') {
+      html += '<span style="color:#d1d5db;font-size:12px;">...</span>';
+    }
   }
-}, 30000);
+  html += '<button '+(cur>=total?'disabled':'')+' data-p="'+(cur+1)+'">다음</button>';
+  el.innerHTML = html;
+  el.querySelectorAll('button[data-p]').forEach(b => {
+    b.addEventListener('click', () => { const p=parseInt(b.dataset.p); if(p>=1&&p<=total) cb(p); });
+  });
+}
+
+// ===== MODAL =====
+function openModal(html) { document.getElementById('modalBox').innerHTML=html; document.getElementById('modal').classList.add('open'); }
+function closeModal() { document.getElementById('modal').classList.remove('open'); document.getElementById('modalBox').classList.remove('wide'); }
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); });
+
+// ===== UTIL =====
+function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+function fmtD(s) { return s ? new Date(s).toLocaleDateString('ko-KR') : '-'; }
+function fmtDT(s) { if(!s) return '-'; const d=new Date(s); return d.toLocaleDateString('ko-KR')+' '+d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); }
+
+// 60초 자동 갱신 (대시보드 탭만)
+setInterval(() => { if(currentTab==='overview' && document.getElementById('dashboard').style.display!=='none') loadOverview(); }, 60000);
 </script>
 </body>
 </html>

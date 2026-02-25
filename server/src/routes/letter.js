@@ -7,9 +7,7 @@ const router = Router();
 router.use(authenticate, requireCouple);
 
 function isDelivered(letter) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return new Date(letter.deliveryDate) <= today;
+  return new Date(letter.deliveryDate) <= new Date();
 }
 
 // GET /letter
@@ -104,9 +102,7 @@ router.post('/', async (req, res) => {
     }
 
     const delivery = new Date(deliveryDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const status = delivery <= today ? 'DELIVERED' : 'SCHEDULED';
+    const status = delivery <= new Date() ? 'DELIVERED' : 'SCHEDULED';
 
     const letter = await prisma.letter.create({
       data: {

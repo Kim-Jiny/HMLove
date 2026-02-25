@@ -183,7 +183,11 @@ class CoupleNotifier extends Notifier<CoupleState> {
       final currentUser = ref.read(currentUserProvider);
       if (currentUser != null) {
         authNotifier.updateUser(
-          currentUser.copyWith(coupleId: null, isCoupleComplete: false),
+          currentUser.copyWith(
+            coupleId: null,
+            isCoupleComplete: false,
+            hasExistingCoupleData: false,
+          ),
         );
       }
       await ApiClient.saveCoupleId('');

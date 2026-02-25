@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
@@ -11,9 +12,9 @@ import 'package:intl/intl.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../core/top_snackbar.dart';
 import '../../providers/chat_provider.dart';
 import 'chat_media_gallery_screen.dart';
-import 'chat_search_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -25,6 +26,9 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
+  final _focusNode = FocusNode();
+  final _searchController = TextEditingController();
+  Timer? _debounceTimer;
   bool _isInitialized = false;
   bool _captureMode = false;
   int? _captureStartIndex;
@@ -65,6 +69,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void dispose() {
     _messageController.dispose();
+    _focusNode.dispose();
+    _searchController.dispose();
+    _debounceTimer?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     ref.read(chatProvider.notifier).disconnect();
@@ -78,6 +85,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ref.read(chatProvider.notifier).sendMessage(content: text);
     _messageController.clear();
     ref.read(chatProvider.notifier).stopTyping();
+    _focusNode.requestFocus();
 
     // Scroll to top (newest messages are first)
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -137,9 +145,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (picked == null) return;
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('이미지 전송 중...'), duration: Duration(seconds: 1)),
-    );
+    showTopSnackBar(context, '이미지 전송 중...', duration: const Duration(seconds: 1));
 
     try {
       final dio = ApiClient.createDio();
@@ -164,9 +170,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('이미지 전송 실패: $e')),
-        );
+        showTopSnackBar(context, '이미지 전송 실패: $e', isError: true);
       }
     }
   }
@@ -281,19 +285,125 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
 
     if (captured == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('캡처가 저장되었습니다')),
-      );
+      showTopSnackBar(context, '캡처가 저장되었습니다');
     }
   }
 
   void _openSearch() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const ChatSearchScreen(),
+    ref.read(chatProvider.notifier).enterSearchMode();
+  }
+
+  PreferredSizeWidget _buildSearchAppBar(ChatState chatState) {
+    return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: _exitSearch,
       ),
+      title: TextField(
+        controller: _searchController,
+        autofocus: true,
+        textInputAction: TextInputAction.search,
+        onSubmitted: (_) => _executeSearch(),
+        onChanged: _onSearchChanged,
+        style: const TextStyle(fontSize: 15),
+        decoration: const InputDecoration(
+          hintText: '메시지 검색...',
+          border: InputBorder.none,
+        ),
+      ),
+      actions: [
+        if (chatState.isSearching)
+          const Padding(
+            padding: EdgeInsets.all(14),
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          )
+        else if (chatState.searchResults.isNotEmpty) ...[
+          Center(
+            child: Text(
+              '${chatState.currentSearchIndex + 1}/${chatState.searchResults.length}',
+              style: const TextStyle(
+                  fontSize: 13, color: AppTheme.textSecondary),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.keyboard_arrow_up),
+            onPressed: () async {
+              final idx = await ref
+                  .read(chatProvider.notifier)
+                  .nextSearchResult();
+              _scrollToTarget(idx);
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.keyboard_arrow_down),
+            onPressed: () async {
+              final idx = await ref
+                  .read(chatProvider.notifier)
+                  .prevSearchResult();
+              _scrollToTarget(idx);
+            },
+          ),
+        ] else if (_searchController.text.isNotEmpty &&
+            !chatState.isSearching)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: Text(
+                '0건',
+                style: TextStyle(
+                    fontSize: 13, color: AppTheme.textSecondary),
+              ),
+            ),
+          ),
+      ],
     );
+  }
+
+  void _onSearchChanged(String text) {
+    _debounceTimer?.cancel();
+    if (text.trim().isEmpty) {
+      ref.read(chatProvider.notifier).searchMessages('');
+      return;
+    }
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _executeSearch();
+    });
+  }
+
+  Future<void> _executeSearch() async {
+    final text = _searchController.text.trim();
+    if (text.isEmpty) return;
+    await ref.read(chatProvider.notifier).searchMessages(text);
+    final results = ref.read(chatProvider).searchResults;
+    if (results.isNotEmpty) {
+      final idx = await ref
+          .read(chatProvider.notifier)
+          .jumpToMessage(results.first.id);
+      _scrollToTarget(idx);
+    }
+  }
+
+  void _exitSearch() {
+    _searchController.clear();
+    _debounceTimer?.cancel();
+    ref.read(chatProvider.notifier).exitSearchMode();
+  }
+
+  void _scrollToTarget(int targetIndex) {
+    // 리스트 교체 전 스크롤 리셋 (위로 튀는 현상 방지)
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      final maxOffset = _scrollController.position.maxScrollExtent;
+      final estimatedOffset = (targetIndex * 72.0).clamp(0.0, maxOffset);
+      _scrollController.jumpTo(estimatedOffset);
+    });
   }
 
   void _onLongPressMessage(ChatMessage message, bool isMe) {
@@ -307,9 +417,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         onTap: () {
           Clipboard.setData(ClipboardData(text: message.content));
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('메시지가 복사되었습니다'), duration: Duration(seconds: 1)),
-          );
+          showTopSnackBar(context, '메시지가 복사되었습니다', duration: const Duration(seconds: 1));
         },
       ));
     }
@@ -473,7 +581,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
               ],
             )
-          : AppBar(
+          : chatState.isSearchMode
+              ? _buildSearchAppBar(chatState)
+              : AppBar(
               title: Column(
                 children: [
                   const Text('채팅'),
@@ -565,6 +675,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
                       final isCaptureSelected =
                           _captureMode && _isInCaptureRange(index);
+                      final isHighlighted = chatState.isSearchMode &&
+                          message.id == chatState.highlightedMessageId;
 
                       return GestureDetector(
                         onTap: _captureMode
@@ -573,7 +685,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         child: Container(
                           color: isCaptureSelected
                               ? AppTheme.primaryColor.withValues(alpha: 0.1)
-                              : null,
+                              : isHighlighted
+                                  ? Colors.amber.withValues(alpha: 0.25)
+                                  : null,
                           child: Column(
                             children: [
                               if (showDateHeader)
@@ -585,6 +699,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     ? null
                                     : () =>
                                         _onLongPressMessage(message, isMe),
+                                onRetry: message.status == MessageStatus.failed
+                                    ? () => ref.read(chatProvider.notifier).retryMessage(message.id)
+                                    : null,
                               ),
                             ],
                           ),
@@ -595,7 +712,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
 
           // Typing indicator
-          if (isPartnerTyping)
+          if (isPartnerTyping && !chatState.isSearchMode)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
               alignment: Alignment.centerLeft,
@@ -621,7 +738,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ),
 
-          // Input area
+          // Input area (hidden in search mode)
+          if (!chatState.isSearchMode)
           Container(
             padding: EdgeInsets.only(
               left: 12,
@@ -656,10 +774,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
                     child: TextField(
                       controller: _messageController,
+                      focusNode: _focusNode,
                       maxLines: 4,
                       minLines: 1,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendMessage(),
+                      textInputAction: TextInputAction.newline,
                       onChanged: _onTextChanged,
                       decoration: const InputDecoration(
                         hintText: '메시지를 입력하세요...',
@@ -728,16 +846,20 @@ class _MessageBubble extends StatelessWidget {
   final ChatMessage message;
   final bool isMe;
   final VoidCallback? onLongPress;
+  final VoidCallback? onRetry;
 
   const _MessageBubble({
     required this.message,
     required this.isMe,
     this.onLongPress,
+    this.onRetry,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return Opacity(
+      opacity: message.status == MessageStatus.sending ? 0.6 : 1.0,
+      child: Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: GestureDetector(
         onLongPress: onLongPress,
@@ -751,22 +873,42 @@ class _MessageBubble extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  if (message.isRead)
-                    const Text(
-                      '읽음',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: AppTheme.primaryColor,
-                      ),
-                    ),
-                  if (message.isEdited)
-                    Text(
-                      '수정됨',
-                      style: TextStyle(
-                        fontSize: 10,
+                  if (message.status == MessageStatus.sending)
+                    SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
                         color: Colors.grey.shade400,
                       ),
-                    ),
+                    )
+                  else if (message.status == MessageStatus.failed)
+                    GestureDetector(
+                      onTap: onRetry,
+                      child: const Icon(
+                        Icons.error_outline,
+                        size: 16,
+                        color: Colors.red,
+                      ),
+                    )
+                  else ...[
+                    if (message.isRead)
+                      const Text(
+                        '읽음',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                    if (message.isEdited)
+                      Text(
+                        '수정됨',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey.shade400,
+                        ),
+                      ),
+                  ],
                   Text(
                     DateFormat('a h:mm', 'ko').format(message.createdAt),
                     style: const TextStyle(
@@ -853,6 +995,7 @@ class _MessageBubble extends StatelessWidget {
           ],
         ),
       ),
+      ),
     );
   }
 }
@@ -890,9 +1033,7 @@ class _CapturePreviewScreenState extends State<_CapturePreviewScreen> {
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('캡처 저장 실패: $e')),
-        );
+        showTopSnackBar(context, '캡처 저장 실패: $e', isError: true);
       }
     } finally {
       if (mounted) setState(() => _saving = false);

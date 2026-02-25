@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../core/api_client.dart';
 
@@ -88,7 +89,8 @@ class MoodNotifier extends Notifier<MoodState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final response = await _dio.get('/mood/today');
+      final localToday = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final response = await _dio.get('/mood/today', queryParameters: {'date': localToday});
       final data = response.data as Map<String, dynamic>;
       final moods = data['moods'] as List<dynamic>;
       final currentUserId = ApiClient.getUserId();
@@ -134,8 +136,10 @@ class MoodNotifier extends Notifier<MoodState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
+      final localToday = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final response = await _dio.post('/mood', data: {
         'emoji': emoji,
+        'date': localToday,
         if (message != null) 'message': message,
       });
 

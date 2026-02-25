@@ -74,7 +74,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { reason, resolution, reflection, date } = req.body;
+    const { reason, resolution, reflection, date, isResolved } = req.body;
 
     const existing = await prisma.fight.findUnique({ where: { id } });
     if (!existing || existing.coupleId !== req.user.coupleId) {
@@ -88,6 +88,7 @@ router.put('/:id', async (req, res) => {
         ...(resolution !== undefined && { resolution }),
         ...(reflection !== undefined && { reflection }),
         ...(date !== undefined && { date: new Date(date) }),
+        ...(isResolved !== undefined && { isResolved }),
       },
       include: {
         author: { select: { id: true, nickname: true } },

@@ -16,8 +16,8 @@ router.get('/:yearMonth', async (req, res) => {
       return res.status(400).json({ error: '올바른 날짜 형식이 아닙니다. (예: 2026-02)' });
     }
 
-    const startOfMonth = new Date(year, month - 1, 1);
-    const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+    const startOfMonth = new Date(Date.UTC(year, month - 1, 1));
+    const endOfMonth = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
 
     // DB 이벤트 조회
     const dbEvents = await prisma.calendarEvent.findMany({
@@ -38,17 +38,18 @@ router.get('/:yearMonth', async (req, res) => {
       orderBy: { date: 'asc' },
     });
 
-    // 반복 이벤트 처리: 해당 월에 맞게 날짜 조정
+    // 반복 이벤트 처리: 해당 월에 맞게 날짜 조정 + eventType 구분
     const events = [];
     for (const ev of dbEvents) {
+      const eventType = ev.isAnniversary ? 'anniversary' : 'schedule';
       if (ev.repeatType === 'YEARLY') {
-        if (ev.date.getMonth() === month - 1) {
-          events.push({ ...ev, date: new Date(year, month - 1, ev.date.getDate()) });
+        if (ev.date.getUTCMonth() === month - 1) {
+          events.push({ ...ev, eventType, date: new Date(Date.UTC(year, month - 1, ev.date.getUTCDate())) });
         }
       } else if (ev.repeatType === 'MONTHLY') {
-        events.push({ ...ev, date: new Date(year, month - 1, ev.date.getDate()) });
+        events.push({ ...ev, eventType, date: new Date(Date.UTC(year, month - 1, ev.date.getUTCDate())) });
       } else {
-        events.push(ev);
+        events.push({ ...ev, eventType });
       }
     }
 
@@ -66,17 +67,18 @@ router.get('/:yearMonth', async (req, res) => {
 
       // 100일 단위
       for (let d = 100; d <= 1000; d += 100) {
-        const date = new Date(start);
-        date.setDate(date.getDate() + d - 1);
-        if (date.getFullYear() === year && date.getMonth() === month - 1) {
+        const ms = start.getTime() + (d - 1) * 86400000;
+        const date = new Date(ms);
+        if (date.getUTCFullYear() === year && date.getUTCMonth() === month - 1) {
           autoEvents.push({
             id: `auto-${d}`,
             title: `${d}일`,
-            date,
+            date: new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())),
             isAnniversary: true,
             repeatType: 'NONE',
             description: null,
             color: null,
+            eventType: 'anniversary',
             _auto: true,
           });
         }
@@ -84,9 +86,8 @@ router.get('/:yearMonth', async (req, res) => {
 
       // N주년
       for (let y = 1; y <= 20; y++) {
-        const date = new Date(start);
-        date.setFullYear(date.getFullYear() + y);
-        if (date.getFullYear() === year && date.getMonth() === month - 1) {
+        const date = new Date(Date.UTC(start.getUTCFullYear() + y, start.getUTCMonth(), start.getUTCDate()));
+        if (date.getUTCFullYear() === year && date.getUTCMonth() === month - 1) {
           autoEvents.push({
             id: `auto-y${y}`,
             title: `${y}주년`,
@@ -95,6 +96,7 @@ router.get('/:yearMonth', async (req, res) => {
             repeatType: 'NONE',
             description: null,
             color: null,
+            eventType: 'anniversary',
             _auto: true,
           });
         }
@@ -104,15 +106,16 @@ router.get('/:yearMonth', async (req, res) => {
       for (const user of couple.users) {
         if (user.birthDate) {
           const birth = new Date(user.birthDate);
-          if (birth.getMonth() === month - 1) {
+          if (birth.getUTCMonth() === month - 1) {
             autoEvents.push({
               id: `auto-bday-${user.nickname}`,
               title: `${user.nickname} 생일`,
-              date: new Date(year, month - 1, birth.getDate()),
+              date: new Date(Date.UTC(year, month - 1, birth.getUTCDate())),
               isAnniversary: true,
               repeatType: 'YEARLY',
               description: null,
               color: null,
+              eventType: 'anniversary',
               _auto: true,
             });
           }
@@ -120,9 +123,50 @@ router.get('/:yearMonth', async (req, res) => {
       }
     }
 
-    const allEvents = [...events, ...autoEvents].sort((a, b) => a.date - b.date);
+    // 피드 조회 (해당 월)
+    const feeds = await prisma.feed.findMany({
+      where: {
+        coupleId: req.user.coupleId,
+        createdAt: { gte: startOfMonth, lte: endOfMonth },
+      },
+      select: { id: true, content: true, imageUrls: true, createdAt: true, authorId: true },
+      orderBy: { createdAt: 'asc' },
+    });
 
-    res.json({ events: allEvents });
+    const feedEvents = feeds.map(f => ({
+      id: `feed-${f.id}`,
+      title: f.imageUrls?.length > 0 ? '사진 피드' : (f.content.length > 20 ? f.content.substring(0, 20) + '...' : f.content),
+      date: f.createdAt,
+      isAnniversary: false,
+      repeatType: 'NONE',
+      description: null,
+      color: null,
+      eventType: 'feed',
+      _auto: false,
+    }));
+
+    // 무드 조회 (해당 월, 커플 전원)
+    const moods = await prisma.mood.findMany({
+      where: {
+        coupleId: req.user.coupleId,
+        date: { gte: startOfMonth, lte: endOfMonth },
+      },
+      select: { emoji: true, date: true, userId: true, user: { select: { nickname: true } } },
+      orderBy: { date: 'asc' },
+    });
+
+    // 날짜별 무드 맵: { "2026-02-14": [{ emoji: "😊", nickname: "현규" }] }
+    const moodMap = {};
+    for (const m of moods) {
+      const d = m.date;
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+      if (!moodMap[key]) moodMap[key] = [];
+      moodMap[key].push({ emoji: m.emoji, nickname: m.user.nickname });
+    }
+
+    const allEvents = [...events, ...autoEvents, ...feedEvents].sort((a, b) => a.date - b.date);
+
+    res.json({ events: allEvents, moods: moodMap });
   } catch (err) {
     console.error('Get calendar events error:', err);
     res.status(500).json({ error: '일정 조회에 실패했습니다.' });
@@ -144,7 +188,7 @@ router.post('/', async (req, res) => {
         authorId: req.user.id,
         title,
         description,
-        date: new Date(date),
+        date: new Date(date + 'T00:00:00.000Z'),
         isAnniversary: isAnniversary || false,
         repeatType: repeatType || 'NONE',
         color,
@@ -163,7 +207,8 @@ router.post('/', async (req, res) => {
       data: { type: 'calendar' },
     });
 
-    res.status(201).json({ event });
+    const eventType = event.isAnniversary ? 'anniversary' : 'schedule';
+    res.status(201).json({ event: { ...event, eventType } });
   } catch (err) {
     console.error('Create calendar event error:', err);
     res.status(500).json({ error: '일정 생성에 실패했습니다.' });
@@ -186,7 +231,7 @@ router.put('/:id', async (req, res) => {
       data: {
         ...(title !== undefined && { title }),
         ...(description !== undefined && { description }),
-        ...(date !== undefined && { date: new Date(date) }),
+        ...(date !== undefined && { date: new Date(date + 'T00:00:00.000Z') }),
         ...(isAnniversary !== undefined && { isAnniversary }),
         ...(repeatType !== undefined && { repeatType }),
         ...(color !== undefined && { color }),
@@ -196,7 +241,8 @@ router.put('/:id', async (req, res) => {
       },
     });
 
-    res.json({ event });
+    const eventType = event.isAnniversary ? 'anniversary' : 'schedule';
+    res.json({ event: { ...event, eventType } });
   } catch (err) {
     console.error('Update calendar event error:', err);
     res.status(500).json({ error: '일정 수정에 실패했습니다.' });

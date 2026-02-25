@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../core/top_snackbar.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user.dart';
 
@@ -97,15 +98,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         ),
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('프로필 사진이 변경되었습니다.')),
-        );
+        showTopSnackBar(context, '프로필 사진이 변경되었습니다.');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('이미지 업로드에 실패했습니다.')),
-        );
+        showTopSnackBar(context, '이미지 업로드에 실패했습니다.', isError: true);
       }
     } finally {
       setState(() => _isUploadingImage = false);
@@ -136,9 +133,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   Future<void> _saveProfile() async {
     final nickname = _nicknameController.text.trim();
     if (nickname.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('닉네임을 입력해주세요.')),
-      );
+      showTopSnackBar(context, '닉네임을 입력해주세요.', isError: true);
       return;
     }
 
@@ -163,16 +158,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('프로필이 수정되었습니다.')),
-        );
+        showTopSnackBar(context, '프로필이 수정되었습니다.');
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('프로필 수정에 실패했습니다.')),
-        );
+        showTopSnackBar(context, '프로필 수정에 실패했습니다.', isError: true);
       }
     } finally {
       setState(() => _isSaving = false);

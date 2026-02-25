@@ -14,13 +14,18 @@ import '../screens/calendar/calendar_screen.dart';
 import '../screens/feed/feed_screen.dart';
 import '../screens/more/more_screen.dart';
 import '../screens/photo/photo_map_screen.dart';
+import '../providers/fight_provider.dart';
 import '../screens/fight/fight_list_screen.dart';
 import '../screens/fight/fight_write_screen.dart';
+import '../providers/letter_provider.dart';
 import '../screens/letter/letter_list_screen.dart';
 import '../screens/letter/letter_write_screen.dart';
 import '../screens/letter/letter_read_screen.dart';
 import '../screens/fortune/fortune_screen.dart';
 import '../screens/home/anniversary_screen.dart';
+
+/// 푸시 알림 등에서 네비게이션 접근용 글로벌 키
+final rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Use a listenable to trigger redirects when auth changes
@@ -28,6 +33,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.onDispose(() => authNotifier.dispose());
 
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
     debugLogDiagnostics: true,
     refreshListenable: authNotifier,
@@ -35,7 +41,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       final authState = ref.read(authProvider);
       final status = authState.status;
       final isLoggedIn = status == AuthStatus.authenticated;
-      final hasCouple = authState.user?.isCoupleComplete ?? false;
+      final hasCouple = (authState.user?.isCoupleComplete ?? false) ||
+          (authState.user?.hasExistingCoupleData ?? false);
       final currentPath = state.matchedLocation;
 
       // While still checking auth (initial), stay on splash
@@ -113,7 +120,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/fight/write',
         builder: (context, state) => FightWriteScreen(
-          fight: state.extra,
+          fight: state.extra as Fight?,
         ),
       ),
 
@@ -125,7 +132,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/letter/write',
         builder: (context, state) => LetterWriteScreen(
-          letter: state.extra,
+          letter: state.extra as Letter?,
         ),
       ),
       GoRoute(

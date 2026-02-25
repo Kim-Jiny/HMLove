@@ -81,7 +81,7 @@ model Feed {
   authorId  String
   author    User     @relation("feedAuthor", fields: [authorId], references: [id])
   content   String
-  imageUrl  String?
+  imageUrls String[]  @default([])
   type      FeedType @default(DIARY)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -204,7 +204,7 @@ model Letter {
   receiver     User         @relation("letterReceiver", fields: [receiverId], references: [id])
   title        String
   content      String
-  deliveryDate DateTime     @db.Date
+  deliveryDate DateTime
   status       LetterStatus @default(DRAFT)
   isRead       Boolean      @default(false)
   createdAt    DateTime     @default(now())
@@ -215,4 +215,11 @@ enum LetterStatus {
   DRAFT
   SCHEDULED
   DELIVERED
+}
+
+model AdminAccount {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
 }

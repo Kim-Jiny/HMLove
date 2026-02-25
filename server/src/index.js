@@ -50,8 +50,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.resolve('uploads')));
 app.use(express.static(path.resolve('public')));
 
-// Admin 페이지 라우트
+// Admin 페이지 라우트 (인라인 스크립트 허용을 위해 CSP 해제)
 app.get('/admin', (req, res) => {
+  res.removeHeader('Content-Security-Policy');
   res.sendFile(path.resolve('public/admin.html'));
 });
 
@@ -127,7 +128,8 @@ io.on('connection', async (socket) => {
       });
 
       const room = `couple:${socket.coupleId}`;
-      io.to(room).emit('message:new', message);
+      const payload = { ...message, _tempId: data._tempId || null };
+      io.to(room).emit('message:new', payload);
 
       // 상대방에게 푸시 알림
       const partner = await prisma.user.findFirst({
@@ -236,11 +238,51 @@ io.on('connection', async (socket) => {
   });
 });
 
+// 예약 편지 배달 스케줄러 (1분마다 체크)
+async function deliverScheduledLetters() {
+  try {
+    const now = new Date();
+    const letters = await prisma.letter.findMany({
+      where: {
+        status: 'SCHEDULED',
+        deliveryDate: { lte: now },
+      },
+      include: {
+        writer: { select: { id: true, nickname: true, coupleId: true } },
+      },
+    });
+
+    for (const letter of letters) {
+      await prisma.letter.update({
+        where: { id: letter.id },
+        data: { status: 'DELIVERED' },
+      });
+
+      // 수신자에게 푸시 알림
+      const { notifyPartner } = await import('./utils/firebase.js');
+      notifyPartner({
+        userId: letter.writerId,
+        coupleId: letter.writer.coupleId,
+        title: letter.writer.nickname || '상대방',
+        body: '편지가 도착했어요 💌',
+        data: { type: 'letter', letterId: letter.id },
+      });
+
+      console.log(`[Scheduler] Letter ${letter.id} delivered`);
+    }
+  } catch (err) {
+    console.error('[Scheduler] deliverScheduledLetters error:', err.message);
+  }
+}
+
+setInterval(deliverScheduledLetters, 60 * 1000); // 1분마다
+
 // 서버 시작
 const PORT = process.env.PORT || 4000;
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`HMLove server running on port ${PORT}`);
+  deliverScheduledLetters(); // 서버 시작 시 즉시 한번 체크
 });
 
 // Graceful shutdown

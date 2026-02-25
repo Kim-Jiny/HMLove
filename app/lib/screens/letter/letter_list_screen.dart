@@ -38,8 +38,15 @@ class _LetterListScreenState extends ConsumerState<LetterListScreen>
     final letterState = ref.watch(letterProvider);
     final currentUserId = ApiClient.getUserId();
     final allLetters = letterState.letters;
-    final sentLetters = allLetters.where((l) => l.senderId == currentUserId).toList();
-    final receivedLetters = allLetters.where((l) => l.receiverId == currentUserId).toList();
+
+    // 보낸 편지: 내가 쓴 모든 편지 (SCHEDULED 포함)
+    final sentLetters =
+        allLetters.where((l) => l.writerId == currentUserId).toList();
+
+    // 받은 편지: 배달 완료된 편지만
+    final receivedLetters = allLetters
+        .where((l) => l.receiverId == currentUserId && l.isDelivered)
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -159,7 +166,7 @@ class _LetterListScreenState extends ConsumerState<LetterListScreen>
 }
 
 class _LetterListTab extends StatelessWidget {
-  final List<dynamic> letters;
+  final List<Letter> letters;
   final bool isSent;
   final String emptyMessage;
   final String emptySubMessage;
@@ -188,7 +195,9 @@ class _LetterListTab extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                isSent ? Icons.outgoing_mail : Icons.markunread_mailbox_outlined,
+                isSent
+                    ? Icons.outgoing_mail
+                    : Icons.markunread_mailbox_outlined,
                 size: 40,
                 color: AppTheme.primaryColor,
               ),
@@ -234,7 +243,7 @@ class _LetterListTab extends StatelessWidget {
 }
 
 class _LetterCard extends StatelessWidget {
-  final dynamic letter;
+  final Letter letter;
   final bool isSent;
 
   const _LetterCard({
@@ -242,8 +251,8 @@ class _LetterCard extends StatelessWidget {
     required this.isSent,
   });
 
-  Color _getStatusColor(String? status) {
-    switch (status?.toUpperCase()) {
+  Color _getStatusColor(String status) {
+    switch (status) {
       case 'DRAFT':
         return AppTheme.textSecondary;
       case 'SCHEDULED':
@@ -255,12 +264,12 @@ class _LetterCard extends StatelessWidget {
     }
   }
 
-  String _getStatusLabel(String? status) {
-    switch (status?.toUpperCase()) {
+  String _getStatusLabel(String status) {
+    switch (status) {
       case 'DRAFT':
         return '임시저장';
       case 'SCHEDULED':
-        return '예약됨';
+        return '발송 예정';
       case 'DELIVERED':
         return '전달됨';
       default:
@@ -270,34 +279,42 @@ class _LetterCard extends StatelessWidget {
 
   IconData _getEnvelopeIcon() {
     if (!isSent) {
-      // Received letter
-      final isDelivered =
-          letter.status?.toString().toUpperCase() == 'DELIVERED';
-      if (!isDelivered) {
-        return Icons.mail_outlined; // Sealed envelope
-      }
-      final isRead = letter.isRead == true;
-      return isRead ? Icons.drafts_outlined : Icons.mark_email_unread_outlined;
+      final isRead = letter.isRead;
+      return isRead
+          ? Icons.drafts_outlined
+          : Icons.mark_email_unread_outlined;
     }
     // Sent letter
+    if (letter.isScheduled) {
+      return Icons.schedule_send_outlined;
+    }
     return Icons.send_outlined;
+  }
+
+  String? _getDdayText() {
+    if (!letter.isScheduled) return null;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final delivery =
+        DateTime(letter.deliveryDate.year, letter.deliveryDate.month, letter.deliveryDate.day);
+    final diff = delivery.difference(today).inDays;
+    if (diff <= 0) return 'D-Day';
+    return 'D-$diff';
   }
 
   @override
   Widget build(BuildContext context) {
-    final status = letter.status?.toString();
-    final isDelivered = status?.toUpperCase() == 'DELIVERED';
-    final isUnreadDelivered = !isSent && isDelivered && letter.isRead != true;
+    final status = letter.status;
+    final isUnreadDelivered = !isSent && letter.isDelivered && !letter.isRead;
+    final ddayText = isSent ? _getDdayText() : null;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: () {
-          if (isSent && status?.toUpperCase() == 'DRAFT') {
-            // Edit draft
+          if (isSent && !letter.isDelivered) {
             context.push('/letter/write', extra: letter);
           } else {
-            // Read letter
             context.push('/letter/${letter.id}');
           }
         },
@@ -320,16 +337,20 @@ class _LetterCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: isUnreadDelivered
-                      ? AppTheme.primaryColor.withValues(alpha: 0.1)
-                      : AppTheme.primaryLight.withValues(alpha: 0.1),
+                  color: letter.isScheduled
+                      ? AppTheme.warningColor.withValues(alpha: 0.1)
+                      : isUnreadDelivered
+                          ? AppTheme.primaryColor.withValues(alpha: 0.1)
+                          : AppTheme.primaryLight.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   _getEnvelopeIcon(),
-                  color: isUnreadDelivered
-                      ? AppTheme.primaryColor
-                      : AppTheme.textSecondary,
+                  color: letter.isScheduled
+                      ? AppTheme.warningColor
+                      : isUnreadDelivered
+                          ? AppTheme.primaryColor
+                          : AppTheme.textSecondary,
                   size: 24,
                 ),
               ),
@@ -341,7 +362,7 @@ class _LetterCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      letter.title ?? '제목 없음',
+                      letter.title,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: isUnreadDelivered
@@ -353,15 +374,39 @@ class _LetterCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      letter.deliveryDate != null
-                          ? DateFormat('yyyy년 M월 d일')
-                              .format(letter.deliveryDate!)
-                          : '날짜 미정',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textSecondary,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          DateFormat('yyyy년 M월 d일 HH:mm')
+                              .format(letter.deliveryDate.toLocal()),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                        if (ddayText != null) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppTheme.warningColor
+                                  .withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              ddayText,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.warningColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),

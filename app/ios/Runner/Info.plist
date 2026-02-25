@@ -49,6 +49,10 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCalendarsUsageDescription</key>
+	<string>캘린더 일정을 앱에서 확인하기 위해 캘린더 접근 권한이 필요합니다.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>캘린더 일정을 앱에서 확인하기 위해 캘린더 접근 권한이 필요합니다.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>채팅에서 사진을 촬영하기 위해 카메라 접근 권한이 필요합니다.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

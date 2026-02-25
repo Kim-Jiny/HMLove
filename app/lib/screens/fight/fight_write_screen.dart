@@ -4,10 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme.dart';
+import '../../core/top_snackbar.dart';
 import '../../providers/fight_provider.dart';
 
 class FightWriteScreen extends ConsumerStatefulWidget {
-  final dynamic fight; // Optional fight data for edit mode
+  final Fight? fight; // Optional fight data for edit mode
 
   const FightWriteScreen({super.key, this.fight});
 
@@ -30,18 +31,16 @@ class _FightWriteScreenState extends ConsumerState<FightWriteScreen> {
   void initState() {
     super.initState();
     _reasonController = TextEditingController(
-      text: _isEditMode ? widget.fight.reason ?? '' : '',
+      text: _isEditMode ? widget.fight!.reason : '',
     );
     _resolutionController = TextEditingController(
-      text: _isEditMode ? widget.fight.resolution ?? '' : '',
+      text: _isEditMode ? widget.fight!.resolution ?? '' : '',
     );
     _reflectionController = TextEditingController(
-      text: _isEditMode ? widget.fight.reflection ?? '' : '',
+      text: _isEditMode ? widget.fight!.reflection ?? '' : '',
     );
-    _selectedDate = _isEditMode && widget.fight.date != null
-        ? widget.fight.date!
-        : DateTime.now();
-    _isResolved = _isEditMode ? (widget.fight.isResolved ?? false) : false;
+    _selectedDate = _isEditMode ? widget.fight!.date : DateTime.now();
+    _isResolved = _isEditMode ? widget.fight!.isResolved : false;
   }
 
   @override
@@ -84,7 +83,7 @@ class _FightWriteScreenState extends ConsumerState<FightWriteScreen> {
     try {
       if (_isEditMode) {
         await ref.read(fightProvider.notifier).updateFight(
-              id: widget.fight.id,
+              id: widget.fight!.id,
               date: _selectedDate,
               reason: _reasonController.text.trim(),
               resolution: _resolutionController.text.trim().isEmpty
@@ -114,12 +113,7 @@ class _FightWriteScreenState extends ConsumerState<FightWriteScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('저장에 실패했습니다: $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
+        showTopSnackBar(context, '저장에 실패했습니다: $e', isError: true);
       }
     } finally {
       if (mounted) {

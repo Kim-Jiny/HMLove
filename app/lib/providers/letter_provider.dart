@@ -7,12 +7,12 @@ import '../core/api_client.dart';
 class Letter {
   final String id;
   final String title;
-  final String content;
+  final String? content;
   final DateTime deliveryDate;
   final bool isRead;
-  final bool isDelivered;
-  final String senderId;
-  final String? senderNickname;
+  final String status; // 'DRAFT', 'SCHEDULED', 'DELIVERED'
+  final String writerId;
+  final String? writerNickname;
   final String receiverId;
   final String? receiverNickname;
   final String coupleId;
@@ -22,12 +22,12 @@ class Letter {
   const Letter({
     required this.id,
     required this.title,
-    required this.content,
+    this.content,
     required this.deliveryDate,
     this.isRead = false,
-    this.isDelivered = false,
-    required this.senderId,
-    this.senderNickname,
+    this.status = 'DRAFT',
+    required this.writerId,
+    this.writerNickname,
     required this.receiverId,
     this.receiverNickname,
     required this.coupleId,
@@ -35,40 +35,29 @@ class Letter {
     required this.updatedAt,
   });
 
+  bool get isDelivered => status == 'DELIVERED';
+  bool get isScheduled => status == 'SCHEDULED';
+
   factory Letter.fromJson(Map<String, dynamic> json) {
+    final writer = json['writer'] as Map<String, dynamic>?;
+    final receiver = json['receiver'] as Map<String, dynamic>?;
     return Letter(
       id: json['id'] as String,
-      title: json['title'] as String,
-      content: json['content'] as String,
+      title: json['title'] as String? ?? '제목 없음',
+      content: json['content'] as String?,
       deliveryDate: DateTime.parse(json['deliveryDate'] as String),
       isRead: json['isRead'] as bool? ?? false,
-      isDelivered: json['isDelivered'] as bool? ?? false,
-      senderId: json['senderId'] as String,
-      senderNickname: json['senderNickname'] as String?,
+      status: json['status'] as String? ?? 'DRAFT',
+      writerId: json['writerId'] as String,
+      writerNickname:
+          writer?['nickname'] as String? ?? json['writerNickname'] as String?,
       receiverId: json['receiverId'] as String,
-      receiverNickname: json['receiverNickname'] as String?,
+      receiverNickname: receiver?['nickname'] as String? ??
+          json['receiverNickname'] as String?,
       coupleId: json['coupleId'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'title': title,
-      'content': content,
-      'deliveryDate': deliveryDate.toIso8601String(),
-      'isRead': isRead,
-      'isDelivered': isDelivered,
-      'senderId': senderId,
-      'senderNickname': senderNickname,
-      'receiverId': receiverId,
-      'receiverNickname': receiverNickname,
-      'coupleId': coupleId,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
-    };
   }
 }
 
@@ -117,13 +106,15 @@ class LetterNotifier extends Notifier<LetterState> {
 
     try {
       final response = await _dio.get('/letter');
-      final data = response.data as List<dynamic>;
-      final letters =
-          data.map((e) => Letter.fromJson(e as Map<String, dynamic>)).toList();
+      final data = response.data as Map<String, dynamic>;
+      final lettersJson = data['letters'] as List<dynamic>;
+      final letters = lettersJson
+          .map((e) => Letter.fromJson(e as Map<String, dynamic>))
+          .toList();
       state = state.copyWith(letters: letters, isLoading: false);
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '편지를 불러오지 못했습니다';
+          e.response?.data?['error'] as String? ?? '편지를 불러오지 못했습니다';
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(
@@ -139,11 +130,12 @@ class LetterNotifier extends Notifier<LetterState> {
 
     try {
       final response = await _dio.get('/letter/$id');
-      final letter = Letter.fromJson(response.data as Map<String, dynamic>);
+      final data = response.data as Map<String, dynamic>;
+      final letter = Letter.fromJson(data['letter'] as Map<String, dynamic>);
       state = state.copyWith(selectedLetter: letter, isLoading: false);
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '편지를 불러오지 못했습니다';
+          e.response?.data?['error'] as String? ?? '편지를 불러오지 못했습니다';
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(
@@ -158,7 +150,6 @@ class LetterNotifier extends Notifier<LetterState> {
     required String title,
     required String content,
     DateTime? deliveryDate,
-    String? status,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -166,11 +157,12 @@ class LetterNotifier extends Notifier<LetterState> {
       final response = await _dio.post('/letter', data: {
         'title': title,
         'content': content,
-        if (deliveryDate != null) 'deliveryDate': deliveryDate.toIso8601String(),
-        if (status != null) 'status': status,
+        if (deliveryDate != null)
+          'deliveryDate': deliveryDate.toIso8601String(),
       });
 
-      final letter = Letter.fromJson(response.data as Map<String, dynamic>);
+      final data = response.data as Map<String, dynamic>;
+      final letter = Letter.fromJson(data['letter'] as Map<String, dynamic>);
       state = state.copyWith(
         letters: [letter, ...state.letters],
         isLoading: false,
@@ -178,7 +170,7 @@ class LetterNotifier extends Notifier<LetterState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '편지 작성에 실패했습니다';
+          e.response?.data?['error'] as String? ?? '편지 작성에 실패했습니다';
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -196,7 +188,6 @@ class LetterNotifier extends Notifier<LetterState> {
     String? title,
     String? content,
     DateTime? deliveryDate,
-    String? status,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -206,11 +197,11 @@ class LetterNotifier extends Notifier<LetterState> {
         if (content != null) 'content': content,
         if (deliveryDate != null)
           'deliveryDate': deliveryDate.toIso8601String(),
-        if (status != null) 'status': status,
       });
 
+      final data = response.data as Map<String, dynamic>;
       final updatedLetter =
-          Letter.fromJson(response.data as Map<String, dynamic>);
+          Letter.fromJson(data['letter'] as Map<String, dynamic>);
       final updatedLetters = state.letters.map((letter) {
         return letter.id == id ? updatedLetter : letter;
       }).toList();
@@ -224,7 +215,7 @@ class LetterNotifier extends Notifier<LetterState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '편지 수정에 실패했습니다';
+          e.response?.data?['error'] as String? ?? '편지 수정에 실패했습니다';
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -253,7 +244,7 @@ class LetterNotifier extends Notifier<LetterState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '편지 삭제에 실패했습니다';
+          e.response?.data?['error'] as String? ?? '편지 삭제에 실패했습니다';
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -269,8 +260,9 @@ class LetterNotifier extends Notifier<LetterState> {
   Future<bool> markAsRead(String id) async {
     try {
       final response = await _dio.patch('/letter/$id/read');
+      final data = response.data as Map<String, dynamic>;
       final updatedLetter =
-          Letter.fromJson(response.data as Map<String, dynamic>);
+          Letter.fromJson(data['letter'] as Map<String, dynamic>);
       final updatedLetters = state.letters.map((letter) {
         return letter.id == id ? updatedLetter : letter;
       }).toList();
@@ -283,7 +275,7 @@ class LetterNotifier extends Notifier<LetterState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '읽음 처리에 실패했습니다';
+          e.response?.data?['error'] as String? ?? '읽음 처리에 실패했습니다';
       state = state.copyWith(error: message);
       return false;
     } catch (e) {
@@ -300,6 +292,9 @@ final letterProvider =
 );
 
 final unreadLettersCountProvider = Provider<int>((ref) {
-  final letters = ref.watch(letterProvider).letters;
-  return letters.where((letter) => !letter.isRead && letter.isDelivered).length;
+  final state = ref.watch(letterProvider);
+  final currentUserId = ApiClient.getUserId();
+  return state.letters
+      .where((l) => l.receiverId == currentUserId && l.isDelivered && !l.isRead)
+      .length;
 });

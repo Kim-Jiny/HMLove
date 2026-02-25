@@ -4,10 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme.dart';
+import '../../core/top_snackbar.dart';
 import '../../providers/letter_provider.dart';
 
 class LetterWriteScreen extends ConsumerStatefulWidget {
-  final dynamic letter; // Optional letter data for edit mode
+  final Letter? letter; // Optional letter data for edit mode
 
   const LetterWriteScreen({super.key, this.letter});
 
@@ -20,6 +21,7 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
   late final TextEditingController _titleController;
   late final TextEditingController _contentController;
   DateTime? _deliveryDate;
+  TimeOfDay? _deliveryTime;
   bool _isSaving = false;
   bool _isPreview = false;
 
@@ -29,13 +31,16 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
   void initState() {
     super.initState();
     _titleController = TextEditingController(
-      text: _isEditMode ? widget.letter.title ?? '' : '',
+      text: _isEditMode ? widget.letter!.title : '',
     );
     _contentController = TextEditingController(
-      text: _isEditMode ? widget.letter.content ?? '' : '',
+      text: _isEditMode ? widget.letter!.content ?? '' : '',
     );
-    _deliveryDate =
-        _isEditMode ? widget.letter.deliveryDate : null;
+    if (_isEditMode) {
+      final d = widget.letter!.deliveryDate.toLocal();
+      _deliveryDate = DateTime(d.year, d.month, d.day);
+      _deliveryTime = TimeOfDay(hour: d.hour, minute: d.minute);
+    }
   }
 
   @override
@@ -45,12 +50,27 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
     super.dispose();
   }
 
+  /// 날짜 + 시간을 합쳐서 UTC DateTime 으로 반환
+  DateTime? _combinedDeliveryUtc() {
+    if (_deliveryDate == null) return null;
+    final time = _deliveryTime ?? const TimeOfDay(hour: 9, minute: 0);
+    final local = DateTime(
+      _deliveryDate!.year,
+      _deliveryDate!.month,
+      _deliveryDate!.day,
+      time.hour,
+      time.minute,
+    );
+    return local.toUtc();
+  }
+
   Future<void> _pickDeliveryDate() async {
+    final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: _deliveryDate ?? DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now().add(const Duration(days: 1)),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: _deliveryDate ?? now.add(const Duration(days: 1)),
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -65,18 +85,37 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
     if (picked != null) {
       setState(() {
         _deliveryDate = picked;
+        // 시간을 아직 안 정했으면 기본 오전 9시
+        _deliveryTime ??= const TimeOfDay(hour: 9, minute: 0);
+      });
+    }
+  }
+
+  Future<void> _pickDeliveryTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _deliveryTime ?? const TimeOfDay(hour: 9, minute: 0),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+                  primary: AppTheme.primaryColor,
+                ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _deliveryTime = picked;
       });
     }
   }
 
   Future<void> _saveDraft() async {
     if (_titleController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('제목을 입력해주세요'),
-          backgroundColor: AppTheme.errorColor,
-        ),
-      );
+      showTopSnackBar(context, '제목을 입력해주세요', isError: true);
       return;
     }
 
@@ -84,38 +123,26 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
     try {
       if (_isEditMode) {
         await ref.read(letterProvider.notifier).updateLetter(
-              id: widget.letter.id,
+              id: widget.letter!.id,
               title: _titleController.text.trim(),
               content: _contentController.text.trim(),
-              deliveryDate: _deliveryDate,
-              status: 'DRAFT',
+              deliveryDate: _combinedDeliveryUtc(),
             );
       } else {
         await ref.read(letterProvider.notifier).createLetter(
               title: _titleController.text.trim(),
               content: _contentController.text.trim(),
-              deliveryDate: _deliveryDate,
-              status: 'DRAFT',
+              deliveryDate: _combinedDeliveryUtc(),
             );
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('임시저장되었습니다'),
-            backgroundColor: AppTheme.successColor,
-          ),
-        );
+        showTopSnackBar(context, '임시저장되었습니다');
         context.pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('저장에 실패했습니다: $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
+        showTopSnackBar(context, '저장에 실패했습니다: $e', isError: true);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -126,12 +153,13 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_deliveryDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('전달 날짜를 선택해주세요'),
-          backgroundColor: AppTheme.errorColor,
-        ),
-      );
+      showTopSnackBar(context, '전달 날짜를 선택해주세요', isError: true);
+      return;
+    }
+
+    final deliveryUtc = _combinedDeliveryUtc()!;
+    if (deliveryUtc.isBefore(DateTime.now().toUtc())) {
+      showTopSnackBar(context, '현재 시각 이후로 설정해주세요', isError: true);
       return;
     }
 
@@ -139,40 +167,30 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
     try {
       if (_isEditMode) {
         await ref.read(letterProvider.notifier).updateLetter(
-              id: widget.letter.id,
+              id: widget.letter!.id,
               title: _titleController.text.trim(),
               content: _contentController.text.trim(),
-              deliveryDate: _deliveryDate,
-              status: 'SCHEDULED',
+              deliveryDate: deliveryUtc,
             );
       } else {
         await ref.read(letterProvider.notifier).createLetter(
               title: _titleController.text.trim(),
               content: _contentController.text.trim(),
-              deliveryDate: _deliveryDate,
-              status: 'SCHEDULED',
+              deliveryDate: deliveryUtc,
             );
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${DateFormat('M월 d일').format(_deliveryDate!)}에 전달될 예정이에요',
-            ),
-            backgroundColor: AppTheme.successColor,
-          ),
+        final time = _deliveryTime ?? const TimeOfDay(hour: 9, minute: 0);
+        showTopSnackBar(
+          context,
+          '${DateFormat('M월 d일').format(_deliveryDate!)} ${time.hour}시 ${time.minute.toString().padLeft(2, '0')}분에 전달될 예정이에요',
         );
         context.pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('저장에 실패했습니다: $e'),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
+        showTopSnackBar(context, '저장에 실패했습니다: $e', isError: true);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -197,11 +215,7 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
             onPressed: () {
               if (_titleController.text.trim().isEmpty &&
                   _contentController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('내용을 입력한 후 미리보기할 수 있어요'),
-                  ),
-                );
+                showTopSnackBar(context, '내용을 입력한 후 미리보기할 수 있어요');
                 return;
               }
               setState(() => _isPreview = true);
@@ -315,9 +329,9 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
 
                 const SizedBox(height: 24),
 
-                // Delivery date
+                // Delivery date & time
                 const Text(
-                  '전달 날짜',
+                  '전달 일시',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -326,50 +340,105 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  '선택한 날짜에 상대방에게 편지가 전달됩니다',
+                  '선택한 날짜와 시간에 상대방에게 편지가 전달됩니다',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppTheme.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 8),
-                InkWell(
-                  onTap: _pickDeliveryDate,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFE0E0E0)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.schedule_send_outlined,
-                          size: 20,
-                          color: AppTheme.primaryColor,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          _deliveryDate != null
-                              ? DateFormat('yyyy년 M월 d일')
-                                  .format(_deliveryDate!)
-                              : '날짜를 선택해주세요',
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: _deliveryDate != null
-                                ? AppTheme.textPrimary
-                                : AppTheme.textHint,
+                Row(
+                  children: [
+                    // 날짜 선택
+                    Expanded(
+                      flex: 3,
+                      child: InkWell(
+                        onTap: _pickDeliveryDate,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: const Color(0xFFE0E0E0)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.calendar_today_outlined,
+                                size: 18,
+                                color: AppTheme.primaryColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _deliveryDate != null
+                                    ? DateFormat('yyyy년 M월 d일')
+                                        .format(_deliveryDate!)
+                                    : '날짜 선택',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: _deliveryDate != null
+                                      ? AppTheme.textPrimary
+                                      : AppTheme.textHint,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    // 시간 선택
+                    Expanded(
+                      flex: 2,
+                      child: InkWell(
+                        onTap: _deliveryDate != null
+                            ? _pickDeliveryTime
+                            : () {
+                                showTopSnackBar(
+                                    context, '날짜를 먼저 선택해주세요');
+                              },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: const Color(0xFFE0E0E0)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.access_time_outlined,
+                                size: 18,
+                                color: AppTheme.primaryColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _deliveryTime != null
+                                    ? '${_deliveryTime!.hour.toString().padLeft(2, '0')}:${_deliveryTime!.minute.toString().padLeft(2, '0')}'
+                                    : '09:00',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: _deliveryTime != null
+                                      ? AppTheme.textPrimary
+                                      : AppTheme.textHint,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
 
                 const SizedBox(height: 32),
@@ -480,7 +549,11 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
                 const SizedBox(height: 8),
                 if (_deliveryDate != null)
                   Text(
-                    DateFormat('yyyy년 M월 d일').format(_deliveryDate!),
+                    () {
+                      final time = _deliveryTime ??
+                          const TimeOfDay(hour: 9, minute: 0);
+                      return '${DateFormat('yyyy년 M월 d일').format(_deliveryDate!)} ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+                    }(),
                     style: const TextStyle(
                       fontSize: 13,
                       color: AppTheme.textSecondary,

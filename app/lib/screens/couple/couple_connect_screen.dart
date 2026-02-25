@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme.dart';
+import '../../core/top_snackbar.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
 
@@ -101,9 +102,7 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
     if (!mounted) return;
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('커플이 해제되었습니다')),
-      );
+      showTopSnackBar(context, '커플이 해제되었습니다');
     }
   }
 
@@ -182,12 +181,7 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
                     icon: const Icon(Icons.copy, color: AppTheme.primaryColor),
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: code));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('초대 코드가 복사되었습니다'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
+                      showTopSnackBar(context, '초대 코드가 복사되었습니다');
                     },
                   ),
                 ],
@@ -387,12 +381,7 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
                               onPressed: () {
                                 Clipboard.setData(ClipboardData(
                                     text: coupleState.generatedInviteCode!));
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('초대 코드가 복사되었습니다'),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
+                                showTopSnackBar(context, '초대 코드가 복사되었습니다');
                               },
                             ),
                           ],

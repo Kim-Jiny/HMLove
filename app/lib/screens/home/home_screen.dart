@@ -4,11 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme.dart';
+import '../../core/top_snackbar.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
 import '../../providers/mood_provider.dart';
 import '../../providers/fortune_provider.dart';
 import '../../providers/badge_provider.dart';
+import '../../providers/letter_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -79,10 +81,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         final success =
             await ref.read(coupleProvider.notifier).updateStartDate(picked);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(success ? '사귄 날짜가 변경되었습니다.' : '날짜 변경에 실패했습니다.'),
-            ),
+          showTopSnackBar(
+            context,
+            success ? '사귄 날짜가 변경되었습니다.' : '날짜 변경에 실패했습니다.',
+            isError: !success,
           );
         }
       }
@@ -93,10 +95,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final moods = [
       {'key': 'happy', 'emoji': '😊', 'label': '행복해'},
       {'key': 'love', 'emoji': '🥰', 'label': '사랑해'},
+      {'key': 'excited', 'emoji': '🤩', 'label': '신나'},
+      {'key': 'grateful', 'emoji': '🙏', 'label': '감사해'},
+      {'key': 'peaceful', 'emoji': '😌', 'label': '평온해'},
+      {'key': 'proud', 'emoji': '😎', 'label': '뿌듯해'},
+      {'key': 'missing', 'emoji': '🥺', 'label': '보고싶어'},
+      {'key': 'bored', 'emoji': '😐', 'label': '심심해'},
       {'key': 'sad', 'emoji': '😢', 'label': '슬퍼'},
       {'key': 'angry', 'emoji': '😤', 'label': '화나'},
       {'key': 'tired', 'emoji': '😴', 'label': '피곤해'},
-      {'key': 'excited', 'emoji': '🤩', 'label': '신나'},
+      {'key': 'stressed', 'emoji': '😩', 'label': '스트레스'},
     ];
 
     showDialog(
@@ -156,11 +164,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final daysTogether = ref.watch(daysSinceStartProvider);
     final moodState = ref.watch(moodProvider);
     final fortuneState = ref.watch(fortuneProvider);
+    final unreadLetters = ref.watch(unreadLettersCountProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('HMLove'),
         actions: [
+          if (unreadLetters > 0)
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.mail_outlined),
+                  onPressed: () => context.push('/letter'),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: AppTheme.errorColor,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      unreadLetters > 9 ? '9+' : '$unreadLetters',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () {
@@ -458,42 +501,27 @@ class _MoodCard extends StatelessWidget {
     required this.onTap,
   });
 
+  static const _moodData = {
+    'happy': ('😊', '행복해'),
+    'love': ('🥰', '사랑해'),
+    'excited': ('🤩', '신나'),
+    'grateful': ('🙏', '감사해'),
+    'peaceful': ('😌', '평온해'),
+    'proud': ('😎', '뿌듯해'),
+    'missing': ('🥺', '보고싶어'),
+    'bored': ('😐', '심심해'),
+    'sad': ('😢', '슬퍼'),
+    'angry': ('😤', '화나'),
+    'tired': ('😴', '피곤해'),
+    'stressed': ('😩', '스트레스'),
+  };
+
   String _getMoodDisplay(String? emoji) {
-    switch (emoji) {
-      case 'happy':
-        return '😊';
-      case 'love':
-        return '🥰';
-      case 'sad':
-        return '😢';
-      case 'angry':
-        return '😤';
-      case 'tired':
-        return '😴';
-      case 'excited':
-        return '🤩';
-      default:
-        return '😶';
-    }
+    return _moodData[emoji]?.$1 ?? '😶';
   }
 
   String _getMoodText(String? emoji) {
-    switch (emoji) {
-      case 'happy':
-        return '행복해';
-      case 'love':
-        return '사랑해';
-      case 'sad':
-        return '슬퍼';
-      case 'angry':
-        return '화나';
-      case 'tired':
-        return '피곤해';
-      case 'excited':
-        return '신나';
-      default:
-        return '설정 안 됨';
-    }
+    return _moodData[emoji]?.$2 ?? '설정 안 됨';
   }
 
   @override

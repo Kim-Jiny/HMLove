@@ -6,15 +6,13 @@ import { notifyPartner } from '../utils/firebase.js';
 const router = Router();
 router.use(authenticate, requireCouple);
 
-function getTodayDate() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
-
-// GET /mood/today
+// GET /mood/today?date=2026-02-25
 router.get('/today', async (req, res) => {
   try {
-    const today = getTodayDate();
+    const dateStr = req.query.date;
+    const today = dateStr
+      ? new Date(dateStr + 'T00:00:00.000Z')
+      : new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()));
 
     const moods = await prisma.mood.findMany({
       where: {
@@ -36,13 +34,15 @@ router.get('/today', async (req, res) => {
 // POST /mood
 router.post('/', async (req, res) => {
   try {
-    const { emoji, message } = req.body;
+    const { emoji, message, date: dateStr } = req.body;
 
     if (!emoji) {
       return res.status(400).json({ error: '이모지를 선택해주세요.' });
     }
 
-    const today = getTodayDate();
+    const today = dateStr
+      ? new Date(dateStr + 'T00:00:00.000Z')
+      : new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()));
 
     const mood = await prisma.mood.upsert({
       where: {

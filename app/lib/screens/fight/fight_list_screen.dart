@@ -30,7 +30,7 @@ class _FightListScreenState extends ConsumerState<FightListScreen> {
   @override
   Widget build(BuildContext context) {
     final fightState = ref.watch(fightProvider);
-    final allFights = fightState.fights ?? [];
+    final allFights = fightState.fights;
 
     // Filter fights
     final fights = allFights.where((fight) {
@@ -38,9 +38,9 @@ class _FightListScreenState extends ConsumerState<FightListScreen> {
         case FightFilter.all:
           return true;
         case FightFilter.unresolved:
-          return fight.isResolved != true;
+          return !fight.isResolved;
         case FightFilter.resolved:
-          return fight.isResolved == true;
+          return fight.isResolved;
       }
     }).toList();
 
@@ -112,8 +112,9 @@ class _FightListScreenState extends ConsumerState<FightListScreen> {
                             }
                           });
                         },
-                        onEdit: () {
-                          context.push('/fight/write', extra: fight);
+                        onEdit: () async {
+                          await context.push('/fight/write', extra: fight);
+                          setState(() => _expandedIds.clear());
                         },
                         onDelete: () async {
                           final confirm = await showDialog<bool>(
@@ -253,7 +254,7 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _FightCard extends StatelessWidget {
-  final dynamic fight;
+  final Fight fight;
   final bool isExpanded;
   final VoidCallback onTap;
   final VoidCallback onEdit;
@@ -269,7 +270,7 @@ class _FightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isResolved = fight.isResolved == true;
+    final isResolved = fight.isResolved;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -292,9 +293,7 @@ class _FightCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    fight.date != null
-                        ? DateFormat('yyyy년 M월 d일').format(fight.date!)
-                        : '날짜 없음',
+                    DateFormat('yyyy년 M월 d일').format(fight.date),
                     style: const TextStyle(
                       fontSize: 13,
                       color: AppTheme.textSecondary,
@@ -343,7 +342,7 @@ class _FightCard extends StatelessWidget {
 
               // Reason
               Text(
-                fight.reason ?? '',
+                fight.reason,
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,

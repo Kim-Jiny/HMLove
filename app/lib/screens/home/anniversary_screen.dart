@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../core/top_snackbar.dart';
 import '../../providers/calendar_provider.dart';
 
 class AnniversaryScreen extends ConsumerStatefulWidget {
@@ -285,9 +286,7 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
                 child: ElevatedButton(
                   onPressed: () async {
                     if (titleController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('기념일 이름을 입력해주세요.')),
-                      );
+                      showTopSnackBar(context, '기념일 이름을 입력해주세요.', isError: true);
                       return;
                     }
                     Navigator.pop(context);
@@ -304,9 +303,7 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
                     if (success) {
                       _fetchAnniversaries();
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('기념일이 추가되었습니다.')),
-                        );
+                        showTopSnackBar(context, '기념일이 추가되었습니다.');
                       }
                     }
                   },
@@ -353,9 +350,7 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
               if (success) {
                 _fetchAnniversaries();
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('기념일이 삭제되었습니다.')),
-                  );
+                  showTopSnackBar(context, '기념일이 삭제되었습니다.');
                 }
               }
             },

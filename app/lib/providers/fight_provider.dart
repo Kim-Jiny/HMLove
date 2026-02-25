@@ -12,7 +12,8 @@ class Fight {
   final String? reflection;
   final bool isResolved;
   final String coupleId;
-  final String createdBy;
+  final String authorId;
+  final String? authorNickname;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -24,12 +25,14 @@ class Fight {
     this.reflection,
     this.isResolved = false,
     required this.coupleId,
-    required this.createdBy,
+    required this.authorId,
+    this.authorNickname,
     required this.createdAt,
     required this.updatedAt,
   });
 
   factory Fight.fromJson(Map<String, dynamic> json) {
+    final author = json['author'] as Map<String, dynamic>?;
     return Fight(
       id: json['id'] as String,
       date: DateTime.parse(json['date'] as String),
@@ -38,25 +41,11 @@ class Fight {
       reflection: json['reflection'] as String?,
       isResolved: json['isResolved'] as bool? ?? false,
       coupleId: json['coupleId'] as String,
-      createdBy: json['createdBy'] as String,
+      authorId: json['authorId'] as String,
+      authorNickname: author?['nickname'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'date': date.toIso8601String(),
-      'reason': reason,
-      'resolution': resolution,
-      'reflection': reflection,
-      'isResolved': isResolved,
-      'coupleId': coupleId,
-      'createdBy': createdBy,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
-    };
   }
 }
 
@@ -108,11 +97,12 @@ class FightNotifier extends Notifier<FightState> {
           await _dio.get('/fight', queryParameters: queryParams);
       final data = response.data as Map<String, dynamic>;
       final fights = (data['fights'] as List<dynamic>)
-          .map((e) => Fight.fromJson(e as Map<String, dynamic>)).toList();
+          .map((e) => Fight.fromJson(e as Map<String, dynamic>))
+          .toList();
       state = state.copyWith(fights: fights, isLoading: false);
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '다툼 기록을 불러오지 못했습니다';
+          e.response?.data?['error'] as String? ?? '다툼 기록을 불러오지 못했습니다';
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(
@@ -141,7 +131,8 @@ class FightNotifier extends Notifier<FightState> {
         if (isResolved != null) 'isResolved': isResolved,
       });
 
-      final fight = Fight.fromJson(response.data as Map<String, dynamic>);
+      final data = response.data as Map<String, dynamic>;
+      final fight = Fight.fromJson(data['fight'] as Map<String, dynamic>);
       state = state.copyWith(
         fights: [fight, ...state.fights],
         isLoading: false,
@@ -149,7 +140,7 @@ class FightNotifier extends Notifier<FightState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '다툼 기록 생성에 실패했습니다';
+          e.response?.data?['error'] as String? ?? '다툼 기록 생성에 실패했습니다';
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -181,8 +172,9 @@ class FightNotifier extends Notifier<FightState> {
         if (isResolved != null) 'isResolved': isResolved,
       });
 
+      final data = response.data as Map<String, dynamic>;
       final updatedFight =
-          Fight.fromJson(response.data as Map<String, dynamic>);
+          Fight.fromJson(data['fight'] as Map<String, dynamic>);
       final updatedFights = state.fights.map((fight) {
         return fight.id == id ? updatedFight : fight;
       }).toList();
@@ -191,7 +183,7 @@ class FightNotifier extends Notifier<FightState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '다툼 기록 수정에 실패했습니다';
+          e.response?.data?['error'] as String? ?? '다툼 기록 수정에 실패했습니다';
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -209,8 +201,9 @@ class FightNotifier extends Notifier<FightState> {
 
     try {
       final response = await _dio.patch('/fight/$id/resolve');
+      final data = response.data as Map<String, dynamic>;
       final updatedFight =
-          Fight.fromJson(response.data as Map<String, dynamic>);
+          Fight.fromJson(data['fight'] as Map<String, dynamic>);
       final updatedFights = state.fights.map((fight) {
         return fight.id == id ? updatedFight : fight;
       }).toList();
@@ -219,7 +212,7 @@ class FightNotifier extends Notifier<FightState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '다툼 해결 처리에 실패했습니다';
+          e.response?.data?['error'] as String? ?? '다툼 해결 처리에 실패했습니다';
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -243,7 +236,7 @@ class FightNotifier extends Notifier<FightState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '다툼 기록 삭제에 실패했습니다';
+          e.response?.data?['error'] as String? ?? '다툼 기록 삭제에 실패했습니다';
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
