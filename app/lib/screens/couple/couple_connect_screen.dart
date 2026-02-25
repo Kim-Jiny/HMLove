@@ -36,14 +36,9 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
       if (!mounted) { _pollTimer?.cancel(); return; }
+      // checkAuthStatus가 isCoupleComplete=true로 업데이트하면
+      // GoRouter redirect가 자동으로 /home으로 이동시킴
       await ref.read(authProvider.notifier).checkAuthStatus();
-      if (!mounted) return;
-      final user = ref.read(currentUserProvider);
-      if (user?.isCoupleComplete == true) {
-        _pollTimer?.cancel();
-        _pollTimer = null;
-        if (mounted) context.go('/home');
-      }
     });
   }
 
@@ -134,9 +129,9 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
 
     if (!mounted) return;
 
-    if (success) {
-      context.go('/home');
-    }
+    // joinCouple 내부에서 authProvider를 업데이트하므로
+    // GoRouter redirect가 자동으로 /home으로 이동시킴
+    // 실패 시에만 별도 처리 없음 (에러는 coupleState.error로 표시)
   }
 
   void _showInviteCodeDialog(String code) {
