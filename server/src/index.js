@@ -21,6 +21,7 @@ import fortuneRoutes from './routes/fortune.js';
 import chatRoutes from './routes/chat.js';
 import photoRoutes from './routes/photo.js';
 import letterRoutes from './routes/letter.js';
+import inquiryRoutes from './routes/inquiry.js';
 import adminRoutes from './routes/admin.js';
 
 const app = express();
@@ -67,6 +68,7 @@ app.use('/api/fortune', fortuneRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/photo', photoRoutes);
 app.use('/api/letter', letterRoutes);
+app.use('/api/inquiry', inquiryRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Health check
@@ -281,7 +283,7 @@ setInterval(deliverScheduledLetters, 60 * 1000); // 1분마다
 const PORT = process.env.PORT || 4000;
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`HMLove server running on port ${PORT}`);
+  console.log(`우리연애 server running on port ${PORT}`);
   deliverScheduledLetters(); // 서버 시작 시 즉시 한번 체크
 });
 

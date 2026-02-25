@@ -28,6 +28,7 @@ class _MainShellState extends ConsumerState<MainShell> {
   void initState() {
     super.initState();
     Future.microtask(() {
+      if (!mounted) return;
       ref.read(badgeProvider.notifier).fetchBadges();
       ref.read(letterProvider.notifier).fetchLetters();
       // 소켓 연결 (채팅 실시간 수신을 위해)

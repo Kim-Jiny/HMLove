@@ -186,23 +186,28 @@ class ChatNotifier extends Notifier<ChatState> {
         final map = data as Map<String, dynamic>;
         final message = ChatMessage.fromJson(map);
         final tempId = map['_tempId'] as String?;
+        final myId = ApiClient.getUserId();
 
-        if (tempId != null) {
+        if (tempId != null && message.senderId == myId) {
           // 내가 보낸 메시지 → 임시 메시지를 서버 메시지로 교체
           final updated = state.messages.map((msg) {
             return msg.id == tempId ? message : msg;
           }).toList();
           state = state.copyWith(messages: updated);
         } else {
-          // 상대방 메시지 → 앞에 추가
-          state = state.copyWith(
-            messages: [message, ...state.messages],
-          );
+          // 상대방 메시지 (또는 tempId 없는 경우) → 앞에 추가
+          // 중복 방지
+          if (!state.messages.any((m) => m.id == message.id)) {
+            state = state.copyWith(
+              messages: [message, ...state.messages],
+            );
+          }
         }
-        // 상대방 메시지면 뱃지 갱신
-        final myId = ApiClient.getUserId();
+        // 상대방 메시지면 뱃지 갱신 + 자동 읽음 처리
         if (message.senderId != myId) {
           ref.read(badgeProvider.notifier).fetchBadges();
+          // 채팅 화면이 열려있으므로 즉시 읽음 처리 → 상대방에게 실시간 "읽음" 표시
+          markAsRead();
         }
       }
     });

@@ -330,4 +330,40 @@ router.post('/profile/image', authenticate, upload.single('image'), async (req, 
   }
 });
 
+// DELETE /auth/account - 회원탈퇴
+router.delete('/account', authenticate, async (req, res) => {
+  try {
+    const id = req.user.id;
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, coupleId: true },
+    });
+    if (!user) return res.status(404).json({ error: '유저를 찾을 수 없습니다.' });
+
+    // 커플 연결 해제
+    if (user.coupleId) {
+      await prisma.user.update({ where: { id }, data: { coupleId: null } });
+    }
+
+    // 관련 데이터 삭제
+    await prisma.$transaction([
+      prisma.feedLike.deleteMany({ where: { userId: id } }),
+      prisma.feedComment.deleteMany({ where: { authorId: id } }),
+      prisma.mood.deleteMany({ where: { userId: id } }),
+      prisma.letter.deleteMany({ where: { OR: [{ writerId: id }, { receiverId: id }] } }),
+      prisma.fight.deleteMany({ where: { authorId: id } }),
+      prisma.photo.deleteMany({ where: { authorId: id } }),
+      prisma.feed.deleteMany({ where: { authorId: id } }),
+      prisma.message.deleteMany({ where: { senderId: id } }),
+      prisma.calendarEvent.deleteMany({ where: { authorId: id } }),
+      prisma.user.delete({ where: { id } }),
+    ]);
+
+    res.json({ message: '회원탈퇴가 완료되었습니다.' });
+  } catch (err) {
+    console.error('Delete account error:', err);
+    res.status(500).json({ error: '회원탈퇴에 실패했습니다.' });
+  }
+});
+
 export default router;

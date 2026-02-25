@@ -25,6 +25,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     // Fetch data on load
     Future.microtask(() {
+      if (!mounted) return;
       ref.read(coupleProvider.notifier).fetchCouple();
       ref.read(moodProvider.notifier).fetchTodayMood();
       ref.read(fortuneProvider.notifier).fetchTodayFortune();
@@ -168,7 +169,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('HMLove'),
+        title: const Text('우리연애'),
         actions: [
           if (unreadLetters > 0)
             Stack(

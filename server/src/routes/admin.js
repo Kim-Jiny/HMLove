@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../utils/prisma.js';
+import { sendPushNotification } from '../utils/firebase.js';
 
 const router = Router();
 
@@ -467,6 +468,104 @@ router.delete('/couples/:id', async (req, res) => {
   } catch (err) {
     console.error('Admin delete couple error:', err);
     res.status(500).json({ error: '커플 삭제에 실패했습니다.' });
+  }
+});
+
+// GET /admin/inquiries
+router.get('/inquiries', async (req, res) => {
+  try {
+    const { page = '1', limit = '20', status = '' } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = Math.min(parseInt(limit), 100);
+
+    const where = status ? { status } : {};
+
+    const [inquiries, total] = await Promise.all([
+      prisma.inquiry.findMany({
+        where, skip, take,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { id: true, nickname: true, email: true, profileImage: true } },
+        },
+      }),
+      prisma.inquiry.count({ where }),
+    ]);
+
+    res.json({ inquiries, total, page: parseInt(page), totalPages: Math.ceil(total / take) });
+  } catch (err) {
+    console.error('Admin inquiries error:', err);
+    res.status(500).json({ error: '문의 조회에 실패했습니다.' });
+  }
+});
+
+// GET /admin/inquiries/:id
+router.get('/inquiries/:id', async (req, res) => {
+  try {
+    const inquiry = await prisma.inquiry.findUnique({
+      where: { id: req.params.id },
+      include: {
+        user: {
+          select: {
+            id: true, nickname: true, email: true, profileImage: true,
+            coupleId: true, createdAt: true,
+            _count: { select: { sentMessages: true, feeds: true, photos: true } },
+          },
+        },
+      },
+    });
+    if (!inquiry) return res.status(404).json({ error: '문의를 찾을 수 없습니다.' });
+    res.json({ inquiry });
+  } catch (err) {
+    console.error('Admin inquiry detail error:', err);
+    res.status(500).json({ error: '문의 조회에 실패했습니다.' });
+  }
+});
+
+// PATCH /admin/inquiries/:id - 상태 변경 + 답변 + 푸시
+router.patch('/inquiries/:id', async (req, res) => {
+  try {
+    const { status, adminReply } = req.body;
+    const inquiry = await prisma.inquiry.findUnique({
+      where: { id: req.params.id },
+      include: { user: { select: { id: true, nickname: true, fcmToken: true } } },
+    });
+    if (!inquiry) return res.status(404).json({ error: '문의를 찾을 수 없습니다.' });
+
+    const data = {};
+    if (status) data.status = status;
+    if (adminReply !== undefined) {
+      data.adminReply = adminReply;
+      data.repliedAt = new Date();
+    }
+
+    const updated = await prisma.inquiry.update({
+      where: { id: req.params.id },
+      data,
+      include: {
+        user: { select: { id: true, nickname: true, email: true } },
+      },
+    });
+
+    // 상태 변경 시 푸시 알림
+    if (status && inquiry.user.fcmToken) {
+      const statusLabels = {
+        PENDING: '접수됨',
+        IN_PROGRESS: '처리 중',
+        RESOLVED: '답변 완료',
+        CLOSED: '종료',
+      };
+      sendPushNotification({
+        token: inquiry.user.fcmToken,
+        title: '문의 상태 변경',
+        body: `"${inquiry.title}" 문의가 ${statusLabels[status] || status} 상태로 변경되었습니다.`,
+        data: { type: 'inquiry', inquiryId: inquiry.id },
+      });
+    }
+
+    res.json({ inquiry: updated });
+  } catch (err) {
+    console.error('Admin update inquiry error:', err);
+    res.status(500).json({ error: '문의 처리에 실패했습니다.' });
   }
 });
 

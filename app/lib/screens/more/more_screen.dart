@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
 import '../../providers/letter_provider.dart';
+import 'inquiry_screen.dart';
 import 'notification_settings_screen.dart';
 import 'profile_edit_screen.dart';
 
@@ -108,7 +108,7 @@ class MoreScreen extends ConsumerWidget {
           children: [
             _InfoRow(label: '버전', value: '1.0.0'),
             SizedBox(height: 8),
-            _InfoRow(label: '개발', value: 'HMLove Team'),
+            _InfoRow(label: '개발', value: '우리연애 팀'),
             SizedBox(height: 16),
             Text(
               '커플을 위한 올인원 앱\n함께하는 모든 순간을 기록하세요.',
@@ -128,6 +128,133 @@ class MoreScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  void _openInquiry(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const InquiryScreen()),
+    );
+  }
+
+  Future<void> _showDeleteAccount(BuildContext context, WidgetRef ref) async {
+    // 1단계: 기본 확인
+    final step1 = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 24),
+            SizedBox(width: 8),
+            Text('회원탈퇴'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '정말로 탈퇴하시겠습니까?\n\n탈퇴 시 다음 데이터가 모두 삭제됩니다:',
+              style: TextStyle(height: 1.5),
+            ),
+            SizedBox(height: 12),
+            _DeleteItem('프로필 정보'),
+            _DeleteItem('채팅 메시지'),
+            _DeleteItem('피드 및 댓글'),
+            _DeleteItem('캘린더 일정'),
+            _DeleteItem('사진'),
+            _DeleteItem('편지'),
+            _DeleteItem('기분 · 다툼 · 운세 기록'),
+            SizedBox(height: 12),
+            Text(
+              '이 작업은 되돌릴 수 없습니다.',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('다음', style: TextStyle(color: Colors.red.shade400)),
+          ),
+        ],
+      ),
+    );
+
+    if (step1 != true || !context.mounted) return;
+
+    // 2단계: "탈퇴" 입력 확인
+    final step2 = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final controller = TextEditingController();
+        return StatefulBuilder(
+          builder: (ctx, setState) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text(
+              '최종 확인',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '확인을 위해 아래에 "탈퇴"를 입력해주세요.',
+                  style: TextStyle(height: 1.5),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    hintText: '탈퇴',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소'),
+              ),
+              FilledButton(
+                onPressed: controller.text.trim() == '탈퇴'
+                    ? () => Navigator.pop(ctx, true)
+                    : null,
+                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('회원탈퇴'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (step2 != true || !context.mounted) return;
+
+    // 실제 탈퇴 실행
+    try {
+      final dio = ref.read(dioProvider);
+      await dio.delete('/auth/account');
+      await ref.read(authProvider.notifier).logout();
+      if (context.mounted) {
+        context.go('/login');
+        showTopSnackBar(context, '회원탈퇴가 완료되었습니다');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showTopSnackBar(context, '회원탈퇴에 실패했습니다', isError: true);
+      }
+    }
   }
 
   Future<void> _showLeaveCouple(BuildContext context, WidgetRef ref) async {
@@ -529,6 +656,14 @@ class MoreScreen extends ConsumerWidget {
                   ),
                   const Divider(height: 1, indent: 72),
                   _MenuTile(
+                    icon: Icons.help_outline,
+                    title: '문의하기',
+                    subtitle: '버그 신고 및 건의사항',
+                    color: const Color(0xFF4CAF50),
+                    onTap: () => _openInquiry(context),
+                  ),
+                  const Divider(height: 1, indent: 72),
+                  _MenuTile(
                     icon: Icons.info_outline,
                     title: '앱 정보',
                     subtitle: 'v1.0.0',
@@ -551,6 +686,14 @@ class MoreScreen extends ConsumerWidget {
                     subtitle: '커플 연결을 해제합니다',
                     color: const Color(0xFFE53935),
                     onTap: () => _showLeaveCouple(context, ref),
+                  ),
+                  const Divider(height: 1, indent: 72),
+                  _MenuTile(
+                    icon: Icons.person_off_outlined,
+                    title: '회원탈퇴',
+                    subtitle: '계정과 모든 데이터를 삭제합니다',
+                    color: const Color(0xFF757575),
+                    onTap: () => _showDeleteAccount(context, ref),
                   ),
                 ],
               ),

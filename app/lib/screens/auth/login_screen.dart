@@ -67,7 +67,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'HMLove',
+                  '우리연애',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 32,

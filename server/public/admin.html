@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HMLove Admin</title>
+  <title>우리연애 Admin</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <!-- Chart.js loaded dynamically after login -->
   <style>
@@ -66,7 +66,7 @@
   <div class="card" style="padding:40px;width:100%;max-width:380px;">
     <div style="text-align:center;margin-bottom:24px;">
       <div style="font-size:40px;margin-bottom:8px;">&#x1F491;</div>
-      <h1 style="font-size:22px;font-weight:700;color:#1f2937;">HMLove Admin</h1>
+      <h1 style="font-size:22px;font-weight:700;color:#1f2937;">우리연애 Admin</h1>
       <p style="font-size:13px;color:#9ca3af;margin-top:4px;">관리자 로그인</p>
     </div>
     <form id="loginForm" style="display:flex;flex-direction:column;gap:12px;">
@@ -86,7 +86,7 @@
       <div style="display:flex;align-items:center;justify-content:space-between;height:56px;">
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:22px;">&#x1F491;</span>
-          <span style="font-size:16px;font-weight:700;color:#1f2937;">HMLove Admin</span>
+          <span style="font-size:16px;font-weight:700;color:#1f2937;">우리연애 Admin</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span id="adminName" style="font-size:12px;color:#9ca3af;"></span>
@@ -99,6 +99,7 @@
         <button class="tab" data-tab="users">유저 관리</button>
         <button class="tab" data-tab="couples">커플 관리</button>
         <button class="tab" data-tab="fights">다툼 관리</button>
+        <button class="tab" data-tab="inquiries">문의 관리</button>
       </div>
     </div>
   </header>
@@ -240,6 +241,36 @@
         </div>
       </div>
     </div>
+
+    <!-- ===== TAB: INQUIRIES ===== -->
+    <div id="page-inquiries" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <h2 style="font-size:18px;font-weight:700;color:#1f2937;">문의 관리 <span id="inquiriesTotal" style="font-size:13px;font-weight:400;color:#9ca3af;"></span></h2>
+        <div style="display:flex;gap:8px;">
+          <select id="inquiryFilter" class="input" style="width:140px;padding:6px 10px;" onchange="inquiriesPage=1;loadInquiries()">
+            <option value="">전체</option>
+            <option value="PENDING">접수됨</option>
+            <option value="IN_PROGRESS">처리 중</option>
+            <option value="RESOLVED">답변 완료</option>
+            <option value="CLOSED">종료</option>
+          </select>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>상태</th><th>유형</th><th>제목</th><th>작성자</th><th>기기</th><th>앱버전</th><th>접수일</th><th style="text-align:center;">액션</th>
+            </tr></thead>
+            <tbody id="inquiriesBody"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-top:1px solid #f1f5f9;">
+          <span id="inquiriesPageInfo" style="font-size:12px;color:#9ca3af;"></span>
+          <div class="pagination" id="inquiriesPaging"></div>
+        </div>
+      </div>
+    </div>
   </main>
 </div>
 
@@ -335,13 +366,14 @@ document.querySelectorAll('.tab').forEach(btn => {
     btn.classList.add('active');
     const tab = btn.dataset.tab;
     currentTab = tab;
-    ['overview','users','couples','fights'].forEach(function(t) {
+    ['overview','users','couples','fights','inquiries'].forEach(function(t) {
       document.getElementById('page-'+t).style.display = t === tab ? '' : 'none';
     });
     if (tab === 'overview') loadOverview();
     else if (tab === 'users') loadUsers();
     else if (tab === 'couples') loadCouples();
     else if (tab === 'fights') loadFights();
+    else if (tab === 'inquiries') loadInquiries();
   });
 });
 
@@ -760,6 +792,119 @@ async function fightDetail(id) {
     '</div>'
   );
   document.getElementById('modalBox').classList.add('wide');
+}
+
+// ===== INQUIRIES =====
+var inquiriesPage = 1;
+
+function inqStatusBadge(s) {
+  var colors = { PENDING:'#f59e0b', IN_PROGRESS:'#3b82f6', RESOLVED:'#10b981', CLOSED:'#9ca3af' };
+  var labels = { PENDING:'접수됨', IN_PROGRESS:'처리 중', RESOLVED:'답변 완료', CLOSED:'종료' };
+  var c = colors[s] || '#9ca3af';
+  return '<span class="badge" style="background:'+c+'20;color:'+c+';">'+(labels[s]||s)+'</span>';
+}
+function inqCatLabel(c) {
+  var m = { bug:'버그', feature:'건의', account:'계정', other:'기타' };
+  return m[c] || c;
+}
+
+async function loadInquiries() {
+  var filter = document.getElementById('inquiryFilter').value;
+  var d = await api('/inquiries?page='+inquiriesPage+'&limit=20'+(filter?'&status='+filter:''));
+  if (!d) return;
+  document.getElementById('inquiriesTotal').textContent = '('+d.total+'건)';
+  document.getElementById('inquiriesBody').innerHTML = d.inquiries.map(function(inq) {
+    var userName = inq.user ? esc(inq.user.nickname) : '?';
+    var titleShort = inq.title.length > 25 ? esc(inq.title.slice(0,25))+'...' : esc(inq.title);
+    return '<tr>'+
+      '<td>'+inqStatusBadge(inq.status)+'</td>'+
+      '<td style="font-size:12px;">'+inqCatLabel(inq.category)+'</td>'+
+      '<td style="font-weight:500;">'+titleShort+'</td>'+
+      '<td style="font-size:12px;">'+userName+'</td>'+
+      '<td style="font-size:11px;color:#9ca3af;">'+(inq.deviceModel?esc(inq.deviceModel):'-')+'</td>'+
+      '<td style="font-size:11px;color:#9ca3af;">'+(inq.appVersion||'-')+'</td>'+
+      '<td style="color:#9ca3af;font-size:12px;">'+fmtD(inq.createdAt)+'</td>'+
+      '<td style="text-align:center;"><button class="btn btn-outline btn-sm" onclick="inquiryDetail(\''+inq.id+'\')">상세</button></td>'+
+    '</tr>';
+  }).join('');
+  document.getElementById('inquiriesPageInfo').textContent = d.totalPages > 0 ? d.page+' / '+d.totalPages+' 페이지' : '';
+  renderPaging('inquiriesPaging', d.page, d.totalPages, function(p) { inquiriesPage=p; loadInquiries(); });
+}
+
+async function inquiryDetail(id) {
+  var d = await api('/inquiries/'+id);
+  if (!d) return;
+  var inq = d.inquiry;
+  var u = inq.user;
+
+  openModal(
+    '<div style="padding:24px;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">'+
+        '<h3 style="font-size:17px;font-weight:700;">문의 상세</h3>'+
+        inqStatusBadge(inq.status)+
+      '</div>'+
+      '<!-- 유저 정보 -->'+
+      '<div style="display:flex;align-items:center;gap:10px;background:#f8fafc;border-radius:10px;padding:12px;margin-bottom:16px;">'+
+        (u.profileImage?'<img src="'+u.profileImage+'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;">':'<div style="width:36px;height:36px;border-radius:50%;background:#fff1f2;display:flex;align-items:center;justify-content:center;color:#f43f5e;font-weight:700;">'+esc(u.nickname?.[0]||'?')+'</div>')+
+        '<div>'+
+          '<div style="font-size:14px;font-weight:600;">'+esc(u.nickname)+'</div>'+
+          '<div style="font-size:11px;color:#9ca3af;">'+esc(u.email)+'</div>'+
+        '</div>'+
+        '<div style="margin-left:auto;text-align:right;font-size:11px;color:#9ca3af;">'+
+          '메시지 '+(u._count?u._count.sentMessages:0)+' | 피드 '+(u._count?u._count.feeds:0)+' | 사진 '+(u._count?u._count.photos:0)+
+        '</div>'+
+      '</div>'+
+      '<!-- 디바이스 정보 -->'+
+      '<div class="info-grid" style="margin-bottom:16px;">'+
+        '<div class="info-box"><div class="label">앱 버전</div><div class="value">'+(inq.appVersion||'-')+'</div></div>'+
+        '<div class="info-box"><div class="label">기기</div><div class="value">'+(inq.deviceModel?esc(inq.deviceModel):'-')+'</div></div>'+
+        '<div class="info-box"><div class="label">OS</div><div class="value">'+(inq.osVersion?esc(inq.osVersion):'-')+'</div></div>'+
+        '<div class="info-box"><div class="label">접수일</div><div class="value">'+fmtDT(inq.createdAt)+'</div></div>'+
+      '</div>'+
+      '<!-- 문의 내용 -->'+
+      '<div style="margin-bottom:14px;">'+
+        '<div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:4px;">유형: '+inqCatLabel(inq.category)+'</div>'+
+        '<div style="font-size:15px;font-weight:700;margin-bottom:8px;">'+esc(inq.title)+'</div>'+
+        '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;font-size:13px;line-height:1.7;color:#374151;white-space:pre-wrap;">'+esc(inq.content)+'</div>'+
+      '</div>'+
+      '<!-- 답변 영역 -->'+
+      '<div style="margin-bottom:16px;">'+
+        '<div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:6px;">관리자 답변</div>'+
+        '<textarea id="inqReplyText" class="input" rows="4" style="resize:vertical;" placeholder="답변을 입력하세요...">'+(inq.adminReply?esc(inq.adminReply):'')+'</textarea>'+
+      '</div>'+
+      '<!-- 상태 변경 + 저장 -->'+
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
+        '<select id="inqStatusSelect" class="input" style="width:140px;padding:6px 10px;">'+
+          '<option value="PENDING"'+(inq.status==='PENDING'?' selected':'')+'>접수됨</option>'+
+          '<option value="IN_PROGRESS"'+(inq.status==='IN_PROGRESS'?' selected':'')+'>처리 중</option>'+
+          '<option value="RESOLVED"'+(inq.status==='RESOLVED'?' selected':'')+'>답변 완료</option>'+
+          '<option value="CLOSED"'+(inq.status==='CLOSED'?' selected':'')+'>종료</option>'+
+        '</select>'+
+        '<button class="btn btn-brand" onclick="saveInquiry(\''+inq.id+'\')">저장 (상태변경 + 답변)</button>'+
+        '<button class="btn btn-outline btn-sm" style="margin-left:auto;" onclick="closeModal()">닫기</button>'+
+      '</div>'+
+    '</div>'
+  );
+  document.getElementById('modalBox').classList.add('wide');
+}
+
+async function saveInquiry(id) {
+  var status = document.getElementById('inqStatusSelect').value;
+  var reply = document.getElementById('inqReplyText').value.trim();
+  var body = { status: status };
+  if (reply) body.adminReply = reply;
+
+  var res = await fetch('/api/admin/inquiries/'+id, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify(body),
+  });
+  if (res.ok) {
+    closeModal();
+    loadInquiries();
+  } else {
+    alert('저장에 실패했습니다.');
+  }
 }
 
 // ===== PAGINATION =====

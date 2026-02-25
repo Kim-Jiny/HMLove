@@ -32,6 +32,7 @@ model User {
   lettersReceived  Letter[]        @relation("letterReceiver")
   feedLikes        FeedLike[]
   feedComments     FeedComment[]   @relation("commentAuthor")
+  inquiries        Inquiry[]
 }
 
 model Couple {
@@ -215,6 +216,32 @@ enum LetterStatus {
   DRAFT
   SCHEDULED
   DELIVERED
+}
+
+model Inquiry {
+  id          String        @id @default(uuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  category    String        // bug, feature, account, other
+  title       String
+  content     String
+  // 디바이스 정보
+  appVersion  String?
+  deviceModel String?
+  osVersion   String?
+  // 관리자 처리
+  status      InquiryStatus @default(PENDING)
+  adminReply  String?
+  repliedAt   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+enum InquiryStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
 }
 
 model AdminAccount {

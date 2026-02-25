@@ -35,12 +35,14 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
   void _startPolling() {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (!mounted) { _pollTimer?.cancel(); return; }
       await ref.read(authProvider.notifier).checkAuthStatus();
       if (!mounted) return;
       final user = ref.read(currentUserProvider);
       if (user?.isCoupleComplete == true) {
         _pollTimer?.cancel();
-        context.go('/home');
+        _pollTimer = null;
+        if (mounted) context.go('/home');
       }
     });
   }
@@ -213,17 +215,31 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final coupleState = ref.watch(coupleProvider);
+  bool _pollInitialized = false;
 
-    // 초대코드가 보이면 폴링 시작, 아니면 중지
-    if (coupleState.generatedInviteCode != null) {
+  void _syncPolling(String? inviteCode) {
+    if (inviteCode != null) {
       if (_pollTimer == null || !_pollTimer!.isActive) {
         _startPolling();
       }
     } else {
       _stopPolling();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final coupleState = ref.watch(coupleProvider);
+
+    ref.listen<CoupleState>(coupleProvider, (prev, next) {
+      _syncPolling(next.generatedInviteCode);
+    });
+
+    if (!_pollInitialized) {
+      _pollInitialized = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _syncPolling(coupleState.generatedInviteCode);
+      });
     }
 
     return Scaffold(
