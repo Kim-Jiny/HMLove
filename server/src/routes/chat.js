@@ -1,12 +1,15 @@
 import { Router } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
-import { mkdirSync, existsSync } from 'fs';
+import { createClient } from '@supabase/supabase-js';
 import { authenticate, requireCouple } from '../middleware/auth.js';
 import prisma from '../utils/prisma.js';
 
-const UPLOAD_DIR = 'uploads/chat';
-if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY,
+);
+const BUCKET = 'chat-images';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -84,7 +87,7 @@ router.patch('/read', async (req, res) => {
   }
 });
 
-// POST /chat/upload — 채팅 이미지 업로드
+// POST /chat/upload — 채팅 이미지 업로드 (Supabase Storage)
 router.post('/upload', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -92,18 +95,30 @@ router.post('/upload', upload.single('image'), async (req, res) => {
     }
 
     const fileName = `${Date.now()}_${req.user.id}.webp`;
-    const filePath = `${UPLOAD_DIR}/${fileName}`;
 
-    await sharp(req.file.buffer)
+    const buffer = await sharp(req.file.buffer)
       .rotate() // EXIF 기반 자동 회전
       .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 80 })
-      .toFile(filePath);
+      .toBuffer();
 
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const imageUrl = `${baseUrl}/${filePath}`;
+    const { error } = await supabase.storage
+      .from(BUCKET)
+      .upload(fileName, buffer, {
+        contentType: 'image/webp',
+        upsert: false,
+      });
 
-    res.json({ imageUrl });
+    if (error) {
+      console.error('Supabase upload error:', error);
+      return res.status(500).json({ error: '이미지 업로드에 실패했습니다.' });
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from(BUCKET)
+      .getPublicUrl(fileName);
+
+    res.json({ imageUrl: publicUrl });
   } catch (err) {
     console.error('Chat upload error:', err);
     res.status(500).json({ error: '이미지 업로드에 실패했습니다.' });
