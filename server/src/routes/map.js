@@ -137,7 +137,7 @@ ${isOk ? '<h2>미리보기</h2><img src="' + proxyImgUrl + '" alt="Static Map" /
 <h2>curl 재현 명령어</h2>
 <pre>curl -v "https://naveropenapi.apigw.ntruss.com/map-static/v2/raster?center=${lng},${lat}&level=${zoom}&w=${w}&h=${h}&maptype=basic" \\
   -H "X-NCP-APIGW-API-KEY-ID: ${NCP_CLIENT_ID}" \\
-  -H "X-NCP-APIGW-API-KEY: ${NCP_CLIENT_SECRET}"</pre>
+  -H "X-NCP-APIGW-API-KEY: ${NCP_CLIENT_SECRET.substring(0, 6)}...${NCP_CLIENT_SECRET.substring(NCP_CLIENT_SECRET.length - 4)}"</pre>
 
 <p style="color:#999;margin-top:40px">Generated at ${new Date().toISOString()}</p>
 </body></html>`);
