@@ -3,13 +3,16 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import sharp from 'sharp';
-import { mkdirSync, existsSync } from 'fs';
+import { createClient } from '@supabase/supabase-js';
 import prisma from '../utils/prisma.js';
 import { getZodiacSign, getChineseZodiac } from '../utils/zodiac.js';
 import { authenticate } from '../middleware/auth.js';
 
-const PROFILE_DIR = 'uploads/profile';
-if (!existsSync(PROFILE_DIR)) mkdirSync(PROFILE_DIR, { recursive: true });
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY,
+);
+const PROFILE_BUCKET = 'profile-images';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -295,7 +298,7 @@ router.patch('/profile', authenticate, async (req, res) => {
   }
 });
 
-// POST /auth/profile/image — 프로필 이미지 업로드
+// POST /auth/profile/image — 프로필 이미지 업로드 (Supabase Storage)
 router.post('/profile/image', authenticate, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -303,15 +306,30 @@ router.post('/profile/image', authenticate, upload.single('image'), async (req, 
     }
 
     const fileName = `${Date.now()}_${req.user.id}.webp`;
-    const filePath = `${PROFILE_DIR}/${fileName}`;
 
-    await sharp(req.file.buffer)
+    const buffer = await sharp(req.file.buffer)
+      .rotate()
       .resize(400, 400, { fit: 'cover' })
       .webp({ quality: 80 })
-      .toFile(filePath);
+      .toBuffer();
 
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const imageUrl = `${baseUrl}/${filePath}`;
+    const { error } = await supabase.storage
+      .from(PROFILE_BUCKET)
+      .upload(fileName, buffer, {
+        contentType: 'image/webp',
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Supabase profile upload error:', error);
+      return res.status(500).json({ error: '이미지 업로드에 실패했습니다.' });
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from(PROFILE_BUCKET)
+      .getPublicUrl(fileName);
+
+    const imageUrl = publicUrl;
 
     const user = await prisma.user.update({
       where: { id: req.user.id },

@@ -1,13 +1,16 @@
 import { Router } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
-import { mkdirSync, existsSync } from 'fs';
+import { createClient } from '@supabase/supabase-js';
 import { authenticate, requireCouple } from '../middleware/auth.js';
 import prisma from '../utils/prisma.js';
 import { notifyPartner } from '../utils/firebase.js';
 
-const UPLOAD_DIR = 'uploads/feed';
-if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY,
+);
+const BUCKET = 'feed-images';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -87,26 +90,41 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /feed/upload — 피드 이미지 업로드 (최대 5장)
+// POST /feed/upload — 피드 이미지 업로드 (최대 5장, Supabase Storage)
 router.post('/upload', upload.array('images', 5), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: '이미지를 첨부해주세요.' });
     }
 
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
     const imageUrls = [];
 
     for (let i = 0; i < req.files.length; i++) {
       const fileName = `${Date.now()}_${req.user.id}_${i}.webp`;
-      const filePath = `${UPLOAD_DIR}/${fileName}`;
 
-      await sharp(req.files[i].buffer)
+      const buffer = await sharp(req.files[i].buffer)
+        .rotate()
         .resize(1080, 1080, { fit: 'inside', withoutEnlargement: true })
         .webp({ quality: 75 })
-        .toFile(filePath);
+        .toBuffer();
 
-      imageUrls.push(`${baseUrl}/${filePath}`);
+      const { error } = await supabase.storage
+        .from(BUCKET)
+        .upload(fileName, buffer, {
+          contentType: 'image/webp',
+          upsert: false,
+        });
+
+      if (error) {
+        console.error('Supabase feed upload error:', error);
+        continue;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from(BUCKET)
+        .getPublicUrl(fileName);
+
+      imageUrls.push(publicUrl);
     }
 
     res.json({ imageUrls });
