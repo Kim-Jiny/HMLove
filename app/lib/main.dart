@@ -14,6 +14,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'core/constants.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
+import 'core/widget_service.dart';
 import 'firebase_options.dart';
 
 @pragma('vm:entry-point')
@@ -39,6 +40,9 @@ void main() async {
 
   // Initialize timeago Korean locale
   timeago.setLocaleMessages('ko', timeago.KoMessages());
+
+  // Initialize Home Widget
+  await WidgetService.initialize();
 
   // Initialize Naver Map SDK
   await FlutterNaverMap().init(

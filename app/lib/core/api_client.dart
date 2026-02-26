@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'constants.dart';
+import 'widget_service.dart';
 
 final dioProvider = Provider<Dio>((ref) {
   return ApiClient.createDio();
@@ -54,6 +55,8 @@ class ApiClient {
     final box = Hive.box(AppConstants.authBox);
     await box.put(AppConstants.accessTokenKey, accessToken);
     await box.put(AppConstants.refreshTokenKey, refreshToken);
+    // Share token with widget extension for background fetching
+    WidgetService.saveAuthInfo(accessToken, AppConstants.apiBaseUrl);
   }
 
   /// Clear all stored tokens.

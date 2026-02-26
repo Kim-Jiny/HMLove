@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
+import '../../core/widget_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
 import '../../providers/mood_provider.dart';
@@ -13,6 +14,7 @@ import '../../providers/badge_provider.dart';
 import '../../providers/letter_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/mission_provider.dart';
+import '../../providers/calendar_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -21,20 +23,103 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+Map<String, dynamic>? _getNextAnniversary(DateTime? startDate) {
+  if (startDate == null) return null;
+  final now = DateTime.now();
+  final milestones = [100, 200, 300, 365, 500, 700, 730, 1000, 1095, 1461];
+  for (final days in milestones) {
+    final date = startDate.add(Duration(days: days - 1));
+    if (date.isAfter(now)) {
+      return {'name': '$days일', 'date': date, 'daysLeft': date.difference(now).inDays};
+    }
+  }
+  int year = now.year - startDate.year;
+  if (DateTime(now.year, startDate.month, startDate.day).isBefore(now)) year++;
+  final nextAnniv = DateTime(startDate.year + year, startDate.month, startDate.day);
+  return {'name': '$year주년', 'date': nextAnniv, 'daysLeft': nextAnniv.difference(now).inDays};
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Fetch data on load
-    Future.microtask(() {
+    Future.microtask(() async {
       if (!mounted) return;
-      ref.read(coupleProvider.notifier).fetchCouple();
-      ref.read(moodProvider.notifier).fetchTodayMood();
+      await Future.wait([
+        ref.read(coupleProvider.notifier).fetchCouple(),
+        ref.read(moodProvider.notifier).fetchTodayMood(),
+      ]);
+      if (!mounted) return;
+      _syncWidgetCouple(ref.read(coupleProvider));
+      _syncWidgetMood(ref.read(moodProvider));
+      _syncWidgetSchedule();
+
       ref.read(fortuneProvider.notifier).fetchTodayFortune();
       ref.read(badgeProvider.notifier).fetchBadges();
       ref.read(notificationProvider.notifier).fetchUnreadCount();
       ref.read(missionProvider.notifier).fetchTodayMissions();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      // App going to background → sync all widget data
+      _syncWidgetCouple(ref.read(coupleProvider));
+      _syncWidgetMood(ref.read(moodProvider));
+      _syncWidgetSchedule();
+    }
+  }
+
+  void _syncWidgetCouple(dynamic coupleState) {
+    final couple = coupleState.couple;
+    if (couple == null) {
+      WidgetService.clearData();
+      return;
+    }
+    final u = ref.read(currentUserProvider);
+    final partner = couple.getPartner(u?.id ?? '');
+    final anniversary = _getNextAnniversary(couple.startDate);
+    WidgetService.updateCoupleData(
+      myName: u?.nickname ?? '나',
+      partnerName: partner?.nickname ?? '상대방',
+      daysTogether: couple.daysTogether,
+      startDate: '${couple.startDate.year}.${couple.startDate.month.toString().padLeft(2, '0')}.${couple.startDate.day.toString().padLeft(2, '0')}',
+      nextAnniversaryName: anniversary?['name'] as String?,
+      nextAnniversaryDaysLeft: anniversary?['daysLeft'] as int?,
+    );
+  }
+
+  void _syncWidgetMood(dynamic moodState) {
+    WidgetService.updateMoodData(
+      myMoodKey: moodState.myMood?.emoji,
+      partnerMoodKey: moodState.partnerMood?.emoji,
+    );
+  }
+
+  Future<void> _syncWidgetSchedule() async {
+    final now = DateTime.now();
+    final yearMonth =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    await ref.read(calendarProvider.notifier).fetchEvents(yearMonth);
+    if (!mounted) return;
+    final calState = ref.read(calendarProvider);
+    final todayEvents = calState.getEventsForDay(now);
+    if (todayEvents.isNotEmpty) {
+      final titles = todayEvents.take(3).map((e) => '• ${e.title}').join('\n');
+      WidgetService.updateTodaySchedule(titles);
+    } else {
+      WidgetService.updateTodaySchedule(null);
+    }
   }
 
   void _showEditStartDate(DateTime? currentDate) async {
@@ -172,6 +257,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final unreadLetters = ref.watch(unreadLettersCountProvider);
     final unreadNotifications = ref.watch(unreadNotificationCountProvider);
     final missionState = ref.watch(missionProvider);
+
+    // Sync widget data when couple/mood changes
+    ref.listen(coupleProvider, (_, next) => _syncWidgetCouple(next));
+    ref.listen(moodProvider, (_, next) => _syncWidgetMood(next));
 
     return Scaffold(
       appBar: AppBar(

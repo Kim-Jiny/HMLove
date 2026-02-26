@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_description">D-Day와 오늘의 기분을 확인하세요</string>
+    <string name="widget_small_description">D-Day를 확인하세요</string>
+</resources>
