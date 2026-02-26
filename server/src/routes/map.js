@@ -35,7 +35,7 @@ router.get('/static', async (req, res) => {
     if (!response.ok) {
       const text = await response.text();
       console.error('[Map] Static map error:', response.status, text);
-      return res.status(response.status).json({ message: 'Static map 요청 실패' });
+      return res.status(response.status).json({ message: 'Static map 요청 실패', detail: text, naverStatus: response.status });
     }
 
     // 이미지 프록시
