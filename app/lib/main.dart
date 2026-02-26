@@ -4,9 +4,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
+
+import 'package:timeago/timeago.dart' as timeago;
 
 import 'core/constants.dart';
 import 'core/router.dart';
@@ -33,6 +36,15 @@ void main() async {
 
   // Initialize Korean locale data
   await initializeDateFormatting('ko_KR', null);
+
+  // Initialize timeago Korean locale
+  timeago.setLocaleMessages('ko', timeago.KoMessages());
+
+  // Initialize Naver Map SDK
+  await FlutterNaverMap().init(
+    clientId: AppConstants.naverMapClientId,
+    onAuthFailed: (ex) => debugPrint('[NaverMap] Auth failed: ${ex.code} - ${ex.message}'),
+  );
 
   runApp(
     const ProviderScope(

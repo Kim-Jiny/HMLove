@@ -33,6 +33,7 @@ model User {
   feedLikes        FeedLike[]
   feedComments     FeedComment[]   @relation("commentAuthor")
   inquiries        Inquiry[]
+  notifications    Notification[]
 }
 
 model Couple {
@@ -51,6 +52,30 @@ model Couple {
   messages        Message[]
   photos          Photo[]
   letters         Letter[]
+  missions        CoupleMission[]
+}
+
+enum MissionType {
+  DAILY
+  WEEKLY
+}
+
+model CoupleMission {
+  id          String      @id @default(uuid())
+  coupleId    String
+  couple      Couple      @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  type        MissionType
+  title       String
+  description String
+  emoji       String      @default("💝")
+  date        DateTime    @db.Date  // DAILY: that date, WEEKLY: Monday of the week
+  isCompleted Boolean     @default(false)
+  completedBy String?     // userId who marked it
+  completedAt DateTime?
+  createdAt   DateTime    @default(now())
+
+  @@unique([coupleId, type, date])
+  @@index([coupleId, date])
 }
 
 model CalendarEvent {
@@ -250,6 +275,21 @@ model AdminAccount {
   username  String   @unique
   password  String
   createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // feed, feed_like, feed_comment, letter, calendar, mood, fight, fortune, inquiry, couple_left
+  title     String
+  body      String
+  data      Json?    // { feedId, letterId, etc. }
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
 }
 
 model AppSettings {

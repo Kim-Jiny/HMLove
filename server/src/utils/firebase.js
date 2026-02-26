@@ -63,6 +63,7 @@ export async function sendPushNotification({ token, title, body, data }) {
 
 /**
  * 커플 상대방에게 푸시 알림을 보내는 헬퍼 함수
+ * + Notification DB에 기록 저장 (chat 제외)
  */
 export async function notifyPartner({ userId, coupleId, title, body, data }) {
   try {
@@ -72,9 +73,25 @@ export async function notifyPartner({ userId, coupleId, title, body, data }) {
         coupleId,
         id: { not: userId },
       },
-      select: { fcmToken: true },
+      select: { id: true, fcmToken: true },
     });
-    if (partner?.fcmToken) {
+    if (!partner) return;
+
+    // 채팅은 알림 DB에 저장하지 않음
+    const type = data?.type;
+    if (type && type !== 'chat') {
+      await prisma.notification.create({
+        data: {
+          userId: partner.id,
+          type,
+          title,
+          body,
+          data: data || {},
+        },
+      });
+    }
+
+    if (partner.fcmToken) {
       await sendPushNotification({ token: partner.fcmToken, title, body, data });
     }
   } catch (err) {

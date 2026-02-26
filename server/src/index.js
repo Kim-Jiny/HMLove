@@ -24,6 +24,9 @@ import letterRoutes from './routes/letter.js';
 import inquiryRoutes from './routes/inquiry.js';
 import adminRoutes from './routes/admin.js';
 import settingsRoutes from './routes/settings.js';
+import notificationRoutes from './routes/notification.js';
+import missionRoutes from './routes/mission.js';
+import mapRoutes from './routes/map.js';
 
 const app = express();
 const server = createServer(app);
@@ -72,6 +75,9 @@ app.use('/api/letter', letterRoutes);
 app.use('/api/inquiry', inquiryRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/notification', notificationRoutes);
+app.use('/api/mission', missionRoutes);
+app.use('/api/map', mapRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

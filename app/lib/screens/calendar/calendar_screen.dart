@@ -10,6 +10,7 @@ import '../../core/device_calendar_service.dart';
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
 import '../../providers/calendar_provider.dart';
+import '../../providers/mission_provider.dart';
 
 class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
@@ -31,6 +32,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       final yearMonth = DateFormat('yyyy-MM').format(_focusedDay);
       ref.read(calendarProvider.notifier).fetchEvents(yearMonth);
       ref.read(calendarProvider.notifier).selectDay(_selectedDay!);
+      ref.read(missionProvider.notifier).fetchCalendarMissions(yearMonth);
     });
   }
 
@@ -90,6 +92,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     _focusedDay = focusedDay;
     final yearMonth = DateFormat('yyyy-MM').format(focusedDay);
     ref.read(calendarProvider.notifier).fetchEvents(yearMonth);
+    ref.read(missionProvider.notifier).fetchCalendarMissions(yearMonth);
   }
 
   void _showDeviceCalendarSettings() {
@@ -604,6 +607,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   Widget build(BuildContext context) {
     final calendarState = ref.watch(calendarProvider);
     final selectedEvents = ref.watch(selectedDayEventsProvider);
+    final missionCompletedDates = ref.watch(missionProvider).completedDates;
 
     return Scaffold(
       appBar: AppBar(
@@ -672,13 +676,23 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               ),
               calendarBuilders: CalendarBuilders(
                 markerBuilder: (context, day, events) {
-                  if (events.isEmpty) return null;
+                  final dayKey =
+                      '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+                  final hasMission = missionCompletedDates.containsKey(dayKey);
+
+                  if (events.isEmpty && !hasMission) return null;
 
                   final types = <String>{};
                   for (final e in events) {
                     types.add(e.eventType);
                   }
                   final dots = <Widget>[];
+                  if (hasMission) {
+                    dots.add(const Text(
+                      '\u2764\uFE0F',
+                      style: TextStyle(fontSize: 6),
+                    ));
+                  }
                   if (types.contains('anniversary')) {
                     dots.add(_buildDot(const Color(0xFFE91E63)));
                   }
@@ -719,17 +733,26 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           // 범례
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 4,
               children: [
                 _buildLegend(const Color(0xFFE91E63), '기념일'),
-                const SizedBox(width: 12),
                 _buildLegend(const Color(0xFF1976D2), '일정'),
-                const SizedBox(width: 12),
                 _buildLegend(const Color(0xFFFF9800), '피드'),
-                if (calendarState.deviceCalendarEnabled) ...[
-                  const SizedBox(width: 12),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Text('\u2764\uFE0F', style: TextStyle(fontSize: 8)),
+                    SizedBox(width: 4),
+                    Text(
+                      '미션',
+                      style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                    ),
+                  ],
+                ),
+                if (calendarState.deviceCalendarEnabled)
                   _buildLegend(const Color(0xFF4CAF50), '기기'),
-                ],
               ],
             ),
           ),

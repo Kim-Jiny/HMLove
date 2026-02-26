@@ -3,18 +3,23 @@ import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api_client.dart';
+import '../../core/constants.dart';
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
 import '../../providers/chat_provider.dart';
+import '../../providers/couple_provider.dart';
 import 'chat_media_gallery_screen.dart';
+import 'location_picker_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -31,6 +36,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Timer? _debounceTimer;
   bool _isInitialized = false;
   bool _captureMode = false;
+  bool _showAttachPanel = false;
+  bool _deleteMode = false;
+  final Set<String> _selectedForDelete = {};
   int? _captureStartIndex;
   int? _captureEndIndex;
   final GlobalKey _captureKey = GlobalKey();
@@ -39,7 +47,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    _focusNode.addListener(_onFocusChanged);
     Future.microtask(() => _initialize());
+  }
+
+  void _onFocusChanged() {
+    if (_focusNode.hasFocus && _showAttachPanel) {
+      setState(() => _showAttachPanel = false);
+    }
   }
 
   Future<void> _initialize() async {
@@ -69,6 +84,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void dispose() {
     _messageController.dispose();
+    _focusNode.removeListener(_onFocusChanged);
     _focusNode.dispose();
     _searchController.dispose();
     _debounceTimer?.cancel();
@@ -99,41 +115,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
   }
 
-  Future<void> _pickImage() async {
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36, height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('카메라'),
-              onTap: () => Navigator.pop(context, ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('앨범에서 선택'),
-              onTap: () => Navigator.pop(context, ImageSource.gallery),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-
-    if (source == null) return;
+  Future<void> _pickAndSendImage(ImageSource source) async {
+    setState(() => _showAttachPanel = false);
 
     final picker = ImagePicker();
     final picked = await picker.pickImage(
@@ -175,6 +158,109 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  void _toggleAttachPanel() {
+    setState(() {
+      _showAttachPanel = !_showAttachPanel;
+      if (_showAttachPanel) {
+        _focusNode.unfocus();
+      }
+    });
+  }
+
+  Future<void> _sendLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          showTopSnackBar(context, '위치 서비스가 꺼져있습니다. 설정에서 켜주세요.', isError: true);
+        }
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            showTopSnackBar(context, '위치 권한이 필요합니다', isError: true);
+          }
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        if (!mounted) return;
+        final goSettings = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('위치 권한 필요'),
+            content: const Text('위치 공유를 위해 설정에서 위치 권한을 허용해주세요.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('취소'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('설정으로 이동'),
+              ),
+            ],
+          ),
+        );
+        if (goSettings == true) {
+          await Geolocator.openAppSettings();
+        }
+        return;
+      }
+
+      if (mounted) {
+        showTopSnackBar(context, '위치 정보를 가져오는 중...', duration: const Duration(seconds: 1));
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+
+      final locationContent = '__LOC__:${position.latitude},${position.longitude}:내 위치';
+      ref.read(chatProvider.notifier).sendMessage(content: locationContent);
+
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(0,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        showTopSnackBar(context, '위치를 가져올 수 없습니다: $e', isError: true);
+      }
+    }
+  }
+
+  Future<void> _openLocationPicker() async {
+    setState(() => _showAttachPanel = false);
+
+    final result = await Navigator.push<LocationPickerResult>(
+      context,
+      MaterialPageRoute(builder: (_) => const LocationPickerScreen()),
+    );
+
+    if (result == null) return;
+
+    final locationContent = '__LOC__:${result.latitude},${result.longitude}:${result.label}';
+    ref.read(chatProvider.notifier).sendMessage(content: locationContent);
+
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
   void _showChatMenu() {
     showModalBottomSheet(
       context: context,
@@ -213,14 +299,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     builder: (_) => const ChatMediaGalleryScreen(),
                   ),
                 );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.screenshot_outlined),
-              title: const Text('캡처하기'),
-              onTap: () {
-                Navigator.pop(context);
-                setState(() => _captureMode = true);
               },
             ),
             const SizedBox(height: 8),
@@ -439,7 +517,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         title: const Text('삭제', style: TextStyle(color: Colors.red)),
         onTap: () {
           Navigator.pop(context);
-          _showDeleteDialog(message);
+          setState(() {
+            _deleteMode = true;
+            _selectedForDelete.clear();
+            _selectedForDelete.add(message.id);
+          });
         },
       ));
     }
@@ -511,12 +593,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  void _showDeleteDialog(ChatMessage message) {
+  void _exitDeleteMode() {
+    setState(() {
+      _deleteMode = false;
+      _selectedForDelete.clear();
+    });
+  }
+
+  void _toggleDeleteSelection(ChatMessage message, bool isMe) {
+    if (!isMe) return; // 내 메시지만 선택 가능
+    setState(() {
+      if (_selectedForDelete.contains(message.id)) {
+        _selectedForDelete.remove(message.id);
+        if (_selectedForDelete.isEmpty) _deleteMode = false;
+      } else {
+        _selectedForDelete.add(message.id);
+      }
+    });
+  }
+
+  void _confirmDeleteSelected() {
+    if (_selectedForDelete.isEmpty) return;
+    final count = _selectedForDelete.length;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('메시지 삭제'),
-        content: const Text('이 메시지를 삭제하시겠습니까?'),
+        content: Text('$count개의 메시지를 삭제하시겠습니까?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -524,8 +627,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
           TextButton(
             onPressed: () {
-              ref.read(chatProvider.notifier).deleteMessage(messageId: message.id);
+              for (final id in _selectedForDelete) {
+                ref.read(chatProvider.notifier).deleteMessage(messageId: id);
+              }
               Navigator.pop(context);
+              _exitDeleteMode();
             },
             child: const Text('삭제', style: TextStyle(color: Colors.red)),
           ),
@@ -549,9 +655,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final currentUserId = ApiClient.getUserId() ?? '';
     final isPartnerTyping = ref.watch(isPartnerTypingProvider);
     final isPartnerOnline = ref.watch(isPartnerOnlineProvider);
+    final coupleState = ref.watch(coupleProvider);
+    final partnerName = coupleState.couple?.getPartner(currentUserId)?.nickname ?? '채팅';
 
     return Scaffold(
-      appBar: _captureMode
+      appBar: _deleteMode
+          ? AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: _exitDeleteMode,
+              ),
+              title: Text(
+                '${_selectedForDelete.length}개 선택됨',
+                style: const TextStyle(fontSize: 15),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: _selectedForDelete.isNotEmpty
+                      ? _confirmDeleteSelected
+                      : null,
+                  child: Text(
+                    '삭제 (${_selectedForDelete.length})',
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : _captureMode
           ? AppBar(
               leading: IconButton(
                 icon: const Icon(Icons.close),
@@ -586,7 +720,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               : AppBar(
               title: Column(
                 children: [
-                  const Text('채팅'),
+                  Text(partnerName),
                   if (isPartnerOnline)
                     const Text(
                       '온라인',
@@ -677,31 +811,58 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           _captureMode && _isInCaptureRange(index);
                       final isHighlighted = chatState.isSearchMode &&
                           message.id == chatState.highlightedMessageId;
+                      final isDeleteSelected =
+                          _deleteMode && _selectedForDelete.contains(message.id);
 
                       return GestureDetector(
                         onTap: _captureMode
                             ? () => _onCaptureTap(index)
-                            : null,
+                            : _deleteMode
+                                ? () => _toggleDeleteSelection(message, isMe)
+                                : null,
                         child: Container(
                           color: isCaptureSelected
                               ? AppTheme.primaryColor.withValues(alpha: 0.1)
-                              : isHighlighted
-                                  ? Colors.amber.withValues(alpha: 0.25)
-                                  : null,
-                          child: Column(
+                              : isDeleteSelected
+                                  ? Colors.red.withValues(alpha: 0.08)
+                                  : isHighlighted
+                                      ? Colors.amber.withValues(alpha: 0.25)
+                                      : null,
+                          child: Row(
                             children: [
-                              if (showDateHeader)
-                                _DateHeader(date: message.createdAt),
-                              _MessageBubble(
-                                message: message,
-                                isMe: isMe,
-                                onLongPress: _captureMode
-                                    ? null
-                                    : () =>
-                                        _onLongPressMessage(message, isMe),
-                                onRetry: message.status == MessageStatus.failed
-                                    ? () => ref.read(chatProvider.notifier).retryMessage(message.id)
-                                    : null,
+                              if (_deleteMode)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: isMe
+                                      ? Icon(
+                                          isDeleteSelected
+                                              ? Icons.check_circle
+                                              : Icons.radio_button_unchecked,
+                                          color: isDeleteSelected
+                                              ? Colors.red
+                                              : Colors.grey.shade400,
+                                          size: 22,
+                                        )
+                                      : const SizedBox(width: 22),
+                                ),
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    if (showDateHeader)
+                                      _DateHeader(date: message.createdAt),
+                                    _MessageBubble(
+                                      message: message,
+                                      isMe: isMe,
+                                      onLongPress: (_captureMode || _deleteMode)
+                                          ? null
+                                          : () =>
+                                              _onLongPressMessage(message, isMe),
+                                      onRetry: message.status == MessageStatus.failed
+                                          ? () => ref.read(chatProvider.notifier).retryMessage(message.id)
+                                          : null,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -738,68 +899,137 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ),
 
-          // Input area (hidden in search mode)
-          if (!chatState.isSearchMode)
-          Container(
-            padding: EdgeInsets.only(
-              left: 12,
-              right: 8,
-              top: 8,
-              bottom: MediaQuery.of(context).padding.bottom + 8,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 4,
-                  offset: const Offset(0, -1),
+          // Input area (hidden in search/delete mode)
+          if (!chatState.isSearchMode && !_deleteMode)
+          Column(
+            children: [
+              Container(
+                padding: EdgeInsets.only(
+                  left: 12,
+                  right: 8,
+                  top: 8,
+                  bottom: _showAttachPanel ? 8 : MediaQuery.of(context).padding.bottom + 8,
                 ),
-              ],
-            ),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(
-                    Icons.image_outlined,
-                    color: AppTheme.textSecondary,
-                  ),
-                  onPressed: _pickImage,
-                ),
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppTheme.backgroundColor,
-                      borderRadius: BorderRadius.circular(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, -1),
                     ),
-                    child: TextField(
-                      controller: _messageController,
-                      focusNode: _focusNode,
-                      maxLines: 4,
-                      minLines: 1,
-                      textInputAction: TextInputAction.newline,
-                      onChanged: _onTextChanged,
-                      decoration: const InputDecoration(
-                        hintText: '메시지를 입력하세요...',
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: AnimatedRotation(
+                        turns: _showAttachPanel ? 0.125 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Icon(
+                          Icons.add,
+                          color: _showAttachPanel
+                              ? AppTheme.primaryColor
+                              : AppTheme.textSecondary,
+                          size: 28,
+                        ),
+                      ),
+                      onPressed: _toggleAttachPanel,
+                    ),
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: AppTheme.backgroundColor,
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: TextField(
+                          controller: _messageController,
+                          focusNode: _focusNode,
+                          maxLines: 4,
+                          minLines: 1,
+                          textInputAction: TextInputAction.newline,
+                          onChanged: _onTextChanged,
+                          decoration: const InputDecoration(
+                            hintText: '메시지를 입력하세요...',
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                          ),
                         ),
                       ),
                     ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.send_rounded,
+                        color: AppTheme.primaryColor,
+                      ),
+                      onPressed: _sendMessage,
+                    ),
+                  ],
+                ),
+              ),
+              // Attach panel
+              if (_showAttachPanel)
+                Container(
+                  padding: EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    top: 16,
+                    bottom: MediaQuery.of(context).padding.bottom + 16,
+                  ),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                  ),
+                  child: Wrap(
+                    spacing: 20,
+                    runSpacing: 16,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      _AttachButton(
+                        icon: Icons.photo_library,
+                        label: '사진',
+                        color: const Color(0xFF4CAF50),
+                        onTap: () => _pickAndSendImage(ImageSource.gallery),
+                      ),
+                      _AttachButton(
+                        icon: Icons.camera_alt,
+                        label: '카메라',
+                        color: const Color(0xFF2196F3),
+                        onTap: () => _pickAndSendImage(ImageSource.camera),
+                      ),
+                      _AttachButton(
+                        icon: Icons.my_location,
+                        label: '내 위치',
+                        color: const Color(0xFFFF9800),
+                        onTap: () {
+                          setState(() => _showAttachPanel = false);
+                          _sendLocation();
+                        },
+                      ),
+                      _AttachButton(
+                        icon: Icons.map_outlined,
+                        label: '지도',
+                        color: const Color(0xFFE91E63),
+                        onTap: _openLocationPicker,
+                      ),
+                      _AttachButton(
+                        icon: Icons.screenshot_outlined,
+                        label: '캡처',
+                        color: const Color(0xFF9C27B0),
+                        onTap: () {
+                          setState(() {
+                            _showAttachPanel = false;
+                            _captureMode = true;
+                          });
+                        },
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 4),
-                IconButton(
-                  icon: const Icon(
-                    Icons.send_rounded,
-                    color: AppTheme.primaryColor,
-                  ),
-                  onPressed: _sendMessage,
-                ),
-              ],
-            ),
+            ],
           ),
         ],
       ),
@@ -855,8 +1085,22 @@ class _MessageBubble extends StatelessWidget {
     this.onRetry,
   });
 
+  static _LocationData? _parseLocation(String content) {
+    if (!content.startsWith('__LOC__:')) return null;
+    final parts = content.substring(8).split(':');
+    if (parts.length < 2) return null;
+    final coords = parts[0].split(',');
+    if (coords.length != 2) return null;
+    final lat = double.tryParse(coords[0]);
+    final lng = double.tryParse(coords[1]);
+    if (lat == null || lng == null) return null;
+    return _LocationData(lat, lng, parts.length > 1 ? parts[1] : '위치');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final locData = _parseLocation(message.content);
+
     return Opacity(
       opacity: message.status == MessageStatus.sending ? 0.6 : 1.0,
       child: Padding(
@@ -921,6 +1165,9 @@ class _MessageBubble extends StatelessWidget {
               const SizedBox(width: 6),
             ],
             // Bubble
+            if (locData != null)
+              _LocationBubble(data: locData, isMe: isMe)
+            else
             Container(
               constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.65,
@@ -995,6 +1242,248 @@ class _MessageBubble extends StatelessWidget {
           ],
         ),
       ),
+      ),
+    );
+  }
+}
+
+class _LocationData {
+  final double lat;
+  final double lng;
+  final String label;
+  const _LocationData(this.lat, this.lng, this.label);
+}
+
+class _LocationBubble extends StatelessWidget {
+  final _LocationData data;
+  final bool isMe;
+
+  const _LocationBubble({required this.data, required this.isMe});
+
+  @override
+  Widget build(BuildContext context) {
+    // 서버 프록시를 통한 Naver Static Map (깔끔한 네이버 지도 이미지)
+    final staticMapUrl =
+        '${AppConstants.apiBaseUrl}/map/static'
+        '?lat=${data.lat}&lng=${data.lng}&w=600&h=300&zoom=15';
+
+    return GestureDetector(
+      onTap: () => _openInMaps(data.lat, data.lng, data.label),
+      child: Container(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.65,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isMe ? 16 : 4),
+            bottomRight: Radius.circular(isMe ? 4 : 16),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 네이버 Static Map 미리보기
+            SizedBox(
+              height: 130,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    staticMapUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: const Color(0xFFF0F4F8),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.location_on, color: Colors.red, size: 36),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${data.lat.toStringAsFixed(4)}, ${data.lng.toStringAsFixed(4)}',
+                            style: const TextStyle(fontSize: 10, color: AppTheme.textHint),
+                          ),
+                        ],
+                      ),
+                    ),
+                    loadingBuilder: (_, child, progress) {
+                      if (progress == null) return child;
+                      return Container(
+                        color: const Color(0xFFF0F4F8),
+                        child: const Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  // 네이버 지도로 보기 뱃지
+                  Positioned(
+                    top: 6,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1EC800),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'N',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(width: 3),
+                          Text(
+                            '지도 보기',
+                            style: TextStyle(fontSize: 10, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on, size: 18, color: Colors.red),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      data.label,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppTheme.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, size: 18, color: AppTheme.textHint),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openInMaps(double lat, double lng, String label) async {
+    final encodedLabel = Uri.encodeComponent(label);
+    // 네이버 지도: 마커 표시 + 장소명
+    final naverUrl = Uri.parse(
+      'nmap://place?lat=$lat&lng=$lng&name=$encodedLabel&appname=com.jiny.hmlove',
+    );
+    // 애플 지도 fallback
+    final appleUrl = Uri.parse(
+      'https://maps.apple.com/?ll=$lat,$lng&q=$encodedLabel',
+    );
+
+    if (await canLaunchUrl(naverUrl)) {
+      await launchUrl(naverUrl);
+    } else {
+      await launchUrl(appleUrl, mode: LaunchMode.externalApplication);
+    }
+  }
+}
+
+class _MapGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFB9D9B0)
+      ..strokeWidth = 0.5;
+
+    // 가로선
+    for (double y = 0; y < size.height; y += 20) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+    // 세로선
+    for (double x = 0; x < size.width; x += 20) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+
+    // 중심 십자선
+    final centerPaint = Paint()
+      ..color = const Color(0xFF81C784)
+      ..strokeWidth = 1;
+    canvas.drawLine(
+      Offset(size.width / 2, 0),
+      Offset(size.width / 2, size.height),
+      centerPaint,
+    );
+    canvas.drawLine(
+      Offset(0, size.height / 2),
+      Offset(size.width, size.height / 2),
+      centerPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _AttachButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _AttachButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: color, size: 26),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+        ],
       ),
     );
   }

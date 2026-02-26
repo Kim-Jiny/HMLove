@@ -379,6 +379,59 @@ router.get('/couples/:id/feeds', async (req, res) => {
   }
 });
 
+// GET /admin/couples/:id/letters
+router.get('/couples/:id/letters', async (req, res) => {
+  try {
+    const { page = '1', limit = '20' } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = Math.min(parseInt(limit), 100);
+
+    const [letters, total] = await Promise.all([
+      prisma.letter.findMany({
+        where: { coupleId: req.params.id },
+        skip, take,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          writer: { select: { id: true, nickname: true, profileImage: true } },
+          receiver: { select: { id: true, nickname: true } },
+        },
+      }),
+      prisma.letter.count({ where: { coupleId: req.params.id } }),
+    ]);
+
+    res.json({ letters, total, page: parseInt(page), totalPages: Math.ceil(total / take) });
+  } catch (err) {
+    console.error('Admin couple letters error:', err);
+    res.status(500).json({ error: '편지 조회에 실패했습니다.' });
+  }
+});
+
+// GET /admin/couples/:id/photos
+router.get('/couples/:id/photos', async (req, res) => {
+  try {
+    const { page = '1', limit = '20' } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = Math.min(parseInt(limit), 100);
+
+    const [photos, total] = await Promise.all([
+      prisma.photo.findMany({
+        where: { coupleId: req.params.id },
+        skip, take,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          author: { select: { id: true, nickname: true, profileImage: true } },
+        },
+      }),
+      prisma.photo.count({ where: { coupleId: req.params.id } }),
+    ]);
+
+    res.json({ photos, total, page: parseInt(page), totalPages: Math.ceil(total / take) });
+  } catch (err) {
+    console.error('Admin couple photos error:', err);
+    res.status(500).json({ error: '사진 조회에 실패했습니다.' });
+  }
+});
+
 // GET /admin/fights
 router.get('/fights', async (req, res) => {
   try {
@@ -547,40 +600,54 @@ router.patch('/inquiries/:id', async (req, res) => {
       },
     });
 
-    // 푸시 알림 전송
+    // 알림 DB 저장 + 푸시 알림 전송
     let pushResult = { sent: false, reason: '' };
 
-    if (!inquiry.user.fcmToken) {
-      pushResult = { sent: false, reason: '유저에게 FCM 토큰이 없습니다 (푸시 알림 미허용 또는 미등록)' };
-    } else if (adminReply) {
-      try {
-        await sendPushNotification({
-          token: inquiry.user.fcmToken,
-          title: '문의 답변 도착',
-          body: `"${inquiry.title}" 문의에 답변이 등록되었습니다.`,
-          data: { type: 'inquiry', inquiryId: inquiry.id },
-        });
-        pushResult = { sent: true, reason: `전송 성공 (토큰: ${inquiry.user.fcmToken.substring(0, 20)}...)` };
-      } catch (pushErr) {
-        pushResult = { sent: false, reason: `전송 실패: ${pushErr.message}` };
+    if (adminReply) {
+      const nTitle = '문의 답변 도착';
+      const nBody = `"${inquiry.title}" 문의에 답변이 등록되었습니다.`;
+      const nData = { type: 'inquiry', inquiryId: inquiry.id };
+
+      // Notification DB 저장
+      await prisma.notification.create({
+        data: { userId: inquiry.user.id, type: 'inquiry', title: nTitle, body: nBody, data: nData },
+      });
+
+      if (!inquiry.user.fcmToken) {
+        pushResult = { sent: false, reason: '유저에게 FCM 토큰이 없습니다 (푸시 알림 미허용 또는 미등록)' };
+      } else {
+        try {
+          await sendPushNotification({ token: inquiry.user.fcmToken, title: nTitle, body: nBody, data: nData });
+          pushResult = { sent: true, reason: `전송 성공 (토큰: ${inquiry.user.fcmToken.substring(0, 20)}...)` };
+        } catch (pushErr) {
+          pushResult = { sent: false, reason: `전송 실패: ${pushErr.message}` };
+        }
       }
     } else if (status) {
-      try {
-        const statusLabels = {
-          PENDING: '접수됨',
-          IN_PROGRESS: '처리 중',
-          RESOLVED: '답변 완료',
-          CLOSED: '종료',
-        };
-        await sendPushNotification({
-          token: inquiry.user.fcmToken,
-          title: '문의 상태 변경',
-          body: `"${inquiry.title}" 문의가 ${statusLabels[status] || status} 상태로 변경되었습니다.`,
-          data: { type: 'inquiry', inquiryId: inquiry.id },
-        });
-        pushResult = { sent: true, reason: `전송 성공 (토큰: ${inquiry.user.fcmToken.substring(0, 20)}...)` };
-      } catch (pushErr) {
-        pushResult = { sent: false, reason: `전송 실패: ${pushErr.message}` };
+      const statusLabels = {
+        PENDING: '접수됨',
+        IN_PROGRESS: '처리 중',
+        RESOLVED: '답변 완료',
+        CLOSED: '종료',
+      };
+      const nTitle = '문의 상태 변경';
+      const nBody = `"${inquiry.title}" 문의가 ${statusLabels[status] || status} 상태로 변경되었습니다.`;
+      const nData = { type: 'inquiry', inquiryId: inquiry.id };
+
+      // Notification DB 저장
+      await prisma.notification.create({
+        data: { userId: inquiry.user.id, type: 'inquiry', title: nTitle, body: nBody, data: nData },
+      });
+
+      if (!inquiry.user.fcmToken) {
+        pushResult = { sent: false, reason: '유저에게 FCM 토큰이 없습니다' };
+      } else {
+        try {
+          await sendPushNotification({ token: inquiry.user.fcmToken, title: nTitle, body: nBody, data: nData });
+          pushResult = { sent: true, reason: `전송 성공 (토큰: ${inquiry.user.fcmToken.substring(0, 20)}...)` };
+        } catch (pushErr) {
+          pushResult = { sent: false, reason: `전송 실패: ${pushErr.message}` };
+        }
       }
     }
 

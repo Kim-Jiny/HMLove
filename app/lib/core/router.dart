@@ -23,6 +23,7 @@ import '../screens/letter/letter_write_screen.dart';
 import '../screens/letter/letter_read_screen.dart';
 import '../screens/fortune/fortune_screen.dart';
 import '../screens/home/anniversary_screen.dart';
+import '../screens/notification/notification_screen.dart';
 
 /// 푸시 알림 등에서 네비게이션 접근용 글로벌 키
 final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -152,6 +153,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/anniversary',
         builder: (context, state) => const AnniversaryScreen(),
+      ),
+
+      // Notifications
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationScreen(),
       ),
 
       // Main Shell with bottom navigation

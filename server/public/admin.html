@@ -620,7 +620,7 @@ async function loadCouples() {
 
 let coupleModalId = '';
 let coupleModalUsers = {};
-let msgPage = 1, feedPage = 1;
+let msgPage = 1, feedPage = 1, letterPage = 1, photoPage = 1;
 
 async function coupleDetail(id) {
   const d = await api('/couples/'+id);
@@ -644,10 +644,12 @@ async function coupleDetail(id) {
         ).join('')+
       '</div>'+
       '<!-- Modal Tabs -->'+
-      '<div style="display:flex;gap:0;border-bottom:1px solid #f1f5f9;margin-bottom:16px;">'+
+      '<div style="display:flex;gap:0;border-bottom:1px solid #f1f5f9;margin-bottom:16px;overflow-x:auto;">'+
         '<button class="mtab active" onclick="switchCoupleTab(this,\'cd-info\')">정보</button>'+
         '<button class="mtab" onclick="switchCoupleTab(this,\'cd-msgs\')">메시지 ('+n.messages.toLocaleString()+')</button>'+
         '<button class="mtab" onclick="switchCoupleTab(this,\'cd-feeds\')">피드 ('+n.feeds+')</button>'+
+        '<button class="mtab" onclick="switchCoupleTab(this,\'cd-letters\')">편지 ('+n.letters+')</button>'+
+        '<button class="mtab" onclick="switchCoupleTab(this,\'cd-photos\')">사진 ('+n.photos+')</button>'+
       '</div>'+
       '<!-- Info Tab -->'+
       '<div id="cd-info">'+
@@ -666,6 +668,10 @@ async function coupleDetail(id) {
       '<div id="cd-msgs" style="display:none;"><div id="cd-msgs-list" style="min-height:100px;"></div><div id="cd-msgs-paging" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;"><span id="cd-msgs-info" style="font-size:12px;color:#9ca3af;"></span><div class="pagination" id="cd-msgs-pages"></div></div></div>'+
       '<!-- Feeds Tab -->'+
       '<div id="cd-feeds" style="display:none;"><div id="cd-feeds-list" style="min-height:100px;"></div><div id="cd-feeds-paging" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;"><span id="cd-feeds-info" style="font-size:12px;color:#9ca3af;"></span><div class="pagination" id="cd-feeds-pages"></div></div></div>'+
+      '<!-- Letters Tab -->'+
+      '<div id="cd-letters" style="display:none;"><div id="cd-letters-list" style="min-height:100px;"></div><div id="cd-letters-paging" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;"><span id="cd-letters-info" style="font-size:12px;color:#9ca3af;"></span><div class="pagination" id="cd-letters-pages"></div></div></div>'+
+      '<!-- Photos Tab -->'+
+      '<div id="cd-photos" style="display:none;"><div id="cd-photos-list" style="min-height:100px;"></div><div id="cd-photos-paging" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;"><span id="cd-photos-info" style="font-size:12px;color:#9ca3af;"></span><div class="pagination" id="cd-photos-pages"></div></div></div>'+
       '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">'+
         '<button class="btn btn-outline btn-sm" onclick="closeModal()">닫기</button>'+
         '<button class="btn btn-danger btn-sm" onclick="closeModal();confirmDelCouple(\''+c.id+'\',\''+esc(c.users[0]?.nickname||'')+'\',\''+esc(c.users[1]?.nickname||'')+'\')">삭제</button>'+
@@ -678,11 +684,13 @@ async function coupleDetail(id) {
 function switchCoupleTab(btn, tabId) {
   document.querySelectorAll('.mtab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
-  ['cd-info','cd-msgs','cd-feeds'].forEach(id => {
+  ['cd-info','cd-msgs','cd-feeds','cd-letters','cd-photos'].forEach(id => {
     document.getElementById(id).style.display = id === tabId ? '' : 'none';
   });
   if (tabId === 'cd-msgs') { msgPage = 1; loadCoupleMessages(); }
   if (tabId === 'cd-feeds') { feedPage = 1; loadCoupleFeeds(); }
+  if (tabId === 'cd-letters') { letterPage = 1; loadCoupleLetters(); }
+  if (tabId === 'cd-photos') { photoPage = 1; loadCouplePhotos(); }
 }
 
 async function loadCoupleMessages() {
@@ -759,6 +767,77 @@ async function loadCoupleFeeds() {
 
   document.getElementById('cd-feeds-info').textContent = d.totalPages > 0 ? d.page+' / '+d.totalPages+' 페이지 (총 '+d.total+'건)' : '';
   renderPaging('cd-feeds-pages', d.page, d.totalPages, function(p) { feedPage=p; loadCoupleFeeds(); });
+}
+
+async function loadCoupleLetters() {
+  var list = document.getElementById('cd-letters-list');
+  list.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:20px;">로딩중...</div>';
+  var d = await api('/couples/'+coupleModalId+'/letters?page='+letterPage+'&limit=20');
+  if (!d) { list.innerHTML = '<div style="text-align:center;color:#dc2626;">로드 실패</div>'; return; }
+  if (d.letters.length === 0) { list.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:20px;">편지가 없습니다.</div>'; return; }
+
+  var html = '<div style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">';
+  d.letters.forEach(function(l) {
+    var writerName = l.writer ? esc(l.writer.nickname) : '?';
+    var receiverName = l.receiver ? esc(l.receiver.nickname) : '?';
+    var statusLabel = l.status === 'DELIVERED' ? '배달됨' : l.status === 'SCHEDULED' ? '예약됨' : '임시저장';
+    var statusColor = l.status === 'DELIVERED' ? '#10b981' : l.status === 'SCHEDULED' ? '#f59e0b' : '#9ca3af';
+    var readBadge = l.status === 'DELIVERED' ? (l.isRead ? '<span style="font-size:10px;color:#10b981;margin-left:4px;">읽음</span>' : '<span style="font-size:10px;color:#ef4444;margin-left:4px;">안읽음</span>') : '';
+
+    html += '<div style="background:#f8fafc;border-radius:10px;padding:14px;">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">';
+    html += '<div style="display:flex;align-items:center;gap:6px;">';
+    html += (l.writer?.profileImage ? '<img src="'+l.writer.profileImage+'" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">' : '<div style="width:28px;height:28px;border-radius:50%;background:#fff1f2;display:flex;align-items:center;justify-content:center;color:#f43f5e;font-weight:700;font-size:11px;">'+writerName[0]+'</div>');
+    html += '<span style="font-size:13px;font-weight:600;">'+writerName+'</span>';
+    html += '<span style="font-size:11px;color:#9ca3af;">&#x2192;</span>';
+    html += '<span style="font-size:13px;font-weight:500;">'+receiverName+'</span>';
+    html += '</div>';
+    html += '<div style="display:flex;align-items:center;gap:6px;">';
+    html += '<span style="font-size:10px;padding:2px 8px;border-radius:9999px;background:'+statusColor+'20;color:'+statusColor+';font-weight:600;">'+statusLabel+'</span>';
+    html += readBadge;
+    html += '</div>';
+    html += '</div>';
+    html += '<div style="font-size:14px;font-weight:600;color:#1f2937;margin-bottom:4px;">'+esc(l.title)+'</div>';
+    html += '<div style="font-size:13px;color:#4b5563;line-height:1.6;white-space:pre-wrap;max-height:80px;overflow:hidden;">'+esc(l.content)+'</div>';
+    html += '<div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:#9ca3af;">';
+    html += '<span>작성: '+fmtDT(l.createdAt)+'</span>';
+    html += '<span>배달예정: '+fmtDT(l.deliveryDate)+'</span>';
+    html += '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  list.innerHTML = html;
+
+  document.getElementById('cd-letters-info').textContent = d.totalPages > 0 ? d.page+' / '+d.totalPages+' 페이지 (총 '+d.total+'건)' : '';
+  renderPaging('cd-letters-pages', d.page, d.totalPages, function(p) { letterPage=p; loadCoupleLetters(); });
+}
+
+async function loadCouplePhotos() {
+  var list = document.getElementById('cd-photos-list');
+  list.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:20px;">로딩중...</div>';
+  var d = await api('/couples/'+coupleModalId+'/photos?page='+photoPage+'&limit=20');
+  if (!d) { list.innerHTML = '<div style="text-align:center;color:#dc2626;">로드 실패</div>'; return; }
+  if (d.photos.length === 0) { list.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:20px;">사진이 없습니다.</div>'; return; }
+
+  var html = '<div style="max-height:400px;overflow-y:auto;">';
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">';
+  d.photos.forEach(function(p) {
+    var authorName = p.author ? esc(p.author.nickname) : '?';
+    html += '<div style="position:relative;border-radius:8px;overflow:hidden;background:#f1f5f9;aspect-ratio:1;">';
+    html += '<img src="'+esc(p.imageUrl)+'" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.parentElement.innerHTML=\'<div style=padding:12px;text-align:center;font-size:11px;color:#9ca3af>이미지 없음</div>\'">';
+    html += '<div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.6));padding:6px 8px;">';
+    html += '<div style="font-size:10px;color:#fff;font-weight:500;">'+authorName+'</div>';
+    if (p.caption) html += '<div style="font-size:9px;color:rgba(255,255,255,.8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(p.caption)+'</div>';
+    html += '<div style="font-size:9px;color:rgba(255,255,255,.6);">'+fmtD(p.takenAt||p.createdAt)+'</div>';
+    if (p.address) html += '<div style="font-size:9px;color:rgba(255,255,255,.7);">&#x1F4CD; '+esc(p.address)+'</div>';
+    html += '</div>';
+    html += '</div>';
+  });
+  html += '</div></div>';
+  list.innerHTML = html;
+
+  document.getElementById('cd-photos-info').textContent = d.totalPages > 0 ? d.page+' / '+d.totalPages+' 페이지 (총 '+d.total+'건)' : '';
+  renderPaging('cd-photos-pages', d.page, d.totalPages, function(p) { photoPage=p; loadCouplePhotos(); });
 }
 
 function confirmDelCouple(id, n1, n2) {

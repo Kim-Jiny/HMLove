@@ -28,6 +28,9 @@ class AppConstants {
   // Push
   static const String fcmTokenKey = 'fcm_token';
 
+  // Naver Map
+  static const String naverMapClientId = '8hmfjdafvp';
+
   // Date Formats
   static const String dateFormat = 'yyyy-MM-dd';
   static const String dateTimeFormat = 'yyyy-MM-dd HH:mm:ss';
