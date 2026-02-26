@@ -29,7 +29,7 @@ class AppConstants {
   static const String fcmTokenKey = 'fcm_token';
 
   // Naver Map
-  static const String naverMapClientId = '8hmfjdafvp';
+  static const String naverMapClientId = 'lk38ez02sj';
 
   // Date Formats
   static const String dateFormat = 'yyyy-MM-dd';

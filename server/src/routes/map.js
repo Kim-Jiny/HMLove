@@ -14,6 +14,8 @@ router.get('/static', async (req, res) => {
       return res.status(400).json({ message: 'lat, lng 파라미터가 필요합니다.' });
     }
 
+    console.log('[Map] Using Client ID:', NCP_CLIENT_ID, 'Secret length:', NCP_CLIENT_SECRET.length);
+
     if (!NCP_CLIENT_SECRET) {
       return res.status(500).json({ message: 'NCP_MAP_CLIENT_SECRET 환경변수가 설정되지 않았습니다.' });
     }
