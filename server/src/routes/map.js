@@ -20,7 +20,7 @@ router.get('/static', async (req, res) => {
       return res.status(500).json({ message: 'NCP_MAP_CLIENT_SECRET 환경변수가 설정되지 않았습니다.' });
     }
 
-    const url = `https://naveropenapi.apigw.ntruss.com/map-static/v2/raster`
+    const url = `https://maps.apigw.ntruss.com/map-static/v2/raster`
       + `?center=${lng},${lat}`
       + `&level=${zoom}`
       + `&w=${w}&h=${h}`
@@ -72,7 +72,7 @@ router.get('/test', async (req, res) => {
   const w = '600';
   const h = '300';
 
-  const naverUrl = `https://naveropenapi.apigw.ntruss.com/map-static/v2/raster`
+  const naverUrl = `https://maps.apigw.ntruss.com/map-static/v2/raster`
     + `?center=${lng},${lat}&level=${zoom}&w=${w}&h=${h}&maptype=basic`
     + `&markers=type:d|size:mid|pos:${lng} ${lat}|color:red`;
 
@@ -135,7 +135,7 @@ router.get('/test', async (req, res) => {
 ${isOk ? '<h2>미리보기</h2><img src="' + proxyImgUrl + '" alt="Static Map" />' : ''}
 
 <h2>curl 재현 명령어</h2>
-<pre>curl -v "https://naveropenapi.apigw.ntruss.com/map-static/v2/raster?center=${lng},${lat}&level=${zoom}&w=${w}&h=${h}&maptype=basic" \\
+<pre>curl -v "https://maps.apigw.ntruss.com/map-static/v2/raster?center=${lng},${lat}&level=${zoom}&w=${w}&h=${h}&maptype=basic" \\
   -H "X-NCP-APIGW-API-KEY-ID: ${NCP_CLIENT_ID}" \\
   -H "X-NCP-APIGW-API-KEY: ${NCP_CLIENT_SECRET.substring(0, 6)}...${NCP_CLIENT_SECRET.substring(NCP_CLIENT_SECRET.length - 4)}"</pre>
 
