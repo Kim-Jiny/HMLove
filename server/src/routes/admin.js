@@ -212,7 +212,7 @@ router.get('/users/:id', async (req, res) => {
       select: {
         id: true, email: true, nickname: true, profileImage: true,
         birthDate: true, zodiacSign: true, chineseZodiac: true,
-        coupleId: true, createdAt: true, updatedAt: true,
+        fcmToken: true, coupleId: true, createdAt: true, updatedAt: true,
         couple: {
           select: {
             id: true, startDate: true, inviteCode: true,
@@ -536,6 +536,7 @@ router.patch('/inquiries/:id', async (req, res) => {
     if (adminReply !== undefined) {
       data.adminReply = adminReply;
       data.repliedAt = new Date();
+      data.isReplyRead = false;
     }
 
     const updated = await prisma.inquiry.update({
@@ -546,26 +547,150 @@ router.patch('/inquiries/:id', async (req, res) => {
       },
     });
 
-    // 상태 변경 시 푸시 알림
-    if (status && inquiry.user.fcmToken) {
-      const statusLabels = {
-        PENDING: '접수됨',
-        IN_PROGRESS: '처리 중',
-        RESOLVED: '답변 완료',
-        CLOSED: '종료',
-      };
-      sendPushNotification({
-        token: inquiry.user.fcmToken,
-        title: '문의 상태 변경',
-        body: `"${inquiry.title}" 문의가 ${statusLabels[status] || status} 상태로 변경되었습니다.`,
-        data: { type: 'inquiry', inquiryId: inquiry.id },
-      });
+    // 푸시 알림 전송
+    let pushResult = { sent: false, reason: '' };
+
+    if (!inquiry.user.fcmToken) {
+      pushResult = { sent: false, reason: '유저에게 FCM 토큰이 없습니다 (푸시 알림 미허용 또는 미등록)' };
+    } else if (adminReply) {
+      try {
+        await sendPushNotification({
+          token: inquiry.user.fcmToken,
+          title: '문의 답변 도착',
+          body: `"${inquiry.title}" 문의에 답변이 등록되었습니다.`,
+          data: { type: 'inquiry', inquiryId: inquiry.id },
+        });
+        pushResult = { sent: true, reason: `전송 성공 (토큰: ${inquiry.user.fcmToken.substring(0, 20)}...)` };
+      } catch (pushErr) {
+        pushResult = { sent: false, reason: `전송 실패: ${pushErr.message}` };
+      }
+    } else if (status) {
+      try {
+        const statusLabels = {
+          PENDING: '접수됨',
+          IN_PROGRESS: '처리 중',
+          RESOLVED: '답변 완료',
+          CLOSED: '종료',
+        };
+        await sendPushNotification({
+          token: inquiry.user.fcmToken,
+          title: '문의 상태 변경',
+          body: `"${inquiry.title}" 문의가 ${statusLabels[status] || status} 상태로 변경되었습니다.`,
+          data: { type: 'inquiry', inquiryId: inquiry.id },
+        });
+        pushResult = { sent: true, reason: `전송 성공 (토큰: ${inquiry.user.fcmToken.substring(0, 20)}...)` };
+      } catch (pushErr) {
+        pushResult = { sent: false, reason: `전송 실패: ${pushErr.message}` };
+      }
     }
 
-    res.json({ inquiry: updated });
+    res.json({ inquiry: updated, pushResult });
   } catch (err) {
     console.error('Admin update inquiry error:', err);
     res.status(500).json({ error: '문의 처리에 실패했습니다.' });
+  }
+});
+
+// ===== PUSH NOTIFICATION =====
+
+// POST /admin/push/send - 개별 유저 푸시 발송
+router.post('/push/send', async (req, res) => {
+  try {
+    const { userId, title, body } = req.body;
+    if (!title || !body) {
+      return res.status(400).json({ error: '제목과 내용을 입력해주세요.' });
+    }
+
+    let users;
+    if (userId) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, nickname: true, fcmToken: true },
+      });
+      if (!user) return res.status(404).json({ error: '유저를 찾을 수 없습니다.' });
+      users = [user];
+    } else {
+      // 전체 발송
+      users = await prisma.user.findMany({
+        where: { fcmToken: { not: null } },
+        select: { id: true, nickname: true, fcmToken: true },
+      });
+    }
+
+    const results = [];
+    for (const user of users) {
+      if (!user.fcmToken) {
+        results.push({ nickname: user.nickname, success: false, reason: '토큰 없음' });
+        continue;
+      }
+      try {
+        await sendPushNotification({
+          token: user.fcmToken,
+          title,
+          body,
+          data: { type: 'notice' },
+        });
+        results.push({ nickname: user.nickname, success: true, reason: '전송 성공' });
+      } catch (err) {
+        results.push({ nickname: user.nickname, success: false, reason: err.message });
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    res.json({ total: results.length, success: successCount, failed: results.length - successCount, results });
+  } catch (err) {
+    console.error('Admin push send error:', err);
+    res.status(500).json({ error: '푸시 발송에 실패했습니다.' });
+  }
+});
+
+// GET /admin/push/tokens - FCM 토큰 보유 유저 목록
+router.get('/push/tokens', async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: { id: true, nickname: true, email: true, fcmToken: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ users });
+  } catch (err) {
+    console.error('Admin push tokens error:', err);
+    res.status(500).json({ error: '조회에 실패했습니다.' });
+  }
+});
+
+// ===== APP SETTINGS =====
+
+// GET /admin/settings - 전체 설정 목록
+router.get('/settings', async (req, res) => {
+  try {
+    const settings = await prisma.appSettings.findMany({
+      orderBy: { key: 'asc' },
+    });
+    res.json({ settings });
+  } catch (err) {
+    console.error('Admin settings list error:', err);
+    res.status(500).json({ error: '설정 조회에 실패했습니다.' });
+  }
+});
+
+// PUT /admin/settings/:key - 설정 생성/수정 (upsert)
+router.put('/settings/:key', async (req, res) => {
+  try {
+    const { value } = req.body;
+    if (value === undefined) {
+      return res.status(400).json({ error: '값을 입력해주세요.' });
+    }
+
+    const setting = await prisma.appSettings.upsert({
+      where: { key: req.params.key },
+      update: { value },
+      create: { key: req.params.key, value },
+    });
+
+    res.json({ setting });
+  } catch (err) {
+    console.error('Admin settings update error:', err);
+    res.status(500).json({ error: '설정 저장에 실패했습니다.' });
   }
 });
 

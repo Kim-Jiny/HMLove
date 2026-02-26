@@ -100,6 +100,8 @@
         <button class="tab" data-tab="couples">커플 관리</button>
         <button class="tab" data-tab="fights">다툼 관리</button>
         <button class="tab" data-tab="inquiries">문의 관리</button>
+        <button class="tab" data-tab="push">푸시 관리</button>
+        <button class="tab" data-tab="settings">설정 관리</button>
       </div>
     </div>
   </header>
@@ -271,6 +273,57 @@
         </div>
       </div>
     </div>
+
+    <!-- ===== TAB: PUSH ===== -->
+    <div id="page-push" style="display:none;">
+      <div style="margin-bottom:16px;">
+        <h2 style="font-size:18px;font-weight:700;color:#1f2937;">푸시 알림 관리</h2>
+      </div>
+
+      <!-- 전체 발송 -->
+      <div class="card" style="padding:20px;margin-bottom:16px;">
+        <h3 style="font-size:15px;font-weight:600;color:#1f2937;margin-bottom:12px;">전체 푸시 발송</h3>
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <input id="pushAllTitle" class="input" style="flex:1;" placeholder="제목">
+          <input id="pushAllBody" class="input" style="flex:2;" placeholder="내용">
+          <button class="btn btn-brand" onclick="sendPushAll()">전체 발송</button>
+        </div>
+        <div id="pushAllResult" style="font-size:12px;color:#9ca3af;"></div>
+      </div>
+
+      <!-- 토큰 현황 -->
+      <div class="card">
+        <div style="padding:16px 16px 8px;display:flex;align-items:center;justify-content:space-between;">
+          <h3 style="font-size:15px;font-weight:600;color:#1f2937;">유저 토큰 현황</h3>
+          <span id="pushTokenStats" style="font-size:12px;color:#9ca3af;"></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>닉네임</th><th>이메일</th><th>FCM 토큰</th><th style="text-align:center;">상태</th><th style="text-align:center;">테스트</th></tr></thead>
+            <tbody id="pushTokensBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== TAB: SETTINGS ===== -->
+    <div id="page-settings" style="display:none;">
+      <div style="margin-bottom:16px;">
+        <h2 style="font-size:18px;font-weight:700;color:#1f2937;">설정 관리</h2>
+        <p style="font-size:13px;color:#9ca3af;">앱에 표시되는 개인정보처리방침 등을 관리합니다.</p>
+      </div>
+      <div class="card" style="padding:24px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <h3 style="font-size:15px;font-weight:600;color:#1f2937;">개인정보처리방침</h3>
+          <button id="settingsSaveBtn" class="btn btn-brand" onclick="savePrivacyPolicy()">저장</button>
+        </div>
+        <textarea id="privacyPolicyText" class="input" rows="24" style="resize:vertical;font-size:13px;line-height:1.8;font-family:inherit;" placeholder="개인정보처리방침 내용을 입력하세요..."></textarea>
+        <div style="margin-top:8px;font-size:12px;color:#9ca3af;">
+          <span id="settingsUpdatedAt"></span>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -366,7 +419,7 @@ document.querySelectorAll('.tab').forEach(btn => {
     btn.classList.add('active');
     const tab = btn.dataset.tab;
     currentTab = tab;
-    ['overview','users','couples','fights','inquiries'].forEach(function(t) {
+    ['overview','users','couples','fights','inquiries','push','settings'].forEach(function(t) {
       document.getElementById('page-'+t).style.display = t === tab ? '' : 'none';
     });
     if (tab === 'overview') loadOverview();
@@ -374,6 +427,8 @@ document.querySelectorAll('.tab').forEach(btn => {
     else if (tab === 'couples') loadCouples();
     else if (tab === 'fights') loadFights();
     else if (tab === 'inquiries') loadInquiries();
+    else if (tab === 'push') loadPushPage();
+    else if (tab === 'settings') loadSettings();
   });
 });
 
@@ -503,10 +558,20 @@ async function userDetail(id) {
         '<div class="info-box"><div class="label">별자리 / 띠</div><div class="value">'+(u.zodiacSign||'-')+' / '+(u.chineseZodiac||'-')+'</div></div>'+
         '<div class="info-box"><div class="label">커플</div><div class="value">'+(partner?esc(partner.nickname)+' 연결':'미연결')+'</div></div>'+
       '</div>'+
+      '<div class="info-box" style="margin-bottom:12px;grid-column:span 2;">'+
+        '<div class="label">FCM 푸시 토큰</div>'+
+        '<div class="value" style="font-size:11px;word-break:break-all;color:'+(u.fcmToken?'#10b981':'#dc2626')+';">'+(u.fcmToken||'미등록 (푸시 수신 불가)')+'</div>'+
+      '</div>'+
       '<div style="font-size:13px;font-weight:600;color:#4b5563;margin-bottom:8px;">활동 통계</div>'+
       '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:20px;">'+
         stats.map(([l,v]) => '<div class="stat-mini"><div class="num">'+v+'</div><div class="lbl">'+l+'</div></div>').join('')+
       '</div>'+
+      (u.fcmToken ? '<div style="margin-bottom:16px;padding:12px;background:#f8fafc;border-radius:8px;">'+
+        '<div style="font-size:12px;font-weight:600;color:#4b5563;margin-bottom:8px;">이 유저에게 푸시 보내기</div>'+
+        '<input id="pushTitle_'+u.id+'" class="input" style="margin-bottom:6px;" placeholder="제목">'+
+        '<input id="pushBody_'+u.id+'" class="input" style="margin-bottom:8px;" placeholder="내용">'+
+        '<button class="btn btn-brand btn-sm" onclick="sendPushToUser(\''+u.id+'\')">발송</button>'+
+      '</div>' : '')+
       '<div style="display:flex;justify-content:flex-end;gap:8px;">'+
         '<button class="btn btn-outline btn-sm" onclick="closeModal()">닫기</button>'+
         '<button class="btn btn-danger btn-sm" onclick="closeModal();confirmDelUser(\''+u.id+'\',\''+esc(u.nickname)+'\')">삭제</button>'+
@@ -900,6 +965,13 @@ async function saveInquiry(id) {
     body: JSON.stringify(body),
   });
   if (res.ok) {
+    var data = await res.json();
+    var p = data.pushResult;
+    if (p) {
+      alert(p.sent ? '저장 완료\n\n📨 푸시: ' + p.reason : '저장 완료\n\n⚠️ 푸시 미전송: ' + p.reason);
+    } else {
+      alert('저장되었습니다.');
+    }
     closeModal();
     loadInquiries();
   } else {
@@ -935,6 +1007,111 @@ document.addEventListener('keydown', e => { if(e.key==='Escape') closeModal(); }
 function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
 function fmtD(s) { return s ? new Date(s).toLocaleDateString('ko-KR') : '-'; }
 function fmtDT(s) { if(!s) return '-'; const d=new Date(s); return d.toLocaleDateString('ko-KR')+' '+d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); }
+
+// ===== PUSH =====
+async function loadPushPage() {
+  const d = await api('/push/tokens');
+  if (!d) return;
+  const users = d.users;
+  const withToken = users.filter(u => u.fcmToken);
+  document.getElementById('pushTokenStats').textContent = '토큰 보유: ' + withToken.length + ' / ' + users.length + '명';
+  document.getElementById('pushTokensBody').innerHTML = users.map(u =>
+    '<tr>'+
+      '<td style="font-weight:500;">'+esc(u.nickname)+'</td>'+
+      '<td style="color:#6b7280;font-size:12px;">'+esc(u.email)+'</td>'+
+      '<td style="font-size:10px;color:#9ca3af;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(u.fcmToken ? esc(u.fcmToken.substring(0,30))+'...' : '-')+'</td>'+
+      '<td style="text-align:center;">'+(u.fcmToken ? '<span class="badge badge-green">활성</span>' : '<span class="badge badge-gray">미등록</span>')+'</td>'+
+      '<td style="text-align:center;">'+(u.fcmToken ? '<button class="btn btn-outline btn-sm" onclick="testPush(\''+u.id+'\',\''+esc(u.nickname)+'\')">테스트</button>' : '-')+'</td>'+
+    '</tr>'
+  ).join('');
+}
+
+async function sendPushToUser(userId) {
+  var title = document.getElementById('pushTitle_'+userId).value.trim();
+  var body = document.getElementById('pushBody_'+userId).value.trim();
+  if (!title || !body) { alert('제목과 내용을 입력해주세요.'); return; }
+  var res = await fetch('/api/admin/push/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ userId: userId, title: title, body: body }),
+  });
+  var d = await res.json();
+  if (res.ok) {
+    var r = d.results[0];
+    alert(r.success ? '✅ 푸시 전송 성공' : '❌ 전송 실패: ' + r.reason);
+  } else {
+    alert('발송 실패: ' + (d.error || '알 수 없는 오류'));
+  }
+}
+
+async function testPush(userId, nickname) {
+  if (!confirm(nickname + '에게 테스트 푸시를 보내시겠습니까?')) return;
+  var res = await fetch('/api/admin/push/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ userId: userId, title: '테스트 알림', body: '관리자가 보낸 테스트 푸시입니다.' }),
+  });
+  var d = await res.json();
+  if (res.ok) {
+    var r = d.results[0];
+    alert(r.success ? '✅ 전송 성공\n' + r.reason : '❌ 전송 실패\n' + r.reason);
+  } else {
+    alert('발송 실패: ' + (d.error || '알 수 없는 오류'));
+  }
+}
+
+async function sendPushAll() {
+  var title = document.getElementById('pushAllTitle').value.trim();
+  var body = document.getElementById('pushAllBody').value.trim();
+  if (!title || !body) { alert('제목과 내용을 입력해주세요.'); return; }
+  if (!confirm('FCM 토큰이 있는 모든 유저에게 푸시를 보냅니다. 계속하시겠습니까?')) return;
+  document.getElementById('pushAllResult').textContent = '발송 중...';
+  var res = await fetch('/api/admin/push/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ title: title, body: body }),
+  });
+  var d = await res.json();
+  if (res.ok) {
+    document.getElementById('pushAllResult').innerHTML =
+      '✅ 전체 ' + d.total + '명 | 성공 <b style="color:#10b981;">' + d.success + '</b> | 실패 <b style="color:#dc2626;">' + d.failed + '</b>' +
+      (d.failed > 0 ? '<br>실패: ' + d.results.filter(function(r){return !r.success}).map(function(r){return r.nickname+'('+r.reason+')'}).join(', ') : '');
+  } else {
+    document.getElementById('pushAllResult').textContent = '❌ 발송 실패: ' + (d.error || '');
+  }
+}
+
+// ===== SETTINGS =====
+async function loadSettings() {
+  try {
+    const res = await fetch('/api/settings/privacy_policy');
+    if (res.ok) {
+      const d = await res.json();
+      document.getElementById('privacyPolicyText').value = d.value || '';
+      document.getElementById('settingsUpdatedAt').textContent = d.updatedAt ? '최종 수정: ' + fmtDT(d.updatedAt) : '';
+    } else {
+      document.getElementById('privacyPolicyText').value = '';
+      document.getElementById('settingsUpdatedAt').textContent = '';
+    }
+  } catch {
+    document.getElementById('privacyPolicyText').value = '';
+  }
+}
+
+async function savePrivacyPolicy() {
+  var value = document.getElementById('privacyPolicyText').value;
+  var res = await fetch('/api/admin/settings/privacy_policy', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ value: value }),
+  });
+  if (res.ok) {
+    alert('저장되었습니다.');
+    loadSettings();
+  } else {
+    alert('저장에 실패했습니다.');
+  }
+}
 
 // 60초 자동 갱신 (대시보드 탭만)
 setInterval(() => { if(currentTab==='overview' && document.getElementById('dashboard').style.display!=='none') loadOverview(); }, 60000);

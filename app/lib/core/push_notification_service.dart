@@ -33,6 +33,14 @@ class PushNotificationService {
     }
 
     debugPrint('[Push] Permission granted');
+
+    // iOS 포그라운드에서도 알림 배너 표시
+    await _messaging.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
     await _syncToken();
 
     // 토큰 갱신 시 서버에 재등록
@@ -105,6 +113,9 @@ class PushNotificationService {
       case 'fortune':
         GoRouter.of(context).push('/fortune');
         break;
+      case 'inquiry':
+        GoRouter.of(context).go('/more');
+        break;
       case 'couple_left':
         onCoupleLeft?.call();
         GoRouter.of(context).go('/more');
@@ -115,23 +126,16 @@ class PushNotificationService {
     }
   }
 
-  /// 현재 토큰을 가져와서 로컬 저장값과 비교, 다르면 서버 업데이트
+  /// 현재 토큰을 서버에 항상 동기화 (로그인마다 유저가 달라질 수 있으므로)
   static Future<void> _syncToken() async {
     try {
       final currentToken = await _messaging.getToken();
       if (currentToken == null) return;
 
-      final box = Hive.box(AppConstants.authBox);
-      final savedToken = box.get(AppConstants.fcmTokenKey) as String?;
-
-      if (savedToken == currentToken) {
-        debugPrint('[Push] Token unchanged, skip update');
-        return;
-      }
-
-      // 토큰이 없었거나 변경됨 → 서버 업데이트
-      debugPrint('[Push] Token changed, updating server');
+      debugPrint('[Push] Syncing token to server');
       await _sendTokenToServer(currentToken);
+
+      final box = Hive.box(AppConstants.authBox);
       await box.put(AppConstants.fcmTokenKey, currentToken);
     } catch (e) {
       debugPrint('[Push] Token sync error: $e');

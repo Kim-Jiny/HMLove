@@ -23,6 +23,7 @@ import photoRoutes from './routes/photo.js';
 import letterRoutes from './routes/letter.js';
 import inquiryRoutes from './routes/inquiry.js';
 import adminRoutes from './routes/admin.js';
+import settingsRoutes from './routes/settings.js';
 
 const app = express();
 const server = createServer(app);
@@ -70,6 +71,7 @@ app.use('/api/photo', photoRoutes);
 app.use('/api/letter', letterRoutes);
 app.use('/api/inquiry', inquiryRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

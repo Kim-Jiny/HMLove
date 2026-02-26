@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
+import '../../providers/inquiry_provider.dart';
 
 class InquiryScreen extends ConsumerStatefulWidget {
   const InquiryScreen({super.key});
@@ -388,6 +389,14 @@ class _InquiryListState extends ConsumerState<_InquiryList> {
   }
 
   void _showDetail(Map<String, dynamic> inq) {
+    // 답변이 있고 읽지 않은 경우 읽음 처리
+    if (inq['adminReply'] != null && inq['isReplyRead'] == false) {
+      final dio = ref.read(dioProvider);
+      dio.patch('/inquiry/${inq['id']}/read').then((_) {
+        ref.read(unreadInquiryCountProvider.notifier).fetch();
+      }).catchError((_) {});
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,

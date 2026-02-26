@@ -233,6 +233,7 @@ model Inquiry {
   status      InquiryStatus @default(PENDING)
   adminReply  String?
   repliedAt   DateTime?
+  isReplyRead Boolean       @default(false)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 }
@@ -249,4 +250,11 @@ model AdminAccount {
   username  String   @unique
   password  String
   createdAt DateTime @default(now())
+}
+
+model AppSettings {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
 }

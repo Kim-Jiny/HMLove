@@ -48,4 +48,43 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /inquiry/unread-count - 미확인 답변 수
+router.get('/unread-count', async (req, res) => {
+  try {
+    const count = await prisma.inquiry.count({
+      where: {
+        userId: req.user.id,
+        adminReply: { not: null },
+        isReplyRead: false,
+      },
+    });
+    res.json({ count });
+  } catch (err) {
+    console.error('Inquiry unread count error:', err);
+    res.status(500).json({ error: '조회에 실패했습니다.' });
+  }
+});
+
+// PATCH /inquiry/:id/read - 답변 읽음 처리
+router.patch('/:id/read', async (req, res) => {
+  try {
+    const inquiry = await prisma.inquiry.findUnique({
+      where: { id: req.params.id },
+    });
+    if (!inquiry || inquiry.userId !== req.user.id) {
+      return res.status(404).json({ error: '문의를 찾을 수 없습니다.' });
+    }
+
+    await prisma.inquiry.update({
+      where: { id: req.params.id },
+      data: { isReplyRead: true },
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Inquiry read error:', err);
+    res.status(500).json({ error: '처리에 실패했습니다.' });
+  }
+});
+
 export default router;

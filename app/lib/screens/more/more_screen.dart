@@ -7,9 +7,11 @@ import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
+import '../../providers/inquiry_provider.dart';
 import '../../providers/letter_provider.dart';
 import 'inquiry_screen.dart';
 import 'notification_settings_screen.dart';
+import 'privacy_policy_screen.dart';
 import 'profile_edit_screen.dart';
 
 class MoreScreen extends ConsumerWidget {
@@ -435,7 +437,11 @@ class MoreScreen extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final coupleState = ref.watch(coupleProvider);
     final unreadLetters = ref.watch(unreadLettersCountProvider);
+    final unreadInquiries = ref.watch(unreadInquiryCountProvider);
     final partner = coupleState.couple?.getPartner(user?.id ?? '');
+
+    // 화면 진입 시 미확인 문의 수 갱신
+    ref.read(unreadInquiryCountProvider.notifier).fetch();
 
     return Scaffold(
       appBar: AppBar(
@@ -660,7 +666,23 @@ class MoreScreen extends ConsumerWidget {
                     title: '문의하기',
                     subtitle: '버그 신고 및 건의사항',
                     color: const Color(0xFF4CAF50),
+                    badge: unreadInquiries,
                     onTap: () => _openInquiry(context),
+                  ),
+                  const Divider(height: 1, indent: 72),
+                  _MenuTile(
+                    icon: Icons.shield_outlined,
+                    title: '개인정보처리방침',
+                    subtitle: '개인정보 보호 정책 확인',
+                    color: const Color(0xFF1976D2),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PrivacyPolicyScreen(),
+                        ),
+                      );
+                    },
                   ),
                   const Divider(height: 1, indent: 72),
                   _MenuTile(

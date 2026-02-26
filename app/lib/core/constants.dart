@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 class AppConstants {
   AppConstants._();
 
@@ -5,8 +7,12 @@ class AppConstants {
   static const String appVersion = '1.0.0';
 
   // API
-  static const String apiBaseUrl = 'http://172.30.1.80:3000/api';
-  static const String socketUrl = 'http://172.30.1.80:3000';
+  static const String _localBaseUrl = 'http://172.30.1.80:3000';
+  static const String _prodBaseUrl = 'https://hmlove-server.onrender.com';
+
+  static String get _baseUrl => kReleaseMode ? _prodBaseUrl : _localBaseUrl;
+  static String get apiBaseUrl => '$_baseUrl/api';
+  static String get socketUrl => _baseUrl;
 
   // Hive Box Names
   static const String authBox = 'auth_box';
