@@ -51,4 +51,17 @@ router.get('/static', async (req, res) => {
   }
 });
 
+// 디버그용 (나중에 제거)
+router.get('/debug', (req, res) => {
+  res.json({
+    clientId: NCP_CLIENT_ID,
+    secretLength: NCP_CLIENT_SECRET.length,
+    secretPrefix: NCP_CLIENT_SECRET.substring(0, 4) + '...',
+    envSet: {
+      id: !!process.env.NCP_MAP_CLIENT_ID,
+      secret: !!process.env.NCP_MAP_CLIENT_SECRET,
+    },
+  });
+});
+
 export default router;

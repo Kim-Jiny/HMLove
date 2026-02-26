@@ -95,6 +95,7 @@ router.post('/upload', upload.single('image'), async (req, res) => {
     const filePath = `${UPLOAD_DIR}/${fileName}`;
 
     await sharp(req.file.buffer)
+      .rotate() // EXIF 기반 자동 회전
       .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 80 })
       .toFile(filePath);

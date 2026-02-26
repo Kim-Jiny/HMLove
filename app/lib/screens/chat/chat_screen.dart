@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -1196,10 +1197,33 @@ class _MessageBubble extends StatelessWidget {
                   if (message.imageUrl != null) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        message.imageUrl!,
+                      child: CachedNetworkImage(
+                        imageUrl: message.imageUrl!,
                         width: double.infinity,
                         fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                          height: 180,
+                          color: isMe
+                              ? Colors.pink.shade200.withValues(alpha: 0.3)
+                              : const Color(0xFFF0F0F0),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppTheme.textHint,
+                              ),
+                            ),
+                          ),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          height: 100,
+                          color: const Color(0xFFF0F0F0),
+                          child: const Center(
+                            child: Icon(Icons.broken_image, color: AppTheme.textHint),
+                          ),
+                        ),
                       ),
                     ),
                     if (message.content.isNotEmpty)
