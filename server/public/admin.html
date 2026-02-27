@@ -57,13 +57,94 @@
     .stat-mini { text-align: center; background: #f8fafc; border-radius: 8px; padding: 8px 4px; }
     .stat-mini .num { font-size: 16px; font-weight: 700; color: #1f2937; }
     .stat-mini .lbl { font-size: 10px; color: #9ca3af; }
+
+    /* ===== MOBILE RESPONSIVE ===== */
+    @media (max-width: 768px) {
+      /* Header */
+      .header-bar { height: auto !important; padding: 10px 0 !important; }
+      .header-title { font-size: 14px !important; }
+
+      /* Tab navigation - horizontal scroll */
+      .tab-nav { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; }
+      .tab-nav::-webkit-scrollbar { display: none; }
+      .tab { padding: 8px 12px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+
+      /* Main content */
+      .main-content { padding: 12px !important; }
+
+      /* Dashboard charts - single column */
+      .charts-grid { grid-template-columns: 1fr !important; }
+
+      /* Dashboard bottom - stack */
+      .bottom-grid { grid-template-columns: 1fr !important; }
+
+      /* Activity cards row */
+      .activity-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important; }
+
+      /* Push form - stack vertically */
+      .push-form { flex-direction: column !important; }
+      .push-form .input { width: 100% !important; flex: none !important; }
+
+      /* User search - stack */
+      .page-header { flex-direction: column !important; align-items: flex-start !important; }
+      .page-header .search-bar { width: 100%; }
+      .page-header .search-bar input { width: 100% !important; flex: 1 !important; }
+
+      /* Modal - wider on mobile */
+      .modal-box { margin: 8px; max-height: 95vh; border-radius: 12px; }
+      .modal-box.wide { max-width: 100%; }
+
+      /* Modal stat grids */
+      .modal-stats-5 { grid-template-columns: repeat(3, 1fr) !important; }
+      .modal-stats-4 { grid-template-columns: repeat(2, 1fr) !important; }
+
+      /* Table improvements */
+      .table-wrap td, .table-wrap th { padding: 8px 10px; font-size: 12px; }
+
+      /* Pagination - compact */
+      .pagination { gap: 2px; }
+      .pagination button { padding: 4px 8px; font-size: 11px; }
+      .page-footer { flex-direction: column; gap: 8px; align-items: center !important; }
+
+      /* Settings textarea */
+      .settings-textarea { rows: 16; }
+
+      /* Info grid on very small screens */
+      .info-grid { gap: 6px; }
+      .info-box { padding: 8px; }
+      .info-box .value { font-size: 13px; }
+
+      /* Card padding reduction */
+      .card-padded { padding: 14px !important; }
+
+      /* Couple modal user cards */
+      .couple-users { flex-direction: column !important; }
+
+      /* Login card */
+      .login-card { padding: 24px !important; margin: 12px; }
+    }
+
+    @media (max-width: 480px) {
+      .tab { padding: 8px 10px; font-size: 11px; }
+      .main-content { padding: 8px !important; }
+      .info-grid { grid-template-columns: 1fr !important; }
+      .modal-stats-5 { grid-template-columns: repeat(2, 1fr) !important; }
+      .modal-stats-4 { grid-template-columns: repeat(2, 1fr) !important; }
+      .stat-card { padding: 10px !important; }
+      .stat-card div:first-child { font-size: 16px !important; }
+      .activity-grid { grid-template-columns: repeat(2, 1fr) !important; }
+      .activity-grid .card { padding: 10px !important; }
+      .activity-grid .card div:last-child { font-size: 18px !important; }
+      .modal-box { margin: 4px; }
+      .modal-inner { padding: 16px !important; }
+    }
   </style>
 </head>
 <body>
 
 <!-- ===== LOGIN ===== -->
 <div id="loginScreen" style="min-height:100vh;display:flex;align-items:center;justify-content:center;">
-  <div class="card" style="padding:40px;width:100%;max-width:380px;">
+  <div class="card login-card" style="padding:40px;width:100%;max-width:380px;">
     <div style="text-align:center;margin-bottom:24px;">
       <div style="font-size:40px;margin-bottom:8px;">&#x1F491;</div>
       <h1 style="font-size:22px;font-weight:700;color:#1f2937;">우리연애 Admin</h1>
@@ -83,10 +164,10 @@
   <!-- Header -->
   <header style="background:#fff;border-bottom:1px solid #f1f5f9;position:sticky;top:0;z-index:50;">
     <div style="max-width:1200px;margin:0 auto;padding:0 20px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;height:56px;">
+      <div class="header-bar" style="display:flex;align-items:center;justify-content:space-between;height:56px;">
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:22px;">&#x1F491;</span>
-          <span style="font-size:16px;font-weight:700;color:#1f2937;">우리연애 Admin</span>
+          <span class="header-title" style="font-size:16px;font-weight:700;color:#1f2937;">우리연애 Admin</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span id="adminName" style="font-size:12px;color:#9ca3af;"></span>
@@ -94,7 +175,7 @@
         </div>
       </div>
       <!-- Tabs -->
-      <div style="display:flex;gap:0;">
+      <div class="tab-nav" style="display:flex;gap:0;">
         <button class="tab active" data-tab="overview">대시보드</button>
         <button class="tab" data-tab="users">유저 관리</button>
         <button class="tab" data-tab="couples">커플 관리</button>
@@ -106,7 +187,7 @@
     </div>
   </header>
 
-  <main style="max-width:1200px;margin:0 auto;padding:20px;">
+  <main class="main-content" style="max-width:1200px;margin:0 auto;padding:20px;">
 
     <!-- ===== TAB: OVERVIEW ===== -->
     <div id="page-overview">
@@ -114,7 +195,7 @@
       <div id="overviewCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:16px;"></div>
 
       <!-- Activity Row -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px;">
+      <div class="activity-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px;">
         <div class="card" style="padding:14px;text-align:center;">
           <div style="font-size:11px;color:#9ca3af;">오늘 활성 유저</div>
           <div id="s-dau" style="font-size:24px;font-weight:700;color:#f43f5e;">-</div>
@@ -138,7 +219,7 @@
       </div>
 
       <!-- Charts -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+      <div class="charts-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
         <div class="card" style="padding:20px;">
           <h3 style="font-size:13px;font-weight:600;color:#6b7280;margin-bottom:12px;">일별 메시지 (14일)</h3>
           <canvas id="chartMessages" height="170"></canvas>
@@ -150,7 +231,7 @@
       </div>
 
       <!-- Fight + Recent -->
-      <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;">
+      <div class="bottom-grid" style="display:grid;grid-template-columns:1fr 2fr;gap:16px;">
         <div class="card" style="padding:20px;">
           <h3 style="font-size:13px;font-weight:600;color:#6b7280;margin-bottom:12px;">다툼 해결률</h3>
           <div style="height:150px;display:flex;align-items:center;justify-content:center;">
@@ -172,9 +253,9 @@
 
     <!-- ===== TAB: USERS ===== -->
     <div id="page-users" style="display:none;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
         <h2 style="font-size:18px;font-weight:700;color:#1f2937;">유저 관리 <span id="usersTotal" style="font-size:13px;font-weight:400;color:#9ca3af;"></span></h2>
-        <div style="display:flex;gap:8px;">
+        <div class="search-bar" style="display:flex;gap:8px;">
           <input id="userSearchInput" class="input" style="width:220px;" placeholder="이름 / 이메일 검색" onkeydown="if(event.key==='Enter')searchUsers()">
           <button class="btn btn-brand btn-sm" onclick="searchUsers()">검색</button>
         </div>
@@ -188,7 +269,7 @@
             <tbody id="usersBody"></tbody>
           </table>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-top:1px solid #f1f5f9;">
+        <div class="page-footer" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-top:1px solid #f1f5f9;">
           <span id="usersPageInfo" style="font-size:12px;color:#9ca3af;"></span>
           <div class="pagination" id="usersPaging"></div>
         </div>
@@ -209,7 +290,7 @@
             <tbody id="couplesBody"></tbody>
           </table>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-top:1px solid #f1f5f9;">
+        <div class="page-footer" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-top:1px solid #f1f5f9;">
           <span id="couplesPageInfo" style="font-size:12px;color:#9ca3af;"></span>
           <div class="pagination" id="couplesPaging"></div>
         </div>
@@ -218,7 +299,7 @@
 
     <!-- ===== TAB: FIGHTS ===== -->
     <div id="page-fights" style="display:none;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
         <h2 style="font-size:18px;font-weight:700;color:#1f2937;">다툼 관리 <span id="fightsTotal" style="font-size:13px;font-weight:400;color:#9ca3af;"></span></h2>
         <div style="display:flex;gap:8px;">
           <select id="fightFilter" class="input" style="width:140px;padding:6px 10px;" onchange="fightsPage=1;loadFights()">
@@ -237,7 +318,7 @@
             <tbody id="fightsBody"></tbody>
           </table>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-top:1px solid #f1f5f9;">
+        <div class="page-footer" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-top:1px solid #f1f5f9;">
           <span id="fightsPageInfo" style="font-size:12px;color:#9ca3af;"></span>
           <div class="pagination" id="fightsPaging"></div>
         </div>
@@ -246,7 +327,7 @@
 
     <!-- ===== TAB: INQUIRIES ===== -->
     <div id="page-inquiries" style="display:none;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
         <h2 style="font-size:18px;font-weight:700;color:#1f2937;">문의 관리 <span id="inquiriesTotal" style="font-size:13px;font-weight:400;color:#9ca3af;"></span></h2>
         <div style="display:flex;gap:8px;">
           <select id="inquiryFilter" class="input" style="width:140px;padding:6px 10px;" onchange="inquiriesPage=1;loadInquiries()">
@@ -267,7 +348,7 @@
             <tbody id="inquiriesBody"></tbody>
           </table>
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-top:1px solid #f1f5f9;">
+        <div class="page-footer" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-top:1px solid #f1f5f9;">
           <span id="inquiriesPageInfo" style="font-size:12px;color:#9ca3af;"></span>
           <div class="pagination" id="inquiriesPaging"></div>
         </div>
@@ -281,12 +362,12 @@
       </div>
 
       <!-- 전체 발송 -->
-      <div class="card" style="padding:20px;margin-bottom:16px;">
+      <div class="card card-padded" style="padding:20px;margin-bottom:16px;">
         <h3 style="font-size:15px;font-weight:600;color:#1f2937;margin-bottom:12px;">전체 푸시 발송</h3>
-        <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <div class="push-form" style="display:flex;gap:8px;margin-bottom:12px;">
           <input id="pushAllTitle" class="input" style="flex:1;" placeholder="제목">
           <input id="pushAllBody" class="input" style="flex:2;" placeholder="내용">
-          <button class="btn btn-brand" onclick="sendPushAll()">전체 발송</button>
+          <button class="btn btn-brand" onclick="sendPushAll()" style="white-space:nowrap;">전체 발송</button>
         </div>
         <div id="pushAllResult" style="font-size:12px;color:#9ca3af;"></div>
       </div>
@@ -312,7 +393,7 @@
         <h2 style="font-size:18px;font-weight:700;color:#1f2937;">설정 관리</h2>
         <p style="font-size:13px;color:#9ca3af;">앱에 표시되는 개인정보처리방침 등을 관리합니다.</p>
       </div>
-      <div class="card" style="padding:24px;">
+      <div class="card card-padded" style="padding:24px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
           <h3 style="font-size:15px;font-weight:600;color:#1f2937;">개인정보처리방침</h3>
           <button id="settingsSaveBtn" class="btn btn-brand" onclick="savePrivacyPolicy()">저장</button>
@@ -547,7 +628,7 @@ async function userDetail(id) {
   const stats = [['메시지',c.sentMessages],['피드',c.feeds],['사진',c.photos],['편지(발)',c.lettersWritten],['편지(수)',c.lettersReceived],['기분',c.moods],['일정',c.calendarEvents],['다툼',c.fights],['좋아요',c.feedLikes],['댓글',c.feedComments]];
 
   openModal(
-    '<div style="padding:24px;">'+
+    '<div class="modal-inner" style="padding:24px;">'+
       '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">'+
         (u.profileImage ? '<img src="'+u.profileImage+'" style="width:52px;height:52px;border-radius:50%;object-fit:cover;">' : '<div style="width:52px;height:52px;border-radius:50%;background:#fff1f2;display:flex;align-items:center;justify-content:center;color:#f43f5e;font-weight:700;font-size:18px;">'+esc(u.nickname?.[0]||'?')+'</div>')+
         '<div><div style="font-size:17px;font-weight:700;">'+esc(u.nickname)+'</div><div style="font-size:13px;color:#9ca3af;">'+esc(u.email)+'</div></div>'+
@@ -558,12 +639,12 @@ async function userDetail(id) {
         '<div class="info-box"><div class="label">별자리 / 띠</div><div class="value">'+(u.zodiacSign||'-')+' / '+(u.chineseZodiac||'-')+'</div></div>'+
         '<div class="info-box"><div class="label">커플</div><div class="value">'+(partner?esc(partner.nickname)+' 연결':'미연결')+'</div></div>'+
       '</div>'+
-      '<div class="info-box" style="margin-bottom:12px;grid-column:span 2;">'+
+      '<div class="info-box" style="margin-bottom:12px;">'+
         '<div class="label">FCM 푸시 토큰</div>'+
         '<div class="value" style="font-size:11px;word-break:break-all;color:'+(u.fcmToken?'#10b981':'#dc2626')+';">'+(u.fcmToken||'미등록 (푸시 수신 불가)')+'</div>'+
       '</div>'+
       '<div style="font-size:13px;font-weight:600;color:#4b5563;margin-bottom:8px;">활동 통계</div>'+
-      '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:20px;">'+
+      '<div class="modal-stats-5" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:20px;">'+
         stats.map(([l,v]) => '<div class="stat-mini"><div class="num">'+v+'</div><div class="lbl">'+l+'</div></div>').join('')+
       '</div>'+
       (u.fcmToken ? '<div style="margin-bottom:16px;padding:12px;background:#f8fafc;border-radius:8px;">'+
@@ -632,9 +713,9 @@ async function coupleDetail(id) {
   const stats = [['메시지',n.messages],['피드',n.feeds],['사진',n.photos],['편지',n.letters],['일정',n.calendarEvents],['기분',n.moods],['다툼',n.fights],['운세',n.fortunes]];
 
   openModal(
-    '<div style="padding:24px;">'+
+    '<div class="modal-inner" style="padding:24px;">'+
       '<h3 style="font-size:17px;font-weight:700;margin-bottom:16px;">커플 상세</h3>'+
-      '<div style="display:flex;gap:10px;margin-bottom:16px;">'+
+      '<div class="couple-users" style="display:flex;gap:10px;margin-bottom:16px;">'+
         c.users.map(u =>
           '<div style="flex:1;background:#f8fafc;border-radius:10px;padding:12px;text-align:center;">'+
             (u.profileImage?'<img src="'+u.profileImage+'" style="width:44px;height:44px;border-radius:50%;object-fit:cover;margin:0 auto 6px;">':'<div style="width:44px;height:44px;border-radius:50%;background:#fff1f2;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;color:#f43f5e;font-weight:700;">'+esc(u.nickname?.[0]||'?')+'</div>')+
@@ -660,7 +741,7 @@ async function coupleDetail(id) {
           '<div class="info-box"><div class="label">마지막 활동</div><div class="value">'+(d.lastActivity?fmtDT(d.lastActivity):'-')+'</div></div>'+
         '</div>'+
         '<div style="font-size:13px;font-weight:600;color:#4b5563;margin-bottom:8px;">콘텐츠 통계</div>'+
-        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:20px;">'+
+        '<div class="modal-stats-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:20px;">'+
           stats.map(([l,v]) => '<div class="stat-mini"><div class="num">'+v.toLocaleString()+'</div><div class="lbl">'+l+'</div></div>').join('')+
         '</div>'+
       '</div>'+
@@ -892,13 +973,13 @@ async function fightDetail(id) {
   var statusBadge = f.isResolved ? '<span class="badge badge-green">해결됨</span>' : '<span class="badge" style="background:#fee2e2;color:#dc2626;">미해결</span>';
 
   openModal(
-    '<div style="padding:24px;">'+
+    '<div class="modal-inner" style="padding:24px;">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">'+
         '<h3 style="font-size:17px;font-weight:700;">다툼 상세</h3>'+
         statusBadge+
       '</div>'+
       '<!-- 커플 정보 -->'+
-      '<div style="display:flex;gap:10px;margin-bottom:16px;">'+
+      '<div class="couple-users" style="display:flex;gap:10px;margin-bottom:16px;">'+
         f.couple.users.map(function(u) {
           var isAuthor = u.id === f.authorId;
           return '<div style="flex:1;background:'+(isAuthor?'#fff1f2':'#f8fafc')+';border-radius:10px;padding:12px;text-align:center;'+(isAuthor?'border:1.5px solid #fda4af;':'border:1px solid #f1f5f9;')+'">'+
@@ -982,19 +1063,19 @@ async function inquiryDetail(id) {
   var u = inq.user;
 
   openModal(
-    '<div style="padding:24px;">'+
+    '<div class="modal-inner" style="padding:24px;">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">'+
         '<h3 style="font-size:17px;font-weight:700;">문의 상세</h3>'+
         inqStatusBadge(inq.status)+
       '</div>'+
       '<!-- 유저 정보 -->'+
-      '<div style="display:flex;align-items:center;gap:10px;background:#f8fafc;border-radius:10px;padding:12px;margin-bottom:16px;">'+
+      '<div style="display:flex;align-items:center;gap:10px;background:#f8fafc;border-radius:10px;padding:12px;margin-bottom:16px;flex-wrap:wrap;">'+
         (u.profileImage?'<img src="'+u.profileImage+'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;">':'<div style="width:36px;height:36px;border-radius:50%;background:#fff1f2;display:flex;align-items:center;justify-content:center;color:#f43f5e;font-weight:700;">'+esc(u.nickname?.[0]||'?')+'</div>')+
-        '<div>'+
+        '<div style="min-width:0;">'+
           '<div style="font-size:14px;font-weight:600;">'+esc(u.nickname)+'</div>'+
-          '<div style="font-size:11px;color:#9ca3af;">'+esc(u.email)+'</div>'+
+          '<div style="font-size:11px;color:#9ca3af;overflow:hidden;text-overflow:ellipsis;">'+esc(u.email)+'</div>'+
         '</div>'+
-        '<div style="margin-left:auto;text-align:right;font-size:11px;color:#9ca3af;">'+
+        '<div style="margin-left:auto;text-align:right;font-size:11px;color:#9ca3af;white-space:nowrap;">'+
           '메시지 '+(u._count?u._count.sentMessages:0)+' | 피드 '+(u._count?u._count.feeds:0)+' | 사진 '+(u._count?u._count.photos:0)+
         '</div>'+
       '</div>'+
@@ -1017,7 +1098,7 @@ async function inquiryDetail(id) {
         '<textarea id="inqReplyText" class="input" rows="4" style="resize:vertical;" placeholder="답변을 입력하세요...">'+(inq.adminReply?esc(inq.adminReply):'')+'</textarea>'+
       '</div>'+
       '<!-- 상태 변경 + 저장 -->'+
-      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
+      '<div class="push-form" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
         '<select id="inqStatusSelect" class="input" style="width:140px;padding:6px 10px;">'+
           '<option value="PENDING"'+(inq.status==='PENDING'?' selected':'')+'>접수됨</option>'+
           '<option value="IN_PROGRESS"'+(inq.status==='IN_PROGRESS'?' selected':'')+'>처리 중</option>'+
