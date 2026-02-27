@@ -658,6 +658,20 @@ router.patch('/inquiries/:id', async (req, res) => {
   }
 });
 
+// DELETE /admin/inquiries/:id
+router.delete('/inquiries/:id', async (req, res) => {
+  try {
+    const inquiry = await prisma.inquiry.findUnique({ where: { id: req.params.id } });
+    if (!inquiry) return res.status(404).json({ error: '문의를 찾을 수 없습니다.' });
+
+    await prisma.inquiry.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Admin delete inquiry error:', err);
+    res.status(500).json({ error: '문의 삭제에 실패했습니다.' });
+  }
+});
+
 // ===== PUSH NOTIFICATION =====
 
 // POST /admin/push/send - 개별 유저 푸시 발송

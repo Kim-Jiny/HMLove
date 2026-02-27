@@ -77,6 +77,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       _syncWidgetCouple(ref.read(coupleProvider));
       _syncWidgetMood(ref.read(moodProvider));
       _syncWidgetSchedule();
+    } else if (state == AppLifecycleState.resumed) {
+      // App returning to foreground → refresh all data
+      ref.read(coupleProvider.notifier).fetchCouple();
+      ref.read(moodProvider.notifier).fetchTodayMood();
+      ref.read(fortuneProvider.notifier).fetchTodayFortune();
+      ref.read(badgeProvider.notifier).fetchBadges();
+      ref.read(notificationProvider.notifier).fetchUnreadCount();
+      ref.read(missionProvider.notifier).fetchTodayMissions();
     }
   }
 

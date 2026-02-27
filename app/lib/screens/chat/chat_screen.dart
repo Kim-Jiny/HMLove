@@ -19,7 +19,10 @@ import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/couple_provider.dart';
+import 'camera_preview_screen.dart';
+import 'chat_links_screen.dart';
 import 'chat_media_gallery_screen.dart';
+import 'full_screen_image_viewer.dart';
 import 'location_picker_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -29,7 +32,8 @@ class ChatScreen extends ConsumerStatefulWidget {
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends ConsumerState<ChatScreen> {
+class _ChatScreenState extends ConsumerState<ChatScreen>
+    with WidgetsBindingObserver {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   final _focusNode = FocusNode();
@@ -47,6 +51,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _scrollController.addListener(_onScroll);
     _focusNode.addListener(_onFocusChanged);
     Future.microtask(() => _initialize());
@@ -62,12 +67,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (_isInitialized) return;
     _isInitialized = true;
 
+    final notifier = ref.read(chatProvider.notifier);
     final token = ApiClient.getAccessToken();
     if (token != null) {
-      ref.read(chatProvider.notifier).connect(token);
+      notifier.connect(token);
     }
-    await ref.read(chatProvider.notifier).fetchHistory();
-    ref.read(chatProvider.notifier).markAsRead();
+    await notifier.fetchHistory();
+    notifier.markAsRead();
   }
 
   void _onScroll() {
@@ -83,7 +89,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // 포그라운드 복귀 → 소켓 재연결 + 최신 메시지 가져오기
+      final notifier = ref.read(chatProvider.notifier);
+      final token = ApiClient.getAccessToken();
+      if (token != null) {
+        notifier.connect(token);
+      }
+      notifier.fetchHistory();
+      // 채팅 탭이 활성 상태일 때만 읽음 처리
+      if (notifier.isChatScreenActive) {
+        notifier.markAsRead();
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _messageController.dispose();
     _focusNode.removeListener(_onFocusChanged);
     _focusNode.dispose();
@@ -128,13 +152,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
     if (picked == null) return;
 
+    // 카메라 촬영이면 프리뷰 화면으로 이동 (인증마크 선택)
+    if (source == ImageSource.camera && mounted) {
+      final resultPath = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CameraPreviewScreen(imagePath: picked.path),
+        ),
+      );
+      if (resultPath == null || !mounted) return;
+      await _uploadAndSendImage(resultPath, picked.name);
+      return;
+    }
+
     if (!mounted) return;
+    await _uploadAndSendImage(picked.path, picked.name);
+  }
+
+  Future<void> _uploadAndSendImage(String filePath, String fileName) async {
     showTopSnackBar(context, '이미지 전송 중...', duration: const Duration(seconds: 1));
 
     try {
       final dio = ApiClient.createDio();
       final formData = FormData.fromMap({
-        'image': await MultipartFile.fromFile(picked.path, filename: picked.name),
+        'image': await MultipartFile.fromFile(filePath, filename: fileName),
       });
       final response = await dio.post('/chat/upload', data: formData);
       final imageUrl = response.data['imageUrl'] as String;
@@ -298,6 +339,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (_) => const ChatMediaGalleryScreen(),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.link),
+              title: const Text('링크 모아보기'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ChatLinksScreen(),
                   ),
                 );
               },
@@ -854,6 +908,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     _MessageBubble(
                                       message: message,
                                       isMe: isMe,
+                                      interactive: !_captureMode && !_deleteMode,
                                       onLongPress: (_captureMode || _deleteMode)
                                           ? null
                                           : () =>
@@ -976,18 +1031,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               if (_showAttachPanel)
                 Container(
                   padding: EdgeInsets.only(
-                    left: 16,
-                    right: 16,
+                    left: 0,
+                    right: 0,
                     top: 16,
                     bottom: MediaQuery.of(context).padding.bottom + 16,
                   ),
                   decoration: const BoxDecoration(
                     color: Colors.white,
                   ),
-                  child: Wrap(
-                    spacing: 20,
-                    runSpacing: 16,
-                    alignment: WrapAlignment.center,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       _AttachButton(
                         icon: Icons.photo_library,
@@ -1078,12 +1131,14 @@ class _MessageBubble extends StatelessWidget {
   final bool isMe;
   final VoidCallback? onLongPress;
   final VoidCallback? onRetry;
+  final bool interactive;
 
   const _MessageBubble({
     required this.message,
     required this.isMe,
     this.onLongPress,
     this.onRetry,
+    this.interactive = true,
   });
 
   static _LocationData? _parseLocation(String content) {
@@ -1167,7 +1222,7 @@ class _MessageBubble extends StatelessWidget {
             ],
             // Bubble
             if (locData != null)
-              _LocationBubble(data: locData, isMe: isMe)
+              _LocationBubble(data: locData, isMe: isMe, interactive: interactive)
             else
             Container(
               constraints: BoxConstraints(
@@ -1195,33 +1250,44 @@ class _MessageBubble extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (message.imageUrl != null) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: CachedNetworkImage(
-                        imageUrl: message.imageUrl!,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(
-                          height: 180,
-                          color: isMe
-                              ? Colors.pink.shade200.withValues(alpha: 0.3)
-                              : const Color(0xFFF0F0F0),
-                          child: const Center(
-                            child: SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppTheme.textHint,
+                    GestureDetector(
+                      onTap: interactive
+                          ? () {
+                              FullScreenImageViewer.open(
+                                context,
+                                imageUrl: message.imageUrl!,
+                                timestamp: message.createdAt,
+                              );
+                            }
+                          : null,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: CachedNetworkImage(
+                          imageUrl: message.imageUrl!,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(
+                            height: 180,
+                            color: isMe
+                                ? Colors.pink.shade200.withValues(alpha: 0.3)
+                                : const Color(0xFFF0F0F0),
+                            child: const Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppTheme.textHint,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        errorWidget: (_, __, ___) => Container(
-                          height: 100,
-                          color: const Color(0xFFF0F0F0),
-                          child: const Center(
-                            child: Icon(Icons.broken_image, color: AppTheme.textHint),
+                          errorWidget: (_, __, ___) => Container(
+                            height: 100,
+                            color: const Color(0xFFF0F0F0),
+                            child: const Center(
+                              child: Icon(Icons.broken_image, color: AppTheme.textHint),
+                            ),
                           ),
                         ),
                       ),
@@ -1281,8 +1347,9 @@ class _LocationData {
 class _LocationBubble extends StatelessWidget {
   final _LocationData data;
   final bool isMe;
+  final bool interactive;
 
-  const _LocationBubble({required this.data, required this.isMe});
+  const _LocationBubble({required this.data, required this.isMe, this.interactive = true});
 
   @override
   Widget build(BuildContext context) {
@@ -1292,7 +1359,7 @@ class _LocationBubble extends StatelessWidget {
         '?lat=${data.lat}&lng=${data.lng}&w=600&h=300&zoom=15';
 
     return GestureDetector(
-      onTap: () => _openInMaps(data.lat, data.lng, data.label),
+      onTap: interactive ? () => _openInMaps(data.lat, data.lng, data.label) : null,
       child: Container(
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.65,
@@ -1607,3 +1674,4 @@ class _CapturePreviewScreenState extends State<_CapturePreviewScreen> {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }
+

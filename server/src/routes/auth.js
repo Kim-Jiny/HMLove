@@ -261,6 +261,26 @@ router.post('/fcm-token', async (req, res) => {
   }
 });
 
+// PATCH /auth/notification-prefs — 알림 설정 동기화
+router.patch('/notification-prefs', authenticate, async (req, res) => {
+  try {
+    const { prefs } = req.body;
+    if (!prefs || typeof prefs !== 'object') {
+      return res.status(400).json({ error: '설정 데이터가 필요합니다.' });
+    }
+
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { notiPrefs: prefs },
+    });
+
+    res.json({ message: '알림 설정이 저장되었습니다.' });
+  } catch (err) {
+    console.error('Notification prefs error:', err);
+    res.status(500).json({ error: '알림 설정 저장에 실패했습니다.' });
+  }
+});
+
 // PATCH /auth/profile — 프로필 수정
 router.patch('/profile', authenticate, async (req, res) => {
   try {

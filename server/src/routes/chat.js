@@ -209,6 +209,36 @@ router.get('/messages/around/:messageId', async (req, res) => {
   }
 });
 
+// GET /chat/links?cursor=xxx&limit=30 — 링크 포함 메시지
+router.get('/links', async (req, res) => {
+  try {
+    const { cursor, limit = '30' } = req.query;
+    const take = Math.min(parseInt(limit), 50);
+
+    const messages = await prisma.message.findMany({
+      where: {
+        coupleId: req.user.coupleId,
+        content: { contains: 'http' },
+      },
+      take: take + 1,
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+      orderBy: { createdAt: 'desc' },
+      include: {
+        sender: { select: { id: true, nickname: true, profileImage: true } },
+      },
+    });
+
+    const hasNext = messages.length > take;
+    if (hasNext) messages.pop();
+    const nextCursor = hasNext ? messages[messages.length - 1].id : null;
+
+    res.json({ messages, nextCursor });
+  } catch (err) {
+    console.error('Get links error:', err);
+    res.status(500).json({ error: '링크 조회에 실패했습니다.' });
+  }
+});
+
 // GET /chat/search?q=keyword&cursor=xxx&limit=20 — 메시지 검색
 router.get('/search', async (req, res) => {
   try {

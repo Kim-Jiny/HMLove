@@ -28,6 +28,15 @@ import '../screens/notification/notification_screen.dart';
 /// 푸시 알림 등에서 네비게이션 접근용 글로벌 키
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
+/// 각 탭 브랜치 네비게이터 키 (탭 전환 시 Navigator.push 화면 pop 용)
+final shellBranchKeys = <int, GlobalKey<NavigatorState>>{
+  0: GlobalKey<NavigatorState>(debugLabel: 'home'),
+  1: GlobalKey<NavigatorState>(debugLabel: 'chat'),
+  2: GlobalKey<NavigatorState>(debugLabel: 'calendar'),
+  3: GlobalKey<NavigatorState>(debugLabel: 'feed'),
+  4: GlobalKey<NavigatorState>(debugLabel: 'more'),
+};
+
 final routerProvider = Provider<GoRouter>((ref) {
   // Use a listenable to trigger redirects when auth changes
   final authNotifier = _AuthChangeNotifier(ref);
@@ -168,6 +177,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
         branches: [
           StatefulShellBranch(
+            navigatorKey: shellBranchKeys[0]!,
             routes: [
               GoRoute(
                 path: '/home',
@@ -176,6 +186,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
+            navigatorKey: shellBranchKeys[1]!,
             routes: [
               GoRoute(
                 path: '/chat',
@@ -184,6 +195,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
+            navigatorKey: shellBranchKeys[2]!,
             routes: [
               GoRoute(
                 path: '/calendar',
@@ -192,6 +204,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
+            navigatorKey: shellBranchKeys[3]!,
             routes: [
               GoRoute(
                 path: '/feed',
@@ -200,6 +213,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
+            navigatorKey: shellBranchKeys[4]!,
             routes: [
               GoRoute(
                 path: '/more',

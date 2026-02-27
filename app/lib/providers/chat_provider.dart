@@ -147,6 +147,7 @@ class ChatState {
 class ChatNotifier extends Notifier<ChatState> {
   late final Dio _dio;
   IO.Socket? _socket;
+  bool _chatScreenActive = false;
 
   @override
   ChatState build() {
@@ -203,11 +204,12 @@ class ChatNotifier extends Notifier<ChatState> {
             );
           }
         }
-        // 상대방 메시지면 뱃지 갱신 + 자동 읽음 처리
+        // 상대방 메시지면 뱃지 갱신 + 채팅 화면 활성 시에만 읽음 처리
         if (message.senderId != myId) {
           ref.read(badgeProvider.notifier).fetchBadges();
-          // 채팅 화면이 열려있으므로 즉시 읽음 처리 → 상대방에게 실시간 "읽음" 표시
-          markAsRead();
+          if (_chatScreenActive) {
+            markAsRead();
+          }
         }
       }
     });
@@ -339,6 +341,14 @@ class ChatNotifier extends Notifier<ChatState> {
   /// Notify the server that the user stopped typing.
   void stopTyping() {
     _socket?.emit('typing:stop');
+  }
+
+  /// 채팅 화면 활성 상태 확인
+  bool get isChatScreenActive => _chatScreenActive;
+
+  /// 채팅 화면 활성/비활성 상태 설정
+  void setChatScreenActive(bool active) {
+    _chatScreenActive = active;
   }
 
   /// Mark messages as read via socket.

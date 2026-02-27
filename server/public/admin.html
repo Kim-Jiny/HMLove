@@ -968,7 +968,7 @@ async function loadInquiries() {
       '<td style="font-size:11px;color:#9ca3af;">'+(inq.deviceModel?esc(inq.deviceModel):'-')+'</td>'+
       '<td style="font-size:11px;color:#9ca3af;">'+(inq.appVersion||'-')+'</td>'+
       '<td style="color:#9ca3af;font-size:12px;">'+fmtD(inq.createdAt)+'</td>'+
-      '<td style="text-align:center;"><button class="btn btn-outline btn-sm" onclick="inquiryDetail(\''+inq.id+'\')">상세</button></td>'+
+      '<td style="text-align:center;"><button class="btn btn-outline btn-sm" onclick="inquiryDetail(\''+inq.id+'\')">상세</button> <button class="btn btn-sm" style="color:#ef4444;border:1px solid #fecaca;background:#fff5f5;" onclick="deleteInquiry(\''+inq.id+'\',event)">삭제</button></td>'+
     '</tr>';
   }).join('');
   document.getElementById('inquiriesPageInfo').textContent = d.totalPages > 0 ? d.page+' / '+d.totalPages+' 페이지' : '';
@@ -1025,7 +1025,8 @@ async function inquiryDetail(id) {
           '<option value="CLOSED"'+(inq.status==='CLOSED'?' selected':'')+'>종료</option>'+
         '</select>'+
         '<button class="btn btn-brand" onclick="saveInquiry(\''+inq.id+'\')">저장 (상태변경 + 답변)</button>'+
-        '<button class="btn btn-outline btn-sm" style="margin-left:auto;" onclick="closeModal()">닫기</button>'+
+        '<button class="btn btn-sm" style="margin-left:auto;color:#ef4444;border:1px solid #fecaca;background:#fff5f5;" onclick="deleteInquiry(\''+inq.id+'\')">삭제</button>'+
+        '<button class="btn btn-outline btn-sm" onclick="closeModal()">닫기</button>'+
       '</div>'+
     '</div>'
   );
@@ -1055,6 +1056,22 @@ async function saveInquiry(id) {
     loadInquiries();
   } else {
     alert('저장에 실패했습니다.');
+  }
+}
+
+async function deleteInquiry(id, e) {
+  if (e) e.stopPropagation();
+  if (!confirm('이 문의를 삭제하시겠습니까?\n삭제하면 복구할 수 없습니다.')) return;
+  var res = await fetch('/api/admin/inquiries/'+id, {
+    method: 'DELETE',
+    headers: { Authorization: 'Bearer ' + token },
+  });
+  if (res.ok) {
+    alert('삭제되었습니다.');
+    closeModal();
+    loadInquiries();
+  } else {
+    alert('삭제에 실패했습니다.');
   }
 }
 

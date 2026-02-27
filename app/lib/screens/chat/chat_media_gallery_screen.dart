@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import 'full_screen_image_viewer.dart';
 
 class ChatMediaGalleryScreen extends StatefulWidget {
   const ChatMediaGalleryScreen({super.key});
@@ -131,14 +131,11 @@ class _ChatMediaGalleryScreenState extends State<ChatMediaGalleryScreen> {
   }
 
   void _openViewer(BuildContext context, int initialIndex) {
-    Navigator.push(
+    FullScreenImageViewer.openGallery(
       context,
-      MaterialPageRoute(
-        builder: (_) => _MediaViewerScreen(
-          items: _items,
-          initialIndex: initialIndex,
-        ),
-      ),
+      imageUrls: _items.map((e) => e.imageUrl).toList(),
+      timestamps: _items.map((e) => e.createdAt).toList(),
+      initialIndex: initialIndex,
     );
   }
 }
@@ -153,67 +150,4 @@ class _MediaItem {
     required this.imageUrl,
     required this.createdAt,
   });
-}
-
-class _MediaViewerScreen extends StatefulWidget {
-  final List<_MediaItem> items;
-  final int initialIndex;
-
-  const _MediaViewerScreen({
-    required this.items,
-    required this.initialIndex,
-  });
-
-  @override
-  State<_MediaViewerScreen> createState() => _MediaViewerScreenState();
-}
-
-class _MediaViewerScreenState extends State<_MediaViewerScreen> {
-  late PageController _pageController;
-  late int _currentIndex;
-
-  @override
-  void initState() {
-    super.initState();
-    _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final item = widget.items[_currentIndex];
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-        title: Text(
-          DateFormat('yyyy.M.d a h:mm', 'ko').format(item.createdAt),
-          style: const TextStyle(fontSize: 14, color: Colors.white70),
-        ),
-      ),
-      body: PageView.builder(
-        controller: _pageController,
-        itemCount: widget.items.length,
-        onPageChanged: (i) => setState(() => _currentIndex = i),
-        itemBuilder: (context, index) {
-          return InteractiveViewer(
-            child: Center(
-              child: Image.network(
-                widget.items[index].imageUrl,
-                fit: BoxFit.contain,
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
 }

@@ -1,17 +1,43 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'api_client.dart';
 import 'constants.dart';
+import 'in_app_notification.dart';
+import 'notification_sound_service.dart';
 import 'router.dart';
+
+/// 알림 타입 → Hive 설정 키 프리픽스 매핑
+const _typeToKeyPrefix = <String, String>{
+  'chat': 'noti_chat',
+  'feed': 'noti_feed',
+  'feed_like': 'noti_feed',
+  'feed_comment': 'noti_feed',
+  'calendar': 'noti_calendar',
+  'anniversary': 'noti_anniversary',
+  'letter': 'noti_letter',
+  'mood': 'noti_mood',
+  'fight': 'noti_fight',
+};
 
 class PushNotificationService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
   /// 커플 해제 알림 수신 시 콜백 (MainShell에서 등록)
   static void Function()? onCoupleLeft;
+
+  /// 앱 시작 시 즉시 호출 — 포그라운드 시스템 푸시 억제 (iOS)
+  static Future<void> suppressForegroundNotifications() async {
+    await _messaging.setForegroundNotificationPresentationOptions(
+      alert: false,
+      badge: true,
+      sound: false,
+    );
+    debugPrint('[Push] Foreground notification suppressed (iOS)');
+  }
 
   /// 권한 요청 + 토큰 비교 후 필요시 서버 업데이트 + 알림 탭 핸들링
   static Future<void> initialize() async {
@@ -34,12 +60,8 @@ class PushNotificationService {
 
     debugPrint('[Push] Permission granted');
 
-    // iOS 포그라운드에서도 알림 배너 표시
-    await _messaging.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    // 포그라운드 시스템 푸시 억제 (혹시 main에서 호출 안 됐을 경우 대비)
+    await suppressForegroundNotifications();
 
     await _syncToken();
 
@@ -48,12 +70,17 @@ class PushNotificationService {
       _updateTokenIfChanged(newToken);
     });
 
-    // 포그라운드 메시지 처리
+    // 포그라운드 메시지 처리 → 인앱 배너
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      debugPrint('[Push] Foreground message: ${message.notification?.title}');
+      debugPrint('[Push] Foreground message received');
+      debugPrint('[Push]   notification: ${message.notification?.title} / ${message.notification?.body}');
+      debugPrint('[Push]   data: ${message.data}');
+
       if (message.data['type'] == 'couple_left') {
         onCoupleLeft?.call();
+        return;
       }
+      _showInAppBanner(message);
     });
 
     // 백그라운드에서 알림 탭하여 앱 열었을 때
@@ -161,6 +188,86 @@ class PushNotificationService {
       debugPrint('[Push] Token sent to server');
     } catch (e) {
       debugPrint('[Push] Failed to send token: $e');
+    }
+  }
+
+  /// 포그라운드 알림 → 인앱 배너 + 소리/진동
+  static void _showInAppBanner(RemoteMessage message) {
+    try {
+      final data = message.data;
+      final type = data['type'] as String? ?? '';
+
+      // title/body: notification 필드 → data 필드 폴백
+      final title = message.notification?.title ??
+          data['title'] as String? ?? '';
+      final body = message.notification?.body ??
+          data['body'] as String? ?? '';
+
+      debugPrint('[Push] Banner — title: "$title", body: "$body", type: "$type"');
+
+      if (title.isEmpty && body.isEmpty) {
+        debugPrint('[Push] Empty title and body, skipping banner');
+        return;
+      }
+
+      final box = Hive.box(AppConstants.settingsBox);
+      final allOn = box.get('noti_all', defaultValue: true) as bool;
+      if (!allOn) return;
+
+      final prefix = _typeToKeyPrefix[type];
+      if (prefix != null) {
+        final categoryOn = box.get(prefix, defaultValue: true) as bool;
+        if (!categoryOn) return;
+      }
+
+      // 인앱 배너 표시
+      showInAppNotification(
+        title: title,
+        body: body,
+        type: type,
+        onTap: () => _handleNotificationTap(data),
+      );
+
+      // 소리/진동
+      _applyNotificationPrefs(data);
+    } catch (e) {
+      debugPrint('[Push] _showInAppBanner error: $e');
+    }
+  }
+
+  /// 포그라운드 알림 수신 시 사용자 설정에 따라 소리/진동 제어
+  static void _applyNotificationPrefs(Map<String, dynamic> data) {
+    try {
+      final box = Hive.box(AppConstants.settingsBox);
+
+      // 전체 알림 꺼져 있으면 무시
+      final allOn = box.get('noti_all', defaultValue: true) as bool;
+      if (!allOn) return;
+
+      final type = data['type'] as String?;
+      final prefix = _typeToKeyPrefix[type];
+      if (prefix == null) return;
+
+      // 카테고리 알림 꺼져 있으면 무시
+      final categoryOn = box.get(prefix, defaultValue: true) as bool;
+      if (!categoryOn) return;
+
+      // 카테고리별 소리/진동 설정
+      final shouldSound = box.get('${prefix}_sound', defaultValue: true) as bool;
+      final shouldVibrate = box.get('${prefix}_vibrate', defaultValue: true) as bool;
+
+      // 사운드 재생
+      if (shouldSound) {
+        NotificationSoundService.playForCategory(prefix);
+      }
+
+      if (shouldVibrate) {
+        HapticFeedback.mediumImpact();
+      }
+
+      debugPrint('[Push] Prefs applied — type: $type, sound: $shouldSound, vibrate: $shouldVibrate');
+    } catch (e) {
+      debugPrint('[Push] Prefs error: $e');
     }
   }
 }

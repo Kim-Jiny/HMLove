@@ -12,6 +12,8 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import 'core/constants.dart';
+import 'core/notification_sound_service.dart';
+import 'core/push_notification_service.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
 import 'core/widget_service.dart';
@@ -29,6 +31,9 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
+  // 포그라운드에서 시스템 푸시 즉시 억제 (iOS) — 최대한 빨리 호출
+  await PushNotificationService.suppressForegroundNotifications();
+
   // Initialize Hive
   await Hive.initFlutter();
   await Hive.openBox(AppConstants.authBox);
@@ -43,6 +48,9 @@ void main() async {
 
   // Initialize Home Widget
   await WidgetService.initialize();
+
+  // Initialize notification sounds
+  await NotificationSoundService.initialize();
 
   // Initialize Naver Map SDK
   await FlutterNaverMap().init(

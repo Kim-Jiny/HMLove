@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/api_client.dart';
 import '../core/push_notification_service.dart';
+import '../core/router.dart';
 import '../core/theme.dart';
 import '../providers/auth_provider.dart';
 import '../providers/badge_provider.dart';
@@ -24,6 +26,8 @@ class MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<MainShell> {
+  DateTime? _lastBackPressed;
+
   @override
   void initState() {
     super.initState();
@@ -89,7 +93,34 @@ class _MainShellState extends ConsumerState<MainShell> {
   Widget build(BuildContext context) {
     final badges = ref.watch(badgeProvider);
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+
+        // 홈이 아닌 탭 → 홈으로 이동
+        if (widget.navigationShell.currentIndex != 0) {
+          widget.navigationShell.goBranch(0);
+          return;
+        }
+
+        // 홈 탭에서 2초 내 두 번 누르면 앱 종료
+        final now = DateTime.now();
+        if (_lastBackPressed != null &&
+            now.difference(_lastBackPressed!) < const Duration(seconds: 2)) {
+          SystemNavigator.pop();
+          return;
+        }
+        _lastBackPressed = now;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('한 번 더 누르면 앱이 종료됩니다'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      },
+      child: Scaffold(
       body: widget.navigationShell,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -110,9 +141,22 @@ class _MainShellState extends ConsumerState<MainShell> {
             } else if (index == 3) {
               ref.read(badgeProvider.notifier).clearFeedBadge();
             }
+
+            // 채팅 탭 활성 상태 관리 (indexedStack은 dispose 안 되므로 여기서 제어)
+            final chatNotifier = ref.read(chatProvider.notifier);
+            chatNotifier.setChatScreenActive(index == 1);
+            // 채팅 탭 진입 시 읽음 처리
+            if (index == 1) {
+              chatNotifier.markAsRead();
+            }
+
+            // Navigator.push로 열린 하위 화면들 pop (탭 루트로 복귀)
+            shellBranchKeys[index]
+                ?.currentState
+                ?.popUntil((route) => route.isFirst);
             widget.navigationShell.goBranch(
               index,
-              initialLocation: index == widget.navigationShell.currentIndex,
+              initialLocation: true,
             );
           },
           items: [
@@ -156,6 +200,7 @@ class _MainShellState extends ConsumerState<MainShell> {
           ],
         ),
       ),
+    ),
     );
   }
 }

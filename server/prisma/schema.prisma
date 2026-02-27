@@ -17,6 +17,7 @@ model User {
   zodiacSign     String?   // 별자리
   chineseZodiac  String?   // 띠
   fcmToken       String?
+  notiPrefs      Json?     // 알림 설정 (sound, vibrate, 카테고리별 등)
   coupleId       String?
   couple         Couple?   @relation(fields: [coupleId], references: [id])
   createdAt      DateTime  @default(now())
