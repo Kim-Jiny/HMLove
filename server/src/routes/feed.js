@@ -1,16 +1,10 @@
 import { Router } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
-import { createClient } from '@supabase/supabase-js';
 import { authenticate, requireCouple } from '../middleware/auth.js';
 import prisma from '../utils/prisma.js';
+import { uploadFile } from '../utils/storage.js';
 import { notifyPartner } from '../utils/firebase.js';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY,
-);
-const BUCKET = 'feed-images';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -108,23 +102,14 @@ router.post('/upload', upload.array('images', 5), async (req, res) => {
         .webp({ quality: 75 })
         .toBuffer();
 
-      const { error } = await supabase.storage
-        .from(BUCKET)
-        .upload(fileName, buffer, {
-          contentType: 'image/webp',
-          upsert: false,
-        });
-
-      if (error) {
-        console.error('Supabase feed upload error:', error);
+      const key = `feed/${fileName}`;
+      try {
+        const publicUrl = await uploadFile(buffer, key, 'image/webp');
+        imageUrls.push(publicUrl);
+      } catch (err) {
+        console.error('Feed upload error:', err);
         continue;
       }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from(BUCKET)
-        .getPublicUrl(fileName);
-
-      imageUrls.push(publicUrl);
     }
 
     res.json({ imageUrls });

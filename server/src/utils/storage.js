@@ -1,36 +1,32 @@
-import { createClient } from '@supabase/supabase-js';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const s3 = new S3Client({
+  endpoint: process.env.MINIO_ENDPOINT || 'http://localhost:9000',
+  region: 'us-east-1',
+  credentials: {
+    accessKeyId: process.env.MINIO_ACCESS_KEY || 'minioadmin',
+    secretAccessKey: process.env.MINIO_SECRET_KEY || 'minioadmin',
+  },
+  forcePathStyle: true,
+});
 
-const supabase = supabaseUrl && supabaseKey && !supabaseUrl.includes('your-project')
-  ? createClient(supabaseUrl, supabaseKey)
-  : null;
+const BUCKET = process.env.MINIO_BUCKET || 'hmlove';
+const PUBLIC_URL = process.env.STORAGE_PUBLIC_URL || 'http://localhost:9000';
 
-const BUCKET = 'photos';
+export async function uploadFile(buffer, key, contentType) {
+  await s3.send(new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+  }));
 
-export async function uploadFile(buffer, fileName, contentType) {
-  if (!supabase) throw new Error('Supabase 스토리지가 설정되지 않았습니다.');
-
-  const { data, error } = await supabase.storage
-    .from(BUCKET)
-    .upload(fileName, buffer, { contentType, upsert: true });
-
-  if (error) throw error;
-
-  const { data: urlData } = supabase.storage
-    .from(BUCKET)
-    .getPublicUrl(data.path);
-
-  return urlData.publicUrl;
+  return `${PUBLIC_URL}/${BUCKET}/${key}`;
 }
 
-export async function deleteFile(filePath) {
-  if (!supabase) return;
-
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .remove([filePath]);
-
-  if (error) throw error;
+export async function deleteFile(key) {
+  await s3.send(new DeleteObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+  }));
 }

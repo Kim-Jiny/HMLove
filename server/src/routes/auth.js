@@ -3,16 +3,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import sharp from 'sharp';
-import { createClient } from '@supabase/supabase-js';
 import prisma from '../utils/prisma.js';
+import { uploadFile } from '../utils/storage.js';
 import { getZodiacSign, getChineseZodiac } from '../utils/zodiac.js';
 import { authenticate } from '../middleware/auth.js';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY,
-);
-const PROFILE_BUCKET = 'profile-images';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -333,23 +327,8 @@ router.post('/profile/image', authenticate, upload.single('image'), async (req, 
       .webp({ quality: 80 })
       .toBuffer();
 
-    const { error } = await supabase.storage
-      .from(PROFILE_BUCKET)
-      .upload(fileName, buffer, {
-        contentType: 'image/webp',
-        upsert: false,
-      });
-
-    if (error) {
-      console.error('Supabase profile upload error:', error);
-      return res.status(500).json({ error: '이미지 업로드에 실패했습니다.' });
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from(PROFILE_BUCKET)
-      .getPublicUrl(fileName);
-
-    const imageUrl = publicUrl;
+    const key = `profile/${fileName}`;
+    const imageUrl = await uploadFile(buffer, key, 'image/webp');
 
     const user = await prisma.user.update({
       where: { id: req.user.id },

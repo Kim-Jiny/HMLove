@@ -12,6 +12,9 @@ COPY . .
 # Prisma 클라이언트 생성
 RUN npx prisma generate
 
+# 엔트리포인트 스크립트 실행 권한
+RUN chmod +x docker-entrypoint.sh
+
 EXPOSE 3000
 
-CMD ["node", "src/index.js"]
+ENTRYPOINT ["./docker-entrypoint.sh"]

@@ -9,7 +9,7 @@ import { uploadFile, deleteFile } from '../utils/storage.js';
 const router = Router();
 router.use(authenticate, requireCouple);
 
-// 메모리에 버퍼로 받기 (Supabase Storage로 업로드)
+// 메모리에 버퍼로 받기 (MinIO Storage로 업로드)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
@@ -150,7 +150,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(403).json({ error: '본인이 업로드한 사진만 삭제할 수 있습니다.' });
     }
 
-    // Supabase Storage에서 파일 삭제
+    // MinIO Storage에서 파일 삭제
     const imageKey = photo.imageUrl.split('/').slice(-2).join('/');
     const thumbKey = photo.thumbnailUrl.split('/').slice(-2).join('/');
     await Promise.allSettled([deleteFile(imageKey), deleteFile(thumbKey)]);

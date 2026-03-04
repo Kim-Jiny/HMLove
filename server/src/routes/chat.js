@@ -1,15 +1,9 @@
 import { Router } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
-import { createClient } from '@supabase/supabase-js';
 import { authenticate, requireCouple } from '../middleware/auth.js';
 import prisma from '../utils/prisma.js';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY,
-);
-const BUCKET = 'chat-images';
+import { uploadFile } from '../utils/storage.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -102,23 +96,10 @@ router.post('/upload', upload.single('image'), async (req, res) => {
       .webp({ quality: 80 })
       .toBuffer();
 
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(fileName, buffer, {
-        contentType: 'image/webp',
-        upsert: false,
-      });
+    const key = `chat/${fileName}`;
+    const imageUrl = await uploadFile(buffer, key, 'image/webp');
 
-    if (error) {
-      console.error('Supabase upload error:', error);
-      return res.status(500).json({ error: '이미지 업로드에 실패했습니다.' });
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from(BUCKET)
-      .getPublicUrl(fileName);
-
-    res.json({ imageUrl: publicUrl });
+    res.json({ imageUrl });
   } catch (err) {
     console.error('Chat upload error:', err);
     res.status(500).json({ error: '이미지 업로드에 실패했습니다.' });
