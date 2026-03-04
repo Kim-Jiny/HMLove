@@ -6,6 +6,7 @@ services:
     restart: unless-stopped
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./firebase-service-account.json:/app/firebase-service-account.json:ro
     environment:
       - POSTGRES_DB=hmlove
       - POSTGRES_USER=hmlove

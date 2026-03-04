@@ -7,8 +7,8 @@ class AppConstants {
   static const String appVersion = '1.0.0';
 
   // API
-  static const String _localBaseUrl = 'http://172.30.1.80:3000';
-  static const String _prodBaseUrl = 'https://hmlove-server.onrender.com';
+  static const String _localBaseUrl = 'https://love.jiny.shop';
+  static const String _prodBaseUrl = 'https://love.jiny.shop';
 
   static String get _baseUrl => kReleaseMode ? _prodBaseUrl : _localBaseUrl;
   static String get apiBaseUrl => '$_baseUrl/api';
