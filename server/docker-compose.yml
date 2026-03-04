@@ -1,4 +1,4 @@
-name: love
+name: hm-love
 services:
   db:
     image: postgres:16-alpine
