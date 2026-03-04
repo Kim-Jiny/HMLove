@@ -7,6 +7,8 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./firebase-service-account.json:/app/firebase-service-account.json:ro
+    ports:
+      - "127.0.0.1:55434:5432"
     environment:
       - POSTGRES_DB=hmlove
       - POSTGRES_USER=hmlove
