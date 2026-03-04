@@ -13,6 +13,7 @@ services:
       - POSTGRES_DB=hmlove
       - POSTGRES_USER=hmlove
       - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - DATABASE_URL=${DATABASE_URL}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U hmlove -d hmlove"]
       interval: 5s
@@ -70,7 +71,7 @@ services:
       minio-init:
         condition: service_completed_successfully
     environment:
-      - DATABASE_URL=postgresql://hmlove:${DB_PASSWORD}@db:5432/hmlove?sslmode=disable
+      - DATABASE_URL=postgresql://hmlove:${DB_PASSWORD}@hmlove-db:5432/hmlove?sslmode=disable
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
