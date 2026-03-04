@@ -10,10 +10,10 @@ services:
       - POSTGRES_USER=hmlove
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hmlove"]
+      test: ["CMD-SHELL", "pg_isready -U hmlove -d hmlove"]
       interval: 5s
       timeout: 3s
-      retries: 5
+      retries: 10
     networks:
       - app-network
 
@@ -31,7 +31,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 5s
       timeout: 3s
-      retries: 5
+      retries: 10
     networks:
       - app-network
 
@@ -54,17 +54,19 @@ services:
     networks:
       - app-network
 
-  app:
+  love:
     build: .
-    container_name: hmlove-app
+    container_name: love
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
       minio:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     environment:
-      - DATABASE_URL=postgresql://hmlove:${DB_PASSWORD}@db:5432/hmlove
+      - DATABASE_URL=postgresql://hmlove:${DB_PASSWORD}@db:5432/hmlove?sslmode=disable
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
@@ -74,40 +76,14 @@ services:
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - FIREBASE_SERVICE_ACCOUNT=./firebase-service-account.json
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - NCP_MAP_CLIENT_ID=${NCP_MAP_CLIENT_ID}
       - NCP_MAP_CLIENT_SECRET=${NCP_MAP_CLIENT_SECRET}
       - PORT=3000
       - NODE_ENV=production
+    expose:
+      - "3000"
     networks:
       - app-network
-
-  nginx:
-    image: nginx:alpine
-    container_name: hmlove-nginx
-    restart: unless-stopped
-    depends_on:
-      - app
-      - minio
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./certbot/conf:/etc/letsencrypt:ro
-      - ./certbot/www:/var/www/certbot:ro
-    networks:
-      - app-network
-
-  # SSL 인증서 발급: docker compose run certbot certonly --webroot -w /var/www/certbot -d yourdomain.com
-  certbot:
-    image: certbot/certbot
-    container_name: hmlove-certbot
-    volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
-    profiles:
-      - certbot
 
 volumes:
   pgdata:
@@ -115,4 +91,4 @@ volumes:
 
 networks:
   app-network:
-    driver: bridge
+    external: true
