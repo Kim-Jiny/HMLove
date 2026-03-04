@@ -9,7 +9,7 @@ RUN npm install --omit=dev
 # 소스 복사
 COPY . .
 
-ENV DATABASE_URL="postgresql://hmlove:jiny1204@db:5432/hmlove?sslmode=disable"
+ENV DATABASE_URL="postgresql://hmlove:${DB_PASSWORD}@db:5432/hmlove?sslmode=disable"
 
 # Prisma 클라이언트 생성
 RUN npx prisma generate

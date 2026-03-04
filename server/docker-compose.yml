@@ -56,7 +56,7 @@ services:
 
   love:
     build: .
-    container_name: love
+    container_name: hm-love
     restart: unless-stopped
     depends_on:
       db:
