@@ -1,5 +1,5 @@
 # Server
-server/.env
+.env
 server/firebase-service-account.json
 server/node_modules/
 server/uploads/
