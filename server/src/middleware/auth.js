@@ -5,6 +5,7 @@ export async function authenticate(req, res, next) {
   try {
     const header = req.headers.authorization;
     if (!header || !header.startsWith('Bearer ')) {
+      console.warn(`[Auth 401] 토큰 없음 - ${req.method} ${req.originalUrl} (IP: ${req.ip})`);
       return res.status(401).json({ error: '인증 토큰이 필요합니다.' });
     }
 
@@ -17,6 +18,7 @@ export async function authenticate(req, res, next) {
     });
 
     if (!user) {
+      console.warn(`[Auth 401] 사용자 없음 - userId: ${payload.userId}, ${req.method} ${req.originalUrl}`);
       return res.status(401).json({ error: '유효하지 않은 사용자입니다.' });
     }
 
@@ -24,8 +26,10 @@ export async function authenticate(req, res, next) {
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
+      console.warn(`[Auth 401] 토큰 만료 - ${req.method} ${req.originalUrl} (exp: ${err.expiredAt})`);
       return res.status(401).json({ error: '토큰이 만료되었습니다.' });
     }
+    console.warn(`[Auth 401] 토큰 검증 실패 - ${req.method} ${req.originalUrl} (${err.name}: ${err.message})`);
     return res.status(401).json({ error: '유효하지 않은 토큰입니다.' });
   }
 }
