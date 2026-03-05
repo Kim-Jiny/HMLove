@@ -43,6 +43,18 @@ class _NotificationSettingsScreenState
     _scheduleSyncToServer();
   }
 
+  List<int> _getRemindDays() {
+    final raw = _box.get('noti_anniversary_remind_days');
+    if (raw is List) return raw.cast<int>();
+    return [1]; // 기본값: 1일 전
+  }
+
+  void _setRemindDays(List<int> days) {
+    _box.put('noti_anniversary_remind_days', days);
+    setState(() {});
+    _scheduleSyncToServer();
+  }
+
   /// 설정 변경 후 500ms 디바운스로 서버에 동기화
   void _scheduleSyncToServer() {
     _syncTimer?.cancel();
@@ -59,6 +71,7 @@ class _NotificationSettingsScreenState
         'noti_feed', 'noti_feed_sound', 'noti_feed_vibrate',
         'noti_calendar', 'noti_calendar_sound', 'noti_calendar_vibrate',
         'noti_anniversary', 'noti_anniversary_sound', 'noti_anniversary_vibrate',
+        'noti_anniversary_remind_days',
         'noti_letter', 'noti_letter_sound', 'noti_letter_vibrate',
         'noti_mood', 'noti_mood_sound', 'noti_mood_vibrate',
         'noti_fight', 'noti_fight_sound', 'noti_fight_vibrate',
@@ -138,7 +151,7 @@ class _NotificationSettingsScreenState
             icon: Icons.cake_outlined,
             iconColor: const Color(0xFFE91E63),
             title: '기념일 리마인드',
-            subtitle: '기념일 하루 전 알림',
+            subtitle: '기념일 알림 시점을 선택하세요',
             enabledKey: 'noti_anniversary',
             soundKey: 'noti_anniversary_sound',
             vibrateKey: 'noti_anniversary_vibrate',
@@ -146,6 +159,12 @@ class _NotificationSettingsScreenState
             box: _box,
             onChanged: () { setState(() {}); _scheduleSyncToServer(); },
           ),
+          // 기념일 리마인드 며칠 전 알림 선택
+          if (_allOn && _get('noti_anniversary'))
+            _AnniversaryRemindDaysSelector(
+              selectedDays: _getRemindDays(),
+              onChanged: _setRemindDays,
+            ),
           _NotificationCategory(
             icon: Icons.mail_outline,
             iconColor: const Color(0xFF9C27B0),
@@ -351,6 +370,88 @@ class _NotificationCategory extends StatelessWidget {
           ),
         const Divider(height: 1, indent: 16, endIndent: 16),
       ],
+    );
+  }
+}
+
+// ── 기념일 리마인드 며칠 전 알림 선택 ──
+class _AnniversaryRemindDaysSelector extends StatelessWidget {
+  final List<int> selectedDays;
+  final ValueChanged<List<int>> onChanged;
+
+  const _AnniversaryRemindDaysSelector({
+    required this.selectedDays,
+    required this.onChanged,
+  });
+
+  static const _options = [
+    (value: 0, label: '당일'),
+    (value: 1, label: '1일 전'),
+    (value: 3, label: '3일 전'),
+    (value: 7, label: '7일 전'),
+    (value: 14, label: '14일 전'),
+    (value: 30, label: '30일 전'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 56, right: 16, bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '며칠 전 알림',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: _options.map((opt) {
+              final isSelected = selectedDays.contains(opt.value);
+              return FilterChip(
+                label: Text(
+                  opt.label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: isSelected ? Colors.white : AppTheme.textSecondary,
+                  ),
+                ),
+                selected: isSelected,
+                onSelected: (selected) {
+                  final newDays = List<int>.from(selectedDays);
+                  if (selected) {
+                    newDays.add(opt.value);
+                  } else {
+                    newDays.remove(opt.value);
+                  }
+                  // 최소 1개는 선택해야 함
+                  if (newDays.isEmpty) return;
+                  newDays.sort();
+                  onChanged(newDays);
+                },
+                selectedColor: AppTheme.primaryColor,
+                backgroundColor: Colors.grey.shade100,
+                checkmarkColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: isSelected ? AppTheme.primaryColor : Colors.grey.shade300,
+                  ),
+                ),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              );
+            }).toList(),
+          ),
+        ],
+      ),
     );
   }
 }

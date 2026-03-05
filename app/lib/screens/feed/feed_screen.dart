@@ -9,6 +9,7 @@ import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/feed_provider.dart';
+import '../chat/full_screen_image_viewer.dart';
 
 class FeedScreen extends ConsumerStatefulWidget {
   const FeedScreen({super.key});
@@ -464,12 +465,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => _CommentsScreen(
-          feed: feed,
-          onCommentCountChanged: (delta) {
-            ref.read(feedProvider.notifier).updateCommentCount(feed.id, delta);
-          },
-        ),
+        builder: (_) => _CommentsScreen(feed: feed),
       ),
     );
   }
@@ -768,6 +764,10 @@ class _ImageCarouselState extends State<_ImageCarousel> {
     if (widget.imageUrls.length == 1) {
       return GestureDetector(
         onDoubleTap: widget.onDoubleTap,
+        onTap: () => FullScreenImageViewer.open(
+          context,
+          imageUrl: widget.imageUrls.first,
+        ),
         child: Image.network(
           widget.imageUrls.first,
           width: double.infinity,
@@ -795,15 +795,22 @@ class _ImageCarouselState extends State<_ImageCarousel> {
               itemCount: widget.imageUrls.length,
               onPageChanged: (page) => setState(() => _currentPage = page),
               itemBuilder: (context, index) {
-                return Image.network(
-                  widget.imageUrls[index],
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: Colors.grey.shade100,
-                    child: const Center(
-                      child: Icon(Icons.image_not_supported_outlined,
-                          color: AppTheme.textHint, size: 48),
+                return GestureDetector(
+                  onTap: () => FullScreenImageViewer.openGallery(
+                    context,
+                    imageUrls: widget.imageUrls,
+                    initialIndex: index,
+                  ),
+                  child: Image.network(
+                    widget.imageUrls[index],
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: Colors.grey.shade100,
+                      child: const Center(
+                        child: Icon(Icons.image_not_supported_outlined,
+                            color: AppTheme.textHint, size: 48),
+                      ),
                     ),
                   ),
                 );
@@ -859,20 +866,18 @@ class _ImageCarouselState extends State<_ImageCarousel> {
 
 // ─── Comments Screen ───
 
-class _CommentsScreen extends StatefulWidget {
+class _CommentsScreen extends ConsumerStatefulWidget {
   final Feed feed;
-  final void Function(int delta) onCommentCountChanged;
 
   const _CommentsScreen({
     required this.feed,
-    required this.onCommentCountChanged,
   });
 
   @override
-  State<_CommentsScreen> createState() => _CommentsScreenState();
+  ConsumerState<_CommentsScreen> createState() => _CommentsScreenState();
 }
 
-class _CommentsScreenState extends State<_CommentsScreen> {
+class _CommentsScreenState extends ConsumerState<_CommentsScreen> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   List<FeedComment> _comments = [];
@@ -922,7 +927,7 @@ class _CommentsScreenState extends State<_CommentsScreen> {
       final comment =
           FeedComment.fromJson(res.data['comment'] as Map<String, dynamic>);
       setState(() => _comments.add(comment));
-      widget.onCommentCountChanged(1);
+      ref.read(feedProvider.notifier).addComment(widget.feed.id, comment);
     } catch (e) {
       if (mounted) {
         showTopSnackBar(context, '댓글 작성에 실패했습니다', isError: true);
@@ -935,7 +940,7 @@ class _CommentsScreenState extends State<_CommentsScreen> {
       final dio = ApiClient.createDio();
       await dio.delete('/feed/${widget.feed.id}/comments/${comment.id}');
       setState(() => _comments.removeWhere((c) => c.id == comment.id));
-      widget.onCommentCountChanged(-1);
+      ref.read(feedProvider.notifier).removeComment(widget.feed.id, comment.id);
     } catch (e) {
       if (mounted) {
         showTopSnackBar(context, '댓글 삭제에 실패했습니다', isError: true);
@@ -1267,14 +1272,7 @@ class _FeedDetailScreen extends ConsumerWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => _CommentsScreen(
-                        feed: feed,
-                        onCommentCountChanged: (delta) {
-                          ref
-                              .read(feedProvider.notifier)
-                              .updateCommentCount(feed.id, delta);
-                        },
-                      ),
+                      builder: (_) => _CommentsScreen(feed: feed),
                     ),
                   );
                 },

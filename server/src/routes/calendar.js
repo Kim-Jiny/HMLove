@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate, requireCouple } from '../middleware/auth.js';
 import prisma from '../utils/prisma.js';
 import { notifyPartner } from '../utils/firebase.js';
+import { getAutoAnniversariesForMonth } from '../utils/anniversary.js';
 
 const router = Router();
 router.use(authenticate, requireCouple);
@@ -61,67 +62,7 @@ router.get('/:yearMonth', async (req, res) => {
       },
     });
 
-    const autoEvents = [];
-    if (couple) {
-      const start = new Date(couple.startDate);
-
-      // 100일 단위
-      for (let d = 100; d <= 1000; d += 100) {
-        const ms = start.getTime() + (d - 1) * 86400000;
-        const date = new Date(ms);
-        if (date.getUTCFullYear() === year && date.getUTCMonth() === month - 1) {
-          autoEvents.push({
-            id: `auto-${d}`,
-            title: `${d}일`,
-            date: new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())),
-            isAnniversary: true,
-            repeatType: 'NONE',
-            description: null,
-            color: null,
-            eventType: 'anniversary',
-            _auto: true,
-          });
-        }
-      }
-
-      // N주년
-      for (let y = 1; y <= 20; y++) {
-        const date = new Date(Date.UTC(start.getUTCFullYear() + y, start.getUTCMonth(), start.getUTCDate()));
-        if (date.getUTCFullYear() === year && date.getUTCMonth() === month - 1) {
-          autoEvents.push({
-            id: `auto-y${y}`,
-            title: `${y}주년`,
-            date,
-            isAnniversary: true,
-            repeatType: 'NONE',
-            description: null,
-            color: null,
-            eventType: 'anniversary',
-            _auto: true,
-          });
-        }
-      }
-
-      // 생일
-      for (const user of couple.users) {
-        if (user.birthDate) {
-          const birth = new Date(user.birthDate);
-          if (birth.getUTCMonth() === month - 1) {
-            autoEvents.push({
-              id: `auto-bday-${user.nickname}`,
-              title: `${user.nickname} 생일`,
-              date: new Date(Date.UTC(year, month - 1, birth.getUTCDate())),
-              isAnniversary: true,
-              repeatType: 'YEARLY',
-              description: null,
-              color: null,
-              eventType: 'anniversary',
-              _auto: true,
-            });
-          }
-        }
-      }
-    }
+    const autoEvents = couple ? getAutoAnniversariesForMonth(couple, year, month) : [];
 
     // 피드 조회 (해당 월)
     const feeds = await prisma.feed.findMany({

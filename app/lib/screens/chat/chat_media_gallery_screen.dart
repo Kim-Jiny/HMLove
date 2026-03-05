@@ -55,14 +55,28 @@ class _ChatMediaGalleryScreenState extends State<ChatMediaGalleryScreen> {
 
       final response = await _dio.get('/chat/media', queryParameters: params);
       final data = response.data as Map<String, dynamic>;
-      final messages = (data['messages'] as List).map((e) {
+      final messages = <_MediaItem>[];
+      for (final e in data['messages'] as List) {
         final m = e as Map<String, dynamic>;
-        return _MediaItem(
-          id: m['id'] as String,
-          imageUrl: m['imageUrl'] as String,
-          createdAt: DateTime.parse(m['createdAt'] as String),
-        );
-      }).toList();
+        final createdAt = DateTime.parse(m['createdAt'] as String);
+        // imageUrls 배열 지원 + 하위 호환 (imageUrl)
+        final urls = m['imageUrls'] as List?;
+        if (urls != null) {
+          for (final url in urls) {
+            messages.add(_MediaItem(
+              id: m['id'] as String,
+              imageUrl: url as String,
+              createdAt: createdAt,
+            ));
+          }
+        } else if (m['imageUrl'] != null) {
+          messages.add(_MediaItem(
+            id: m['id'] as String,
+            imageUrl: m['imageUrl'] as String,
+            createdAt: createdAt,
+          ));
+        }
+      }
       final cursor = data['nextCursor'] as String?;
 
       setState(() {

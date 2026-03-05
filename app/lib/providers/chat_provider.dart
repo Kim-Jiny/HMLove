@@ -13,7 +13,7 @@ enum MessageStatus { sending, sent, failed }
 class ChatMessage {
   final String id;
   final String content;
-  final String? imageUrl;
+  final List<String> imageUrls;
   final String senderId;
   final String? senderNickname;
   final String coupleId;
@@ -25,7 +25,7 @@ class ChatMessage {
   const ChatMessage({
     required this.id,
     required this.content,
-    this.imageUrl,
+    this.imageUrls = const [],
     required this.senderId,
     this.senderNickname,
     required this.coupleId,
@@ -36,10 +36,18 @@ class ChatMessage {
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    // 하위 호환: imageUrl (단일) → imageUrls (배열)
+    List<String> urls = [];
+    if (json['imageUrls'] != null) {
+      urls = (json['imageUrls'] as List).cast<String>();
+    } else if (json['imageUrl'] != null) {
+      urls = [json['imageUrl'] as String];
+    }
+
     return ChatMessage(
       id: json['id'] as String,
       content: (json['content'] as String?) ?? '',
-      imageUrl: json['imageUrl'] as String?,
+      imageUrls: urls,
       senderId: json['senderId'] as String,
       senderNickname: json['senderNickname'] as String?,
       coupleId: json['coupleId'] as String,
@@ -53,7 +61,7 @@ class ChatMessage {
   ChatMessage copyWith({
     String? id,
     String? content,
-    String? imageUrl,
+    List<String>? imageUrls,
     String? senderId,
     String? senderNickname,
     String? coupleId,
@@ -65,7 +73,7 @@ class ChatMessage {
     return ChatMessage(
       id: id ?? this.id,
       content: content ?? this.content,
-      imageUrl: imageUrl ?? this.imageUrl,
+      imageUrls: imageUrls ?? this.imageUrls,
       senderId: senderId ?? this.senderId,
       senderNickname: senderNickname ?? this.senderNickname,
       coupleId: coupleId ?? this.coupleId,
@@ -268,7 +276,7 @@ class ChatNotifier extends Notifier<ChatState> {
   /// Send a chat message via socket with optimistic UI.
   void sendMessage({
     required String content,
-    String? imageUrl,
+    List<String> imageUrls = const [],
   }) {
     final myId = ApiClient.getUserId() ?? '';
     final tempId = 'temp-${DateTime.now().millisecondsSinceEpoch}';
@@ -277,7 +285,7 @@ class ChatNotifier extends Notifier<ChatState> {
     final optimistic = ChatMessage(
       id: tempId,
       content: content,
-      imageUrl: imageUrl,
+      imageUrls: imageUrls,
       senderId: myId,
       coupleId: '',
       createdAt: DateTime.now(),
@@ -288,11 +296,11 @@ class ChatNotifier extends Notifier<ChatState> {
     // 소켓 전송
     _socket?.emit('message:send', {
       'content': content,
-      if (imageUrl != null) 'imageUrl': imageUrl,
+      if (imageUrls.isNotEmpty) 'imageUrls': imageUrls,
       '_tempId': tempId,
     });
 
-    // 3초 내 서버 응답 없으면 실패 처리
+    // 5초 내 서버 응답 없으면 실패 처리
     Future.delayed(const Duration(seconds: 5), () {
       final idx = state.messages.indexWhere((m) => m.id == tempId);
       if (idx != -1 && state.messages[idx].status == MessageStatus.sending) {
@@ -315,7 +323,7 @@ class ChatNotifier extends Notifier<ChatState> {
     state = state.copyWith(messages: updated);
 
     // 재전송
-    sendMessage(content: msg.content, imageUrl: msg.imageUrl);
+    sendMessage(content: msg.content, imageUrls: msg.imageUrls);
   }
 
   /// Edit a message via socket.

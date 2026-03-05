@@ -81,25 +81,29 @@ router.patch('/read', async (req, res) => {
   }
 });
 
-// POST /chat/upload — 채팅 이미지 업로드 (Supabase Storage)
-router.post('/upload', upload.single('image'), async (req, res) => {
+// POST /chat/upload — 채팅 이미지 업로드 (최대 5장)
+router.post('/upload', upload.fields([{ name: 'images', maxCount: 5 }, { name: 'image', maxCount: 5 }]), async (req, res) => {
   try {
-    if (!req.file) {
+    const files = req.files?.['images'] || req.files?.['image'] || [];
+    req.files = files;
+    if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: '이미지를 첨부해주세요.' });
     }
 
-    const fileName = `${Date.now()}_${req.user.id}.webp`;
+    const imageUrls = await Promise.all(
+      req.files.map(async (file, i) => {
+        const fileName = `${Date.now()}_${i}_${req.user.id}.webp`;
+        const buffer = await sharp(file.buffer)
+          .rotate()
+          .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 80 })
+          .toBuffer();
+        const key = `chat/${fileName}`;
+        return uploadFile(buffer, key, 'image/webp');
+      })
+    );
 
-    const buffer = await sharp(req.file.buffer)
-      .rotate() // EXIF 기반 자동 회전
-      .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 80 })
-      .toBuffer();
-
-    const key = `chat/${fileName}`;
-    const imageUrl = await uploadFile(buffer, key, 'image/webp');
-
-    res.json({ imageUrl });
+    res.json({ imageUrls });
   } catch (err) {
     console.error('Chat upload error:', err);
     res.status(500).json({ error: '이미지 업로드에 실패했습니다.' });
@@ -115,12 +119,12 @@ router.get('/media', async (req, res) => {
     const messages = await prisma.message.findMany({
       where: {
         coupleId: req.user.coupleId,
-        imageUrl: { not: null },
+        imageUrls: { isEmpty: false },
       },
       take: take + 1,
       ...(cursor && { cursor: { id: cursor }, skip: 1 }),
       orderBy: { createdAt: 'desc' },
-      select: { id: true, imageUrl: true, senderId: true, createdAt: true },
+      select: { id: true, imageUrls: true, senderId: true, createdAt: true },
     });
 
     const hasNext = messages.length > take;

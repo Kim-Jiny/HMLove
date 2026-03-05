@@ -11,6 +11,7 @@ import path from 'path';
 
 import prisma from './utils/prisma.js';
 import { sendPushNotification } from './utils/firebase.js';
+import { getUpcomingAnniversaries } from './utils/anniversary.js';
 import authRoutes from './routes/auth.js';
 import coupleRoutes from './routes/couple.js';
 import calendarRoutes from './routes/calendar.js';
@@ -122,15 +123,16 @@ io.on('connection', async (socket) => {
     try {
       if (!socket.coupleId) return;
 
-      const { content, imageUrl } = data;
-      if (!content && !imageUrl) return;
+      const { content, imageUrls } = data;
+      const urls = Array.isArray(imageUrls) ? imageUrls : [];
+      if (!content && urls.length === 0) return;
 
       const message = await prisma.message.create({
         data: {
           coupleId: socket.coupleId,
           senderId: socket.userId,
           content,
-          imageUrl,
+          imageUrls: urls,
         },
         include: {
           sender: { select: { id: true, nickname: true, profileImage: true } },
@@ -150,10 +152,15 @@ io.on('connection', async (socket) => {
         select: { fcmToken: true },
       });
       if (partner?.fcmToken) {
+        const pushBody = content
+          ? content
+          : urls.length === 1
+            ? '사진을 보냈습니다'
+            : `사진 ${urls.length}장을 보냈습니다`;
         sendPushNotification({
           token: partner.fcmToken,
           title: socket.nickname || '상대방',
-          body: content || '사진을 보냈습니다',
+          body: pushBody,
           data: { type: 'chat', coupleId: socket.coupleId },
         });
       }
@@ -287,12 +294,101 @@ async function deliverScheduledLetters() {
 
 setInterval(deliverScheduledLetters, 60 * 1000); // 1분마다
 
+// 기념일 리마인드 스케줄러 (1시간마다 체크)
+async function sendAnniversaryReminders() {
+  try {
+    const couples = await prisma.couple.findMany({
+      include: {
+        users: {
+          select: { id: true, nickname: true, birthDate: true, fcmToken: true, notiPrefs: true },
+        },
+      },
+    });
+
+    const now = new Date();
+    const todayStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+
+    let sentCount = 0;
+
+    for (const couple of couples) {
+      if (couple.users.length < 2) continue;
+
+      const upcoming = getUpcomingAnniversaries(couple, 30);
+      if (upcoming.length === 0) continue;
+
+      for (const user of couple.users) {
+        const prefs = user.notiPrefs || {};
+
+        // 전체 알림 OFF이거나 기념일 알림 OFF이면 스킵
+        if (prefs.noti_all === false || prefs.noti_anniversary === false) continue;
+
+        const remindDays = Array.isArray(prefs.noti_anniversary_remind_days)
+          ? prefs.noti_anniversary_remind_days
+          : [1]; // 기본값: 1일 전
+
+        for (const ann of upcoming) {
+          if (!remindDays.includes(ann.daysLeft)) continue;
+
+          // 중복 방지: 오늘 같은 알림을 이미 보냈는지 확인
+          const dedupKey = `anniversary_remind:${ann.title}:d-${ann.daysLeft}`;
+          const existing = await prisma.notification.findFirst({
+            where: {
+              userId: user.id,
+              type: 'anniversary_remind',
+              createdAt: { gte: new Date(todayStr + 'T00:00:00.000Z') },
+              data: { path: ['dedupKey'], equals: dedupKey },
+            },
+          });
+          if (existing) continue;
+
+          // Notification 레코드 생성
+          const body = ann.daysLeft === 0
+            ? `오늘은 ${ann.title}이에요!`
+            : `${ann.title}이 ${ann.daysLeft}일 남았어요!`;
+
+          await prisma.notification.create({
+            data: {
+              userId: user.id,
+              type: 'anniversary_remind',
+              title: '기념일 리마인드',
+              body,
+              data: { dedupKey, anniversaryTitle: ann.title, daysLeft: ann.daysLeft },
+            },
+          });
+
+          // 푸시 알림 전송
+          if (user.fcmToken) {
+            sendPushNotification({
+              token: user.fcmToken,
+              title: '기념일 리마인드',
+              body,
+              data: { type: 'anniversary_remind' },
+            });
+          }
+
+          sentCount++;
+        }
+      }
+    }
+
+    if (sentCount > 0) {
+      console.log(`[Scheduler] Anniversary reminders sent: ${sentCount}`);
+    }
+    console.log(`[Scheduler] Anniversary reminders checked`);
+  } catch (err) {
+    console.error('[Scheduler] sendAnniversaryReminders error:', err.message);
+  }
+}
+
+setInterval(sendAnniversaryReminders, 3600 * 1000); // 1시간마다
+
 // 서버 시작
 const PORT = process.env.PORT || 4000;
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`우리연애 server running on port ${PORT}`);
   deliverScheduledLetters(); // 서버 시작 시 즉시 한번 체크
+  sendAnniversaryReminders(); // 서버 시작 시 즉시 한번 체크
 });
 
 // Graceful shutdown

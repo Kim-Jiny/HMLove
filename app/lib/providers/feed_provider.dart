@@ -307,6 +307,54 @@ class FeedNotifier extends Notifier<FeedState> {
         feed.copyWith(commentCount: feed.commentCount + delta);
     state = state.copyWith(feeds: updatedFeeds);
   }
+
+  /// 댓글 추가 시 recentComments도 업데이트
+  void addComment(String feedId, FeedComment comment) {
+    final idx = state.feeds.indexWhere((f) => f.id == feedId);
+    if (idx == -1) return;
+    final feed = state.feeds[idx];
+    final updatedComments = [...feed.recentComments, comment];
+    // 최근 3개만 유지
+    final trimmed = updatedComments.length > 3
+        ? updatedComments.sublist(updatedComments.length - 3)
+        : updatedComments;
+    final updatedFeeds = [...state.feeds];
+    updatedFeeds[idx] = feed.copyWith(
+      commentCount: feed.commentCount + 1,
+      recentComments: trimmed,
+    );
+    state = state.copyWith(feeds: updatedFeeds);
+  }
+
+  /// 댓글 삭제 시 recentComments에서도 제거
+  void removeComment(String feedId, String commentId) {
+    final idx = state.feeds.indexWhere((f) => f.id == feedId);
+    if (idx == -1) return;
+    final feed = state.feeds[idx];
+    final updatedComments =
+        feed.recentComments.where((c) => c.id != commentId).toList();
+    final updatedFeeds = [...state.feeds];
+    updatedFeeds[idx] = feed.copyWith(
+      commentCount: (feed.commentCount - 1).clamp(0, 999999),
+      recentComments: updatedComments,
+    );
+    state = state.copyWith(feeds: updatedFeeds);
+  }
+
+  /// 단일 피드 새로고침 (서버에서 최신 데이터)
+  Future<void> refreshSingleFeed(String feedId) async {
+    try {
+      final response = await _dio.get('/feed/$feedId');
+      final data = response.data as Map<String, dynamic>;
+      final feedJson = data['feed'] as Map<String, dynamic>? ?? data;
+      final updatedFeed = Feed.fromJson(feedJson);
+      final idx = state.feeds.indexWhere((f) => f.id == feedId);
+      if (idx == -1) return;
+      final updatedFeeds = [...state.feeds];
+      updatedFeeds[idx] = updatedFeed;
+      state = state.copyWith(feeds: updatedFeeds);
+    } catch (_) {}
+  }
 }
 
 // Providers

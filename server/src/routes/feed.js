@@ -84,9 +84,11 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /feed/upload — 피드 이미지 업로드 (최대 5장, Supabase Storage)
-router.post('/upload', upload.array('images', 5), async (req, res) => {
+// POST /feed/upload — 피드 이미지 업로드 (최대 5장)
+router.post('/upload', upload.fields([{ name: 'images', maxCount: 5 }, { name: 'image', maxCount: 5 }]), async (req, res) => {
   try {
+    const files = req.files?.['images'] || req.files?.['image'] || [];
+    req.files = files;
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: '이미지를 첨부해주세요.' });
     }
@@ -116,6 +118,36 @@ router.post('/upload', upload.array('images', 5), async (req, res) => {
   } catch (err) {
     console.error('Feed upload error:', err);
     res.status(500).json({ error: '이미지 업로드에 실패했습니다.' });
+  }
+});
+
+// GET /feed/:id — 단일 피드 조회
+router.get('/:id', async (req, res) => {
+  try {
+    const feed = await prisma.feed.findUnique({
+      where: { id: req.params.id },
+      include: feedInclude(req.user.id),
+    });
+
+    if (!feed || feed.coupleId !== req.user.coupleId) {
+      return res.status(404).json({ error: '피드를 찾을 수 없습니다.' });
+    }
+
+    const result = {
+      ...feed,
+      isLiked: feed.likes.length > 0,
+      likeCount: feed._count.likes,
+      commentCount: feed._count.comments,
+      recentComments: [...feed.comments].reverse(),
+      likes: undefined,
+      _count: undefined,
+      comments: undefined,
+    };
+
+    res.json({ feed: result });
+  } catch (err) {
+    console.error('Get single feed error:', err);
+    res.status(500).json({ error: '피드 조회에 실패했습니다.' });
   }
 });
 

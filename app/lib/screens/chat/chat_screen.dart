@@ -144,6 +144,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     setState(() => _showAttachPanel = false);
 
     final picker = ImagePicker();
+
+    if (source == ImageSource.gallery) {
+      // 다중 이미지 선택 (최대 5장)
+      final pickedList = await picker.pickMultiImage(
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 80,
+        limit: 5,
+      );
+      if (pickedList.isEmpty || !mounted) return;
+      final files = pickedList.take(5).toList();
+      await _uploadAndSendImages(files);
+      return;
+    }
+
+    // 카메라 촬영 (단일)
     final picked = await picker.pickImage(
       source: source,
       maxWidth: 1200,
@@ -152,7 +168,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
     if (picked == null) return;
 
-    // 카메라 촬영이면 프리뷰 화면으로 이동 (인증마크 선택)
     if (source == ImageSource.camera && mounted) {
       final resultPath = await Navigator.push<String>(
         context,
@@ -161,28 +176,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         ),
       );
       if (resultPath == null || !mounted) return;
-      await _uploadAndSendImage(resultPath, picked.name);
+      await _uploadAndSendImages([XFile(resultPath)]);
       return;
     }
 
     if (!mounted) return;
-    await _uploadAndSendImage(picked.path, picked.name);
+    await _uploadAndSendImages([picked]);
   }
 
-  Future<void> _uploadAndSendImage(String filePath, String fileName) async {
-    showTopSnackBar(context, '이미지 전송 중...', duration: const Duration(seconds: 1));
+  Future<void> _uploadAndSendImages(List<XFile> files) async {
+    showTopSnackBar(
+      context,
+      files.length == 1 ? '이미지 전송 중...' : '이미지 ${files.length}장 전송 중...',
+      duration: const Duration(seconds: 2),
+    );
 
     try {
       final dio = ApiClient.createDio();
-      final formData = FormData.fromMap({
-        'image': await MultipartFile.fromFile(filePath, filename: fileName),
-      });
+      final formData = FormData();
+      for (final file in files) {
+        formData.files.add(MapEntry(
+          'images',
+          await MultipartFile.fromFile(file.path, filename: file.name),
+        ));
+      }
       final response = await dio.post('/chat/upload', data: formData);
-      final imageUrl = response.data['imageUrl'] as String;
+      final imageUrls = (response.data['imageUrls'] as List).cast<String>();
 
       ref.read(chatProvider.notifier).sendMessage(
         content: '',
-        imageUrl: imageUrl,
+        imageUrls: imageUrls,
       );
 
       Future.delayed(const Duration(milliseconds: 100), () {
@@ -1249,49 +1272,8 @@ class _MessageBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (message.imageUrl != null) ...[
-                    GestureDetector(
-                      onTap: interactive
-                          ? () {
-                              FullScreenImageViewer.open(
-                                context,
-                                imageUrl: message.imageUrl!,
-                                timestamp: message.createdAt,
-                              );
-                            }
-                          : null,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: CachedNetworkImage(
-                          imageUrl: message.imageUrl!,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => Container(
-                            height: 180,
-                            color: isMe
-                                ? Colors.pink.shade200.withValues(alpha: 0.3)
-                                : const Color(0xFFF0F0F0),
-                            child: const Center(
-                              child: SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppTheme.textHint,
-                                ),
-                              ),
-                            ),
-                          ),
-                          errorWidget: (_, __, ___) => Container(
-                            height: 100,
-                            color: const Color(0xFFF0F0F0),
-                            child: const Center(
-                              child: Icon(Icons.broken_image, color: AppTheme.textHint),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                  if (message.imageUrls.isNotEmpty) ...[
+                    _buildImageGrid(context, message, isMe, interactive),
                     if (message.content.isNotEmpty)
                       const SizedBox(height: 6),
                   ],
@@ -1333,6 +1315,144 @@ class _MessageBubble extends StatelessWidget {
         ),
       ),
       ),
+    );
+  }
+
+  static Widget _buildImageGrid(
+    BuildContext context,
+    ChatMessage message,
+    bool isMe,
+    bool interactive,
+  ) {
+    final urls = message.imageUrls;
+    if (urls.isEmpty) return const SizedBox.shrink();
+
+    Widget imageWidget(String url, {double? width, double? height, int? overlayCount}) {
+      return GestureDetector(
+        onTap: interactive
+            ? () {
+                FullScreenImageViewer.openGallery(
+                  context,
+                  imageUrls: urls,
+                  initialIndex: urls.indexOf(url),
+                );
+              }
+            : null,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            CachedNetworkImage(
+              imageUrl: url,
+              width: width,
+              height: height,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => Container(
+                color: isMe
+                    ? Colors.pink.shade200.withValues(alpha: 0.3)
+                    : const Color(0xFFF0F0F0),
+                child: const Center(
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppTheme.textHint,
+                    ),
+                  ),
+                ),
+              ),
+              errorWidget: (_, __, ___) => Container(
+                color: const Color(0xFFF0F0F0),
+                child: const Center(
+                  child: Icon(Icons.broken_image, color: AppTheme.textHint),
+                ),
+              ),
+            ),
+            if (overlayCount != null && overlayCount > 0)
+              Container(
+                color: Colors.black.withValues(alpha: 0.5),
+                child: Center(
+                  child: Text(
+                    '+$overlayCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: () {
+        if (urls.length == 1) {
+          return SizedBox(
+            width: double.infinity,
+            child: AspectRatio(
+              aspectRatio: 1.2,
+              child: imageWidget(urls[0]),
+            ),
+          );
+        }
+        if (urls.length == 2) {
+          return Row(
+            children: [
+              Expanded(child: AspectRatio(aspectRatio: 0.8, child: imageWidget(urls[0]))),
+              const SizedBox(width: 2),
+              Expanded(child: AspectRatio(aspectRatio: 0.8, child: imageWidget(urls[1]))),
+            ],
+          );
+        }
+        if (urls.length == 3) {
+          return Column(
+            children: [
+              AspectRatio(aspectRatio: 1.8, child: imageWidget(urls[0])),
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Expanded(child: AspectRatio(aspectRatio: 1.0, child: imageWidget(urls[1]))),
+                  const SizedBox(width: 2),
+                  Expanded(child: AspectRatio(aspectRatio: 1.0, child: imageWidget(urls[2]))),
+                ],
+              ),
+            ],
+          );
+        }
+        // 4장 이상: 2x2 그리드 + 오버레이
+        final showOverlay = urls.length > 4;
+        return Column(
+          children: [
+            Row(
+              children: [
+                Expanded(child: AspectRatio(aspectRatio: 1.0, child: imageWidget(urls[0]))),
+                const SizedBox(width: 2),
+                Expanded(child: AspectRatio(aspectRatio: 1.0, child: imageWidget(urls[1]))),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                Expanded(child: AspectRatio(aspectRatio: 1.0, child: imageWidget(urls[2]))),
+                const SizedBox(width: 2),
+                Expanded(
+                  child: AspectRatio(
+                    aspectRatio: 1.0,
+                    child: imageWidget(
+                      urls[3],
+                      overlayCount: showOverlay ? urls.length - 4 : null,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      }(),
     );
   }
 }

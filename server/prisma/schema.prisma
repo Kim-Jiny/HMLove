@@ -199,7 +199,7 @@ model Message {
   senderId  String
   sender    User     @relation("sender", fields: [senderId], references: [id])
   content   String?
-  imageUrl  String?
+  imageUrls String[] @default([])
   isRead    Boolean  @default(false)
   isEdited  Boolean  @default(false)
   createdAt DateTime @default(now())
