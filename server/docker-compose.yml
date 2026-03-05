@@ -1,4 +1,5 @@
 name: hm-love
+
 services:
   db:
     image: postgres:16-alpine
@@ -6,7 +7,6 @@ services:
     restart: unless-stopped
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./firebase-service-account.json:/app/firebase-service-account.json:ro
     ports:
       - "127.0.0.1:55434:5432"
     environment:
@@ -29,6 +29,9 @@ services:
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
+    ports:
+      - "127.0.0.1:59001:9001" # MinIO Console (WebUI)
+      # - "127.0.0.1:59000:9000" # (선택) MinIO API 로컬 접속 필요할 때만 주석 해제
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
@@ -70,6 +73,8 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+    volumes:
+      - ./firebase-service-account.json:/app/firebase-service-account.json:ro
     environment:
       - DATABASE_URL=postgresql://hmlove:${DB_PASSWORD}@hmlove-db:5432/hmlove?sslmode=disable
       - MINIO_ENDPOINT=http://minio:9000
