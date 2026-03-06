@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -1607,15 +1608,21 @@ class _LocationBubble extends StatelessWidget {
     final naverUrl = Uri.parse(
       'nmap://place?lat=$lat&lng=$lng&name=$encodedLabel&appname=com.jiny.hmlove',
     );
-    // 애플 지도 fallback
-    final appleUrl = Uri.parse(
-      'https://maps.apple.com/?ll=$lat,$lng&q=$encodedLabel',
-    );
 
     if (await canLaunchUrl(naverUrl)) {
       await launchUrl(naverUrl);
-    } else {
+    } else if (Platform.isIOS) {
+      // iOS: 애플 지도 fallback
+      final appleUrl = Uri.parse(
+        'https://maps.apple.com/?ll=$lat,$lng&q=$encodedLabel',
+      );
       await launchUrl(appleUrl, mode: LaunchMode.externalApplication);
+    } else {
+      // Android: 구글 지도 fallback
+      final googleUrl = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+      );
+      await launchUrl(googleUrl, mode: LaunchMode.externalApplication);
     }
   }
 }
