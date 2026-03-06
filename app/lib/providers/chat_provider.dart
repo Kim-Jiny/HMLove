@@ -5,6 +5,8 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../core/api_client.dart';
 import '../core/constants.dart';
 import 'badge_provider.dart';
+import 'feed_provider.dart';
+import 'mission_provider.dart';
 
 // Message send status
 enum MessageStatus { sending, sent, failed }
@@ -53,7 +55,7 @@ class ChatMessage {
       coupleId: json['coupleId'] as String,
       isRead: json['isRead'] as bool? ?? false,
       isEdited: json['isEdited'] as bool? ?? false,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
       status: MessageStatus.sent,
     );
   }
@@ -261,6 +263,69 @@ class ChatNotifier extends Notifier<ChatState> {
 
     _socket!.on('partner:offline', (_) {
       state = state.copyWith(partnerOnline: false);
+    });
+
+    // 피드 실시간 수신
+    _socket!.on('feed:new', (data) {
+      if (data != null) {
+        final map = data as Map<String, dynamic>;
+        final feedJson = map['feed'] as Map<String, dynamic>;
+        final feed = Feed.fromJson(feedJson);
+        final myId = ApiClient.getUserId();
+        if (feed.authorId != myId) {
+          ref.read(feedProvider.notifier).addFeedFromSocket(feed);
+        }
+      }
+    });
+
+    _socket!.on('feed:deleted', (data) {
+      if (data != null) {
+        final map = data as Map<String, dynamic>;
+        final feedId = map['feedId'] as String;
+        ref.read(feedProvider.notifier).removeFeedFromSocket(feedId);
+      }
+    });
+
+    // 피드 댓글 실시간 수신 (상대방 댓글만 반영, 내 댓글은 이미 로컬 처리)
+    _socket!.on('feed:comment:new', (data) {
+      if (data != null) {
+        final map = data as Map<String, dynamic>;
+        final feedId = map['feedId'] as String;
+        final commentJson = map['comment'] as Map<String, dynamic>;
+        final comment = FeedComment.fromJson(commentJson);
+        final myId = ApiClient.getUserId();
+        if (comment.authorId != myId) {
+          ref.read(feedProvider.notifier).addComment(feedId, comment);
+        }
+      }
+    });
+
+    _socket!.on('feed:comment:deleted', (data) {
+      if (data != null) {
+        final map = data as Map<String, dynamic>;
+        final feedId = map['feedId'] as String;
+        final commentId = map['commentId'] as String;
+        ref.read(feedProvider.notifier).removeComment(feedId, commentId);
+      }
+    });
+
+    // 미션 실시간 수신
+    _socket!.on('mission:complete', (data) {
+      if (data != null) {
+        final map = data as Map<String, dynamic>;
+        final missionJson = map['mission'] as Map<String, dynamic>;
+        final mission = Mission.fromJson(missionJson);
+        ref.read(missionProvider.notifier).updateMissionFromSocket(mission);
+      }
+    });
+
+    _socket!.on('mission:cancel', (data) {
+      if (data != null) {
+        final map = data as Map<String, dynamic>;
+        final missionJson = map['mission'] as Map<String, dynamic>;
+        final mission = Mission.fromJson(missionJson);
+        ref.read(missionProvider.notifier).updateMissionFromSocket(mission);
+      }
     });
 
     _socket!.connect();

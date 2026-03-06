@@ -244,15 +244,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          if (mounted) {
-            showTopSnackBar(context, '위치 권한이 필요합니다', isError: true);
-          }
-          return;
+        try {
+          permission = await Geolocator.requestPermission();
+        } catch (_) {
+          permission = LocationPermission.deniedForever;
         }
       }
-      if (permission == LocationPermission.deniedForever) {
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
         if (!mounted) return;
         final goSettings = await showDialog<bool>(
           context: context,

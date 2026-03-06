@@ -182,6 +182,12 @@ router.post('/', async (req, res) => {
       comments: undefined,
     };
 
+    // 소켓으로 실시간 피드 전송
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`couple:${req.user.coupleId}`).emit('feed:new', { feed: result });
+    }
+
     notifyPartner({
       userId: req.user.id,
       coupleId: req.user.coupleId,
@@ -212,6 +218,13 @@ router.delete('/:id', async (req, res) => {
     }
 
     await prisma.feed.delete({ where: { id } });
+
+    // 소켓으로 실시간 피드 삭제 전송
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`couple:${req.user.coupleId}`).emit('feed:deleted', { feedId: id });
+    }
+
     res.json({ message: '피드가 삭제되었습니다.' });
   } catch (err) {
     console.error('Delete feed error:', err);
@@ -308,6 +321,15 @@ router.post('/:id/comments', async (req, res) => {
       },
     });
 
+    // 소켓으로 실시간 댓글 전송
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`couple:${req.user.coupleId}`).emit('feed:comment:new', {
+        feedId: id,
+        comment,
+      });
+    }
+
     // 댓글 알림
     if (feed.authorId !== req.user.id) {
       notifyPartner({
@@ -339,6 +361,16 @@ router.delete('/:id/comments/:commentId', async (req, res) => {
     }
 
     await prisma.feedComment.delete({ where: { id: commentId } });
+
+    // 소켓으로 실시간 댓글 삭제 전송
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`couple:${req.user.coupleId}`).emit('feed:comment:deleted', {
+        feedId: req.params.id,
+        commentId,
+      });
+    }
+
     res.json({ message: '댓글이 삭제되었습니다.' });
   } catch (err) {
     console.error('Delete comment error:', err);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
@@ -13,6 +14,11 @@ import 'inquiry_screen.dart';
 import 'notification_settings_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'profile_edit_screen.dart';
+
+final _appVersionProvider = FutureProvider<String>((ref) async {
+  final info = await PackageInfo.fromPlatform();
+  return 'v${info.version}+${info.buildNumber}';
+});
 
 class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key});
@@ -84,7 +90,10 @@ class MoreScreen extends ConsumerWidget {
     );
   }
 
-  void _showAppInfo(BuildContext context) {
+  void _showAppInfo(BuildContext context) async {
+    final info = await PackageInfo.fromPlatform();
+    final version = '${info.version}+${info.buildNumber}';
+    if (!context.mounted) return;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -104,15 +113,15 @@ class MoreScreen extends ConsumerWidget {
             const Text('우리연애', style: TextStyle(fontSize: 18)),
           ],
         ),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _InfoRow(label: '버전', value: '1.0.0'),
-            SizedBox(height: 8),
-            _InfoRow(label: '개발', value: '우리연애 팀'),
-            SizedBox(height: 16),
-            Text(
+            _InfoRow(label: '버전', value: version),
+            const SizedBox(height: 8),
+            const _InfoRow(label: '개발', value: '지니'),
+            const SizedBox(height: 16),
+            const Text(
               '커플을 위한 올인원 앱\n함께하는 모든 순간을 기록하세요.',
               style: TextStyle(
                 fontSize: 13,
@@ -688,7 +697,7 @@ class MoreScreen extends ConsumerWidget {
                   _MenuTile(
                     icon: Icons.info_outline,
                     title: '앱 정보',
-                    subtitle: 'v1.0.0',
+                    subtitle: ref.watch(_appVersionProvider).value ?? '',
                     color: const Color(0xFF607D8B),
                     onTap: () => _showAppInfo(context),
                   ),

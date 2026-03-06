@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
-import '../../providers/auth_provider.dart';
 import '../../providers/feed_provider.dart';
 import '../chat/full_screen_image_viewer.dart';
 
@@ -345,6 +344,11 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
       appBar: AppBar(
         title: const Text('피드'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, size: 22),
+            onPressed: () =>
+                ref.read(feedProvider.notifier).fetchFeeds(refresh: true),
+          ),
           IconButton(
             icon: Icon(
               _isGridView ? Icons.view_list : Icons.grid_view_rounded,
@@ -896,6 +900,8 @@ class _CommentsScreenState extends ConsumerState<_CommentsScreen> {
     super.dispose();
   }
 
+
+
   Future<void> _fetchComments() async {
     setState(() => _isLoading = true);
     try {
@@ -959,6 +965,16 @@ class _CommentsScreenState extends ConsumerState<_CommentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 소켓으로 들어온 댓글 변경을 실시간 반영
+    ref.listen<FeedState>(feedProvider, (prev, next) {
+      final prevFeed = prev?.feeds.where((f) => f.id == widget.feed.id).firstOrNull;
+      final nextFeed = next.feeds.where((f) => f.id == widget.feed.id).firstOrNull;
+      if (nextFeed == null || prevFeed == null) return;
+      if (prevFeed.commentCount != nextFeed.commentCount && !_isLoading) {
+        _fetchComments();
+      }
+    });
+
     final currentUserId = ApiClient.getUserId() ?? '';
 
     return Scaffold(

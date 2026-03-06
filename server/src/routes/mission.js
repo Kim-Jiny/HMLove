@@ -131,6 +131,12 @@ router.patch('/:id/complete', async (req, res) => {
       data: { type: 'mission' },
     });
 
+    // Socket: 실시간 미션 완료 이벤트
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`couple:${req.user.coupleId}`).emit('mission:complete', { mission: updated });
+    }
+
     res.json({ mission: updated });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -150,6 +156,12 @@ router.patch('/:id/cancel', async (req, res) => {
       where: { id: req.params.id },
       data: { isCompleted: false, completedBy: null, completedAt: null },
     });
+
+    // Socket: 실시간 미션 취소 이벤트
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`couple:${req.user.coupleId}`).emit('mission:cancel', { mission: updated });
+    }
 
     res.json({ mission: updated });
   } catch (err) {

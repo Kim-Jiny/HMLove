@@ -267,6 +267,21 @@ class FeedNotifier extends Notifier<FeedState> {
     }
   }
 
+  /// 소켓으로 받은 새 피드 추가 (상대방이 올린 피드)
+  void addFeedFromSocket(Feed feed) {
+    // 중복 방지
+    if (state.feeds.any((f) => f.id == feed.id)) return;
+    state = state.copyWith(feeds: [feed, ...state.feeds]);
+  }
+
+  /// 소켓으로 받은 피드 삭제
+  void removeFeedFromSocket(String feedId) {
+    final updatedFeeds = state.feeds.where((f) => f.id != feedId).toList();
+    if (updatedFeeds.length != state.feeds.length) {
+      state = state.copyWith(feeds: updatedFeeds);
+    }
+  }
+
   /// Toggle like on a feed
   Future<void> toggleLike(String feedId) async {
     // Optimistic update

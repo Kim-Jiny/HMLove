@@ -41,6 +41,9 @@ const io = new Server(server, {
   },
 });
 
+// io 객체를 라우트에서 사용할 수 있도록 공유
+app.set('io', io);
+
 // Middleware
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',

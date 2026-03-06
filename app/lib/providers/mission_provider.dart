@@ -133,6 +133,20 @@ class MissionNotifier extends Notifier<MissionState> {
     }
   }
 
+  /// 소켓으로 받은 미션 완료/취소 업데이트
+  void updateMissionFromSocket(Mission mission) {
+    if (mission.type == 'DAILY') {
+      if (state.daily?.id == mission.id) {
+        state = state.copyWith(daily: mission);
+      }
+    } else {
+      if (state.weekly?.id == mission.id) {
+        state = state.copyWith(weekly: mission);
+      }
+    }
+    _refreshCalendar();
+  }
+
   void _refreshCalendar() {
     final now = DateTime.now();
     final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';

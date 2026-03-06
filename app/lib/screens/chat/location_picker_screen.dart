@@ -50,11 +50,36 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        try {
+          permission = await Geolocator.requestPermission();
+        } catch (_) {
+          permission = LocationPermission.deniedForever;
+        }
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
         setState(() => _isLoading = false);
+        if (!mounted) return;
+        final goSettings = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('위치 권한 필요'),
+            content: const Text('위치 선택을 위해 설정에서 위치 권한을 허용해주세요.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('취소'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('설정으로 이동'),
+              ),
+            ],
+          ),
+        );
+        if (goSettings == true) {
+          await Geolocator.openAppSettings();
+        }
         return;
       }
 
