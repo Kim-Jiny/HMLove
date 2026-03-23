@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/api_client.dart';
+import '../../core/constants.dart';
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
 import '../../providers/calendar_provider.dart';
+import '../../widgets/banner_ad_widget.dart';
 
 class AnniversaryScreen extends ConsumerStatefulWidget {
   const AnniversaryScreen({super.key});
@@ -413,22 +415,32 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _fetchAnniversaries,
-      color: AppTheme.primaryColor,
-      child: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: upcoming.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, index) {
-          return _AnniversaryTile(
-            anniversary: upcoming[index],
-            onLongPress: upcoming[index]['type'] == 'custom'
-                ? () => _showDeleteConfirm(upcoming[index])
-                : null,
-          );
-        },
-      ),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: BannerAdWidget(adUnitId: AppConstants.adMobAnniversaryBanner),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _fetchAnniversaries,
+            color: AppTheme.primaryColor,
+            child: ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: upcoming.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                return _AnniversaryTile(
+                  anniversary: upcoming[index],
+                  onLongPress: upcoming[index]['type'] == 'custom'
+                      ? () => _showDeleteConfirm(upcoming[index])
+                      : null,
+                );
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -449,23 +461,33 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _fetchAnniversaries,
-      color: AppTheme.primaryColor,
-      child: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: past.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, index) {
-          return _AnniversaryTile(
-            anniversary: past[index],
-            isPast: true,
-            onLongPress: past[index]['type'] == 'custom'
-                ? () => _showDeleteConfirm(past[index])
-                : null,
-          );
-        },
-      ),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: BannerAdWidget(adUnitId: AppConstants.adMobAnniversaryBanner),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _fetchAnniversaries,
+            color: AppTheme.primaryColor,
+            child: ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: past.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                return _AnniversaryTile(
+                  anniversary: past[index],
+                  isPast: true,
+                  onLongPress: past[index]['type'] == 'custom'
+                      ? () => _showDeleteConfirm(past[index])
+                      : null,
+                );
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

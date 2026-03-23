@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:math' as math;
 
+import '../../core/constants.dart';
 import '../../core/theme.dart';
+import '../../widgets/banner_ad_widget.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
 import '../../providers/fortune_provider.dart';
@@ -251,6 +253,10 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+
+            // Banner Ad
+            BannerAdWidget(adUnitId: AppConstants.adMobFortuneBanner),
             const SizedBox(height: 12),
 
             // General Luck

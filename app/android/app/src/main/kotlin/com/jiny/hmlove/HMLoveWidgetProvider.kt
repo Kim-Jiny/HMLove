@@ -7,6 +7,9 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetPlugin
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 class HMLoveWidgetProvider : AppWidgetProvider() {
     private fun launchAppIntent(context: Context): PendingIntent {
@@ -40,10 +43,19 @@ class HMLoveWidgetProvider : AppWidgetProvider() {
 
                 val myName = prefs.getString("myName", "나") ?: "나"
                 val partnerName = prefs.getString("partnerName", "상대방") ?: "상대방"
-                val daysTogether = prefs.getSafeLong("daysTogether", 0)
                 val startDate = prefs.getString("startDate", "") ?: ""
-                val nextAnniversaryName = prefs.getString("nextAnniversaryName", null)
-                val nextAnniversaryDaysLeft = if (prefs.contains("nextAnniversaryDaysLeft")) {
+
+                // Calculate daysTogether from startDate so it updates without opening the app
+                val parsed = parseStartDate(startDate)
+                val daysTogether = if (parsed != null) {
+                    ChronoUnit.DAYS.between(parsed, LocalDate.now()) + 1
+                } else {
+                    prefs.getSafeLong("daysTogether", 0)
+                }
+
+                val anniversary = if (parsed != null) calcNextAnniversary(parsed) else null
+                val nextAnniversaryName = anniversary?.first ?: prefs.getString("nextAnniversaryName", null)
+                val nextAnniversaryDaysLeft = anniversary?.second ?: if (prefs.contains("nextAnniversaryDaysLeft")) {
                     prefs.getSafeLong("nextAnniversaryDaysLeft", 0)
                 } else null
 
@@ -91,4 +103,31 @@ fun SharedPreferences.getSafeLong(key: String, defaultValue: Long): Long {
             getString(key, null)?.toLongOrNull() ?: defaultValue
         }
     }
+}
+
+fun parseStartDate(dateStr: String): LocalDate? {
+    return try {
+        LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("yyyy.MM.dd"))
+    } catch (e: Exception) {
+        null
+    }
+}
+
+fun calcNextAnniversary(startDate: LocalDate): Pair<String, Long>? {
+    val today = LocalDate.now()
+    val milestones = listOf(100, 200, 300, 365, 500, 700, 730, 1000, 1095, 1461)
+    for (days in milestones) {
+        val date = startDate.plusDays((days - 1).toLong())
+        if (date.isAfter(today)) {
+            val daysLeft = ChronoUnit.DAYS.between(today, date)
+            return Pair("${days}일", daysLeft)
+        }
+    }
+    // Fall back to annual anniversary
+    var year = today.year - startDate.year
+    val thisYearAnniv = startDate.withYear(today.year)
+    if (!thisYearAnniv.isAfter(today)) year++
+    val nextAnniv = startDate.withYear(startDate.year + year)
+    val daysLeft = ChronoUnit.DAYS.between(today, nextAnniv)
+    return Pair("${year}주년", daysLeft)
 }

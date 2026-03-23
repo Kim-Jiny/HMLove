@@ -6,6 +6,8 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetPlugin
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 class HMLoveSmallWidgetProvider : AppWidgetProvider() {
     private fun launchAppIntent(context: Context): PendingIntent {
@@ -39,10 +41,19 @@ class HMLoveSmallWidgetProvider : AppWidgetProvider() {
 
                 val myName = prefs.getString("myName", "나") ?: "나"
                 val partnerName = prefs.getString("partnerName", "상대방") ?: "상대방"
-                val daysTogether = prefs.getSafeLong("daysTogether", 0)
                 val startDate = prefs.getString("startDate", "") ?: ""
-                val nextAnniversaryName = prefs.getString("nextAnniversaryName", null)
-                val nextAnniversaryDaysLeft = if (prefs.contains("nextAnniversaryDaysLeft")) {
+
+                // Calculate daysTogether from startDate so it updates without opening the app
+                val parsed = parseStartDate(startDate)
+                val daysTogether = if (parsed != null) {
+                    ChronoUnit.DAYS.between(parsed, LocalDate.now()) + 1
+                } else {
+                    prefs.getSafeLong("daysTogether", 0)
+                }
+
+                val anniversary = if (parsed != null) calcNextAnniversary(parsed) else null
+                val nextAnniversaryName = anniversary?.first ?: prefs.getString("nextAnniversaryName", null)
+                val nextAnniversaryDaysLeft = anniversary?.second ?: if (prefs.contains("nextAnniversaryDaysLeft")) {
                     prefs.getSafeLong("nextAnniversaryDaysLeft", 0)
                 } else null
 

@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/constants.dart';
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
 import '../../core/widget_service.dart';
+import '../../widgets/banner_ad_widget.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
 import '../../providers/mood_provider.dart';
@@ -25,18 +27,19 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 Map<String, dynamic>? _getNextAnniversary(DateTime? startDate) {
   if (startDate == null) return null;
-  final now = DateTime.now();
+  final today = DateUtils.dateOnly(DateTime.now());
+  final start = DateUtils.dateOnly(startDate);
   final milestones = [100, 200, 300, 365, 500, 700, 730, 1000, 1095, 1461];
   for (final days in milestones) {
-    final date = startDate.add(Duration(days: days - 1));
-    if (date.isAfter(now)) {
-      return {'name': '$days일', 'date': date, 'daysLeft': date.difference(now).inDays};
+    final date = start.add(Duration(days: days - 1));
+    if (date.isAfter(today)) {
+      return {'name': '$days일', 'date': date, 'daysLeft': date.difference(today).inDays};
     }
   }
-  int year = now.year - startDate.year;
-  if (DateTime(now.year, startDate.month, startDate.day).isBefore(now)) year++;
-  final nextAnniv = DateTime(startDate.year + year, startDate.month, startDate.day);
-  return {'name': '$year주년', 'date': nextAnniv, 'daysLeft': nextAnniv.difference(now).inDays};
+  int year = today.year - start.year;
+  if (DateTime(today.year, start.month, start.day).isBefore(today)) year++;
+  final nextAnniv = DateTime(start.year + year, start.month, start.day);
+  return {'name': '$year주년', 'date': nextAnniv, 'daysLeft': nextAnniv.difference(today).inDays};
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
@@ -377,6 +380,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
               const SizedBox(height: 12),
 
+              // Banner Ad
+              BannerAdWidget(adUnitId: AppConstants.adMobHomeBanner),
+              const SizedBox(height: 12),
+
               // Mission Card
               _MissionCard(
                 daily: missionState.daily,
@@ -556,13 +563,14 @@ class _AnniversaryCard extends StatelessWidget {
   Map<String, dynamic>? _getNextAnniversary() {
     if (startDate == null) return null;
 
-    final now = DateTime.now();
+    final today = DateUtils.dateOnly(DateTime.now());
+    final start = DateUtils.dateOnly(startDate!);
     final milestones = [100, 200, 300, 365, 500, 700, 730, 1000, 1095, 1461];
 
     for (final days in milestones) {
-      final date = startDate!.add(Duration(days: days - 1));
-      if (date.isAfter(now)) {
-        final daysLeft = date.difference(now).inDays;
+      final date = start.add(Duration(days: days - 1));
+      if (date.isAfter(today)) {
+        final daysLeft = date.difference(today).inDays;
         return {
           'name': '$days일',
           'date': date,
@@ -572,19 +580,19 @@ class _AnniversaryCard extends StatelessWidget {
     }
 
     // Annual anniversary
-    int year = now.year - startDate!.year;
-    if (DateTime(now.year, startDate!.month, startDate!.day).isBefore(now)) {
+    int year = today.year - start.year;
+    if (DateTime(today.year, start.month, start.day).isBefore(today)) {
       year++;
     }
     final nextAnniv = DateTime(
-      startDate!.year + year,
-      startDate!.month,
-      startDate!.day,
+      start.year + year,
+      start.month,
+      start.day,
     );
     return {
       'name': '$year주년',
       'date': nextAnniv,
-      'daysLeft': nextAnniv.difference(now).inDays,
+      'daysLeft': nextAnniv.difference(today).inDays,
     };
   }
 

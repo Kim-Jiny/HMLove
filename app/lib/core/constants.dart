@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kReleaseMode;
 
 class AppConstants {
   AppConstants._();
@@ -36,4 +38,24 @@ class AppConstants {
   static const String dateTimeFormat = 'yyyy-MM-dd HH:mm:ss';
   static const String displayDateFormat = 'yyyy년 M월 d일';
   static const String displayTimeFormat = 'a h:mm';
+
+  // AdMob
+  static String get adMobHomeBanner => Platform.isIOS
+      ? 'ca-app-pub-2707874353926722/7735582107'
+      : 'ca-app-pub-2707874353926722/2483255423';
+
+  static String get adMobAnniversaryBanner => Platform.isIOS
+      ? 'ca-app-pub-2707874353926722/6472136740'
+      : 'ca-app-pub-2707874353926722/3638356743';
+
+  static String get adMobMoreBanner => Platform.isIOS
+      ? 'ca-app-pub-2707874353926722/4779781128'
+      : 'ca-app-pub-2707874353926722/2730667438';
+
+  static String get adMobFortuneBanner => Platform.isIOS
+      ? 'ca-app-pub-2707874353926722/7002886688'
+      : 'ca-app-pub-2707874353926722/9489449225';
+
+  // Hive Keys - Ads
+  static const String adsRemovedKey = 'adsRemoved';
 }

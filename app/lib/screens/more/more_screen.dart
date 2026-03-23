@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/api_client.dart';
+import '../../core/constants.dart';
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
+import '../../widgets/banner_ad_widget.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
 import '../../providers/inquiry_provider.dart';
@@ -648,6 +650,10 @@ class MoreScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 16),
+
+            // Banner Ad
+            BannerAdWidget(adUnitId: AppConstants.adMobMoreBanner),
             const SizedBox(height: 16),
 
             // Settings

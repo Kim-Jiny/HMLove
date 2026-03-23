@@ -11,6 +11,7 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'package:timeago/timeago.dart' as timeago;
 
+import 'core/ad_service.dart';
 import 'core/constants.dart';
 import 'core/notification_sound_service.dart';
 import 'core/push_notification_service.dart';
@@ -51,6 +52,9 @@ void main() async {
 
   // Initialize notification sounds
   await NotificationSoundService.initialize();
+
+  // Initialize AdMob
+  await AdService.initialize();
 
   // Initialize Naver Map SDK
   await FlutterNaverMap().init(

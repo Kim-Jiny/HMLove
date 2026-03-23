@@ -64,14 +64,31 @@ struct CoupleTimelineProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CoupleEntry>) -> Void) {
-        let localData = loadData()
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
-
         // Try to fetch fresh data from server
         fetchFromServer { serverData in
-            let data = serverData ?? localData
-            let entry = CoupleEntry(date: Date(), data: data)
-            let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+            let data = serverData ?? self.loadData()
+            let now = Date()
+            let calendar = Calendar.current
+
+            // Create entry for now
+            let currentEntry = CoupleEntry(date: now, data: data)
+
+            // Schedule next update at midnight so D-Day rolls over
+            var nextMidnight = calendar.startOfDay(for: calendar.date(byAdding: .day, value: 1, to: now)!)
+            // Also refresh every 30 minutes for mood/schedule updates
+            let next30Min = calendar.date(byAdding: .minute, value: 30, to: now)!
+            let nextUpdate = min(nextMidnight, next30Min)
+
+            // If midnight is within 30 min, create an entry for midnight with recalculated data
+            var entries = [currentEntry]
+            if nextMidnight.timeIntervalSince(now) < 30 * 60 {
+                let midnightData = self.loadData()
+                entries.append(CoupleEntry(date: nextMidnight, data: midnightData))
+                // After midnight entry, schedule next refresh 30 min later
+                nextMidnight = calendar.date(byAdding: .minute, value: 30, to: nextMidnight)!
+            }
+
+            let timeline = Timeline(entries: entries, policy: .after(nextUpdate))
             completion(timeline)
         }
     }
@@ -161,18 +178,81 @@ struct CoupleTimelineProvider: TimelineProvider {
             return .notConnected
         }
 
+        let startDateStr = defaults.string(forKey: "startDate") ?? ""
+
+        // Calculate daysTogether from startDate so it updates even without opening the app
+        let daysTogether: Int
+        let nextAnniversaryName: String?
+        let nextAnniversaryDaysLeft: Int?
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy.MM.dd"
+        if let startDate = formatter.date(from: startDateStr) {
+            let calendar = Calendar.current
+            let now = Date()
+            daysTogether = calendar.dateComponents([.day], from: calendar.startOfDay(for: startDate), to: calendar.startOfDay(for: now)).day! + 1
+
+            // Calculate next anniversary
+            let result = Self.calcNextAnniversary(startDate: startDate, now: now)
+            nextAnniversaryName = result?.name
+            nextAnniversaryDaysLeft = result?.daysLeft
+        } else {
+            // Fallback to stored values if date parsing fails
+            daysTogether = defaults.integer(forKey: "daysTogether")
+            nextAnniversaryName = defaults.string(forKey: "nextAnniversaryName")
+            nextAnniversaryDaysLeft = defaults.object(forKey: "nextAnniversaryDaysLeft") as? Int
+        }
+
         return CoupleData(
             isConnected: true,
             myName: defaults.string(forKey: "myName") ?? "나",
             partnerName: defaults.string(forKey: "partnerName") ?? "상대방",
-            daysTogether: defaults.integer(forKey: "daysTogether"),
-            startDate: defaults.string(forKey: "startDate") ?? "",
-            nextAnniversaryName: defaults.string(forKey: "nextAnniversaryName"),
-            nextAnniversaryDaysLeft: defaults.object(forKey: "nextAnniversaryDaysLeft") as? Int,
+            daysTogether: daysTogether,
+            startDate: startDateStr,
+            nextAnniversaryName: nextAnniversaryName,
+            nextAnniversaryDaysLeft: nextAnniversaryDaysLeft,
             myMoodEmoji: defaults.string(forKey: "myMoodEmoji") ?? "😶",
             partnerMoodEmoji: defaults.string(forKey: "partnerMoodEmoji") ?? "😶",
             todaySchedule: defaults.string(forKey: "todaySchedule") ?? ""
         )
+    }
+
+    /// Calculate next anniversary from start date (matches Dart logic)
+    private static func calcNextAnniversary(startDate: Date, now: Date) -> (name: String, daysLeft: Int)? {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+
+        // Check predefined milestones first
+        let milestones = [100, 200, 300, 365, 500, 700, 730, 1000, 1095, 1461]
+        for days in milestones {
+            guard let date = calendar.date(byAdding: .day, value: days - 1, to: startDate) else { continue }
+            let milestoneDay = calendar.startOfDay(for: date)
+            if milestoneDay > today {
+                let daysLeft = calendar.dateComponents([.day], from: today, to: milestoneDay).day ?? 0
+                return (name: "\(days)일", daysLeft: daysLeft)
+            }
+        }
+
+        // Fall back to annual anniversary
+        let startComps = calendar.dateComponents([.month, .day], from: startDate)
+        var year = calendar.component(.year, from: now) - calendar.component(.year, from: startDate)
+        if let thisYearAnniv = calendar.date(from: DateComponents(
+            year: calendar.component(.year, from: now),
+            month: startComps.month,
+            day: startComps.day
+        )), calendar.startOfDay(for: thisYearAnniv) <= today {
+            year += 1
+        }
+        if let nextAnniv = calendar.date(from: DateComponents(
+            year: calendar.component(.year, from: startDate) + year,
+            month: startComps.month,
+            day: startComps.day
+        )) {
+            let daysLeft = calendar.dateComponents([.day], from: today, to: calendar.startOfDay(for: nextAnniv)).day ?? 0
+            return (name: "\(year)주년", daysLeft: daysLeft)
+        }
+
+        return nil
     }
 }
 
