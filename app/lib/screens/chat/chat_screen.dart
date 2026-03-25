@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -25,6 +26,10 @@ import 'chat_links_screen.dart';
 import 'chat_media_gallery_screen.dart';
 import 'full_screen_image_viewer.dart';
 import 'location_picker_screen.dart';
+import 'minigame/minigame_select_sheet.dart';
+import 'minigame/roulette_screen.dart';
+import 'minigame/ladder_screen.dart';
+import 'minigame/game_result_bubble.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -326,6 +331,86 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     });
   }
 
+  void _openMiniGameSelect() {
+    setState(() => _showAttachPanel = false);
+    MinigameSelectSheet.show(context).then((type) {
+      if (type == null) return;
+      switch (type) {
+        case MiniGameType.roulette:
+          _openRoulette();
+        case MiniGameType.ladder:
+          _openLadder();
+      }
+    });
+  }
+
+  Future<void> _openRoulette() async {
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const RouletteScreen()),
+    );
+    if (result == null || !mounted) return;
+
+    // Inject senderName
+    final currentUserId = ApiClient.getUserId() ?? '';
+    final couple = ref.read(coupleProvider).couple;
+    final myName = couple?.users
+            .where((u) => u.id == currentUserId)
+            .firstOrNull
+            ?.nickname ??
+        '';
+    final content = _injectSenderName(result, myName);
+
+    ref.read(chatProvider.notifier).sendMessage(content: content);
+    _scrollToNewest();
+  }
+
+  Future<void> _openLadder() async {
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const LadderScreen()),
+    );
+    if (result == null || !mounted) return;
+
+    final currentUserId = ApiClient.getUserId() ?? '';
+    final couple = ref.read(coupleProvider).couple;
+    final myName = couple?.users
+            .where((u) => u.id == currentUserId)
+            .firstOrNull
+            ?.nickname ??
+        '';
+    final content = _injectSenderName(result, myName);
+
+    ref.read(chatProvider.notifier).sendMessage(content: content);
+    _scrollToNewest();
+  }
+
+  String _injectSenderName(String gameResult, String senderName) {
+    // Insert senderName into the JSON payload
+    final colonIdx = gameResult.indexOf(':');
+    if (colonIdx < 0) return gameResult;
+    final prefix = gameResult.substring(0, colonIdx + 1);
+    final jsonStr = gameResult.substring(colonIdx + 1);
+    try {
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+      map['senderName'] = senderName;
+      return '$prefix${jsonEncode(map)}';
+    } catch (_) {
+      return gameResult;
+    }
+  }
+
+  void _scrollToNewest() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
   void _showChatMenu() {
     showModalBottomSheet(
       context: context,
@@ -580,7 +665,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
     // 수정/삭제 (내 메시지만)
     if (isMe) {
-      if (message.content.isNotEmpty) {
+      if (message.content.isNotEmpty &&
+          !message.content.startsWith('__GAME_')) {
         actions.add(ListTile(
           leading: const Icon(Icons.edit),
           title: const Text('수정'),
@@ -1062,46 +1148,60 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   decoration: const BoxDecoration(
                     color: Colors.white,
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  child: Column(
                     children: [
-                      _AttachButton(
-                        icon: Icons.photo_library,
-                        label: '사진',
-                        color: const Color(0xFF4CAF50),
-                        onTap: () => _pickAndSendImage(ImageSource.gallery),
+                      Row(
+                        children: [
+                          _AttachButtonExpanded(
+                            icon: Icons.photo_library,
+                            label: '사진',
+                            color: const Color(0xFF4CAF50),
+                            onTap: () => _pickAndSendImage(ImageSource.gallery),
+                          ),
+                          _AttachButtonExpanded(
+                            icon: Icons.camera_alt,
+                            label: '카메라',
+                            color: const Color(0xFF2196F3),
+                            onTap: () => _pickAndSendImage(ImageSource.camera),
+                          ),
+                          _AttachButtonExpanded(
+                            icon: Icons.my_location,
+                            label: '내 위치',
+                            color: const Color(0xFFFF9800),
+                            onTap: () {
+                              setState(() => _showAttachPanel = false);
+                              _sendLocation();
+                            },
+                          ),
+                        ],
                       ),
-                      _AttachButton(
-                        icon: Icons.camera_alt,
-                        label: '카메라',
-                        color: const Color(0xFF2196F3),
-                        onTap: () => _pickAndSendImage(ImageSource.camera),
-                      ),
-                      _AttachButton(
-                        icon: Icons.my_location,
-                        label: '내 위치',
-                        color: const Color(0xFFFF9800),
-                        onTap: () {
-                          setState(() => _showAttachPanel = false);
-                          _sendLocation();
-                        },
-                      ),
-                      _AttachButton(
-                        icon: Icons.map_outlined,
-                        label: '지도',
-                        color: const Color(0xFFE91E63),
-                        onTap: _openLocationPicker,
-                      ),
-                      _AttachButton(
-                        icon: Icons.screenshot_outlined,
-                        label: '캡처',
-                        color: const Color(0xFF9C27B0),
-                        onTap: () {
-                          setState(() {
-                            _showAttachPanel = false;
-                            _captureMode = true;
-                          });
-                        },
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          _AttachButtonExpanded(
+                            icon: Icons.map_outlined,
+                            label: '지도',
+                            color: const Color(0xFFE91E63),
+                            onTap: _openLocationPicker,
+                          ),
+                          _AttachButtonExpanded(
+                            icon: Icons.screenshot_outlined,
+                            label: '캡처',
+                            color: const Color(0xFF9C27B0),
+                            onTap: () {
+                              setState(() {
+                                _showAttachPanel = false;
+                                _captureMode = true;
+                              });
+                            },
+                          ),
+                          _AttachButtonExpanded(
+                            icon: Icons.casino,
+                            label: '미니게임',
+                            color: const Color(0xFF673AB7),
+                            onTap: _openMiniGameSelect,
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -1246,6 +1346,8 @@ class _MessageBubble extends StatelessWidget {
             // Bubble
             if (locData != null)
               _LocationBubble(data: locData, isMe: isMe, interactive: interactive)
+            else if (GameResultBubble.isGameMessage(message.content))
+              GameResultBubble(content: message.content, isMe: isMe)
             else
             Container(
               constraints: BoxConstraints(
@@ -1663,13 +1765,13 @@ class _MapGridPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _AttachButton extends StatelessWidget {
+class _AttachButtonExpanded extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
   final VoidCallback onTap;
 
-  const _AttachButton({
+  const _AttachButtonExpanded({
     required this.icon,
     required this.label,
     required this.color,
@@ -1678,29 +1780,32 @@ class _AttachButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(16),
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: color, size: 26),
             ),
-            child: Icon(icon, color: color, size: 26),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppTheme.textSecondary,
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.textSecondary,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
