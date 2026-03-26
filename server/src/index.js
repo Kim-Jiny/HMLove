@@ -155,11 +155,18 @@ io.on('connection', async (socket) => {
         select: { fcmToken: true },
       });
       if (partner?.fcmToken) {
-        const pushBody = content
-          ? content
-          : urls.length === 1
+        let pushBody;
+        if (!content) {
+          pushBody = urls.length === 1
             ? '사진을 보냈습니다'
             : `사진 ${urls.length}장을 보냈습니다`;
+        } else if (content.startsWith('__GAME_ROULETTE__:')) {
+          pushBody = '🎰 룰렛을 돌렸어요!';
+        } else if (content.startsWith('__GAME_LADDER__:')) {
+          pushBody = '🪜 사다리타기를 했어요!';
+        } else {
+          pushBody = content;
+        }
         sendPushNotification({
           token: partner.fcmToken,
           title: socket.nickname || '상대방',
