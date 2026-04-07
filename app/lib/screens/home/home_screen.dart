@@ -60,7 +60,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       _syncWidgetMood(ref.read(moodProvider));
       _syncWidgetSchedule();
 
-      ref.read(fortuneProvider.notifier).fetchTodayFortune();
+      ref.read(fortuneProvider.notifier).checkTodayFortune();
       ref.read(badgeProvider.notifier).fetchBadges();
       ref.read(notificationProvider.notifier).fetchUnreadCount();
       ref.read(missionProvider.notifier).fetchTodayMissions();
@@ -84,7 +84,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // App returning to foreground → refresh all data
       ref.read(coupleProvider.notifier).fetchCouple();
       ref.read(moodProvider.notifier).fetchTodayMood();
-      ref.read(fortuneProvider.notifier).fetchTodayFortune();
+      ref.read(fortuneProvider.notifier).checkTodayFortune();
       ref.read(badgeProvider.notifier).fetchBadges();
       ref.read(notificationProvider.notifier).fetchUnreadCount();
       ref.read(missionProvider.notifier).fetchTodayMissions();
@@ -353,7 +353,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           await Future.wait<void>([
             ref.read(coupleProvider.notifier).fetchCouple(),
             ref.read(moodProvider.notifier).fetchTodayMood(),
-            ref.read(fortuneProvider.notifier).fetchTodayFortune(),
+            ref.read(fortuneProvider.notifier).checkTodayFortune(),
             ref.read(notificationProvider.notifier).fetchUnreadCount(),
             ref.read(missionProvider.notifier).fetchTodayMissions(),
           ]);
@@ -453,6 +453,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 luckyScore: fortuneState.fortune?.luckyScore,
                 coupleLuck: fortuneState.fortune?.coupleLuck,
                 isLoading: fortuneState.isLoading,
+                exists: fortuneState.exists,
                 onTap: () {
                   context.push('/fortune');
                 },
@@ -1062,12 +1063,14 @@ class _FortuneCard extends StatelessWidget {
   final int? luckyScore;
   final String? coupleLuck;
   final bool isLoading;
+  final bool? exists;
   final VoidCallback onTap;
 
   const _FortuneCard({
     this.luckyScore,
     this.coupleLuck,
     this.isLoading = false,
+    this.exists,
     required this.onTap,
   });
 
@@ -1120,6 +1123,15 @@ class _FortuneCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppTheme.primaryColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      )
+                    else if (exists == false)
+                      const Text(
+                        '광고를 보고 오늘의 운세를 확인하세요',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF9C27B0),
                           fontWeight: FontWeight.w500,
                         ),
                       )

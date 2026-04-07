@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'dart:math' as math;
 
 import '../../core/constants.dart';
 import '../../core/theme.dart';
 import '../../widgets/banner_ad_widget.dart';
+import '../../providers/ad_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
 import '../../providers/fortune_provider.dart';
@@ -20,6 +22,8 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   late Animation<double> _scaleAnimation;
+  RewardedAd? _rewardedAd;
+  bool _isAdLoading = false;
 
   @override
   void initState() {
@@ -37,6 +41,8 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
       final state = ref.read(fortuneProvider);
       if (state.fortune != null) {
         _animController.forward();
+      } else if (state.exists == false) {
+        _loadRewardedAd();
       }
     });
   }
@@ -44,13 +50,78 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
   @override
   void dispose() {
     _animController.dispose();
+    _rewardedAd?.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchFortune() async {
-    await ref.read(fortuneProvider.notifier).fetchTodayFortune();
+  void _loadRewardedAd() {
+    if (_isAdLoading || _rewardedAd != null) return;
+    setState(() => _isAdLoading = true);
+
+    RewardedAd.load(
+      adUnitId: AppConstants.adMobFortuneRewarded,
+      request: const AdRequest(),
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (ad) {
+          if (mounted) {
+            setState(() {
+              _rewardedAd = ad;
+              _isAdLoading = false;
+            });
+          } else {
+            ad.dispose();
+          }
+        },
+        onAdFailedToLoad: (error) {
+          debugPrint('Rewarded ad failed to load: $error');
+          if (mounted) {
+            setState(() => _isAdLoading = false);
+          }
+        },
+      ),
+    );
+  }
+
+  void _showRewardedAd() {
+    if (_rewardedAd == null) return;
+
+    _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _rewardedAd = null;
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _rewardedAd = null;
+        if (mounted) {
+          _loadRewardedAd();
+        }
+      },
+    );
+
+    _rewardedAd!.show(
+      onUserEarnedReward: (ad, reward) {
+        _generateFortune();
+      },
+    );
+  }
+
+  Future<void> _generateFortune() async {
+    await ref.read(fortuneProvider.notifier).generateFortune();
     if (mounted) {
       _animController.forward(from: 0);
+    }
+  }
+
+  Future<void> _checkFortune() async {
+    await ref.read(fortuneProvider.notifier).checkTodayFortune();
+    if (mounted) {
+      final state = ref.read(fortuneProvider);
+      if (state.fortune != null) {
+        _animController.forward(from: 0);
+      } else if (state.exists == false && _rewardedAd == null) {
+        _loadRewardedAd();
+      }
     }
   }
 
@@ -65,13 +136,13 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
       ),
       body: RefreshIndicator(
         color: AppTheme.primaryColor,
-        onRefresh: _fetchFortune,
+        onRefresh: _checkFortune,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: fortuneState.isLoading
               ? _buildLoadingState()
               : fortune == null
-                  ? _buildInitialState()
+                  ? _buildInitialState(fortuneState)
                   : _buildFortuneContent(fortune),
         ),
       ),
@@ -119,7 +190,9 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
     );
   }
 
-  Widget _buildInitialState() {
+  Widget _buildInitialState(FortuneState fortuneState) {
+    final adsRemoved = ref.watch(adProvider);
+
     return SizedBox(
       height: MediaQuery.of(context).size.height - 200,
       child: Center(
@@ -158,27 +231,81 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              '둘만의 특별한 운세가 기다리고 있어요',
-              style: TextStyle(
+            Text(
+              adsRemoved
+                  ? '둘만의 특별한 운세가 기다리고 있어요'
+                  : '짧은 광고를 보고 오늘의 운세를 확인하세요',
+              style: const TextStyle(
                 fontSize: 14,
                 color: AppTheme.textSecondary,
               ),
             ),
             const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: _fetchFortune,
-              icon: const Icon(Icons.auto_awesome, size: 20),
-              label: const Text('운세 확인하기'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF9C27B0),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 14,
+            if (adsRemoved)
+              // 광고 제거 유저: 바로 생성
+              ElevatedButton.icon(
+                onPressed: _generateFortune,
+                icon: const Icon(Icons.auto_awesome, size: 20),
+                label: const Text('운세 확인하기'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF9C27B0),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 14,
+                  ),
+                ),
+              )
+            else
+              // 광고 시청 필요
+              ElevatedButton.icon(
+                onPressed:
+                    (_rewardedAd != null) ? _showRewardedAd : null,
+                icon: Icon(
+                  _isAdLoading ? Icons.hourglass_top : Icons.play_circle_outline,
+                  size: 20,
+                ),
+                label: Text(
+                  _isAdLoading
+                      ? '광고 준비 중...'
+                      : _rewardedAd != null
+                          ? '광고 보고 운세 확인하기'
+                          : '광고를 불러오지 못했어요',
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF9C27B0),
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  disabledForegroundColor: Colors.grey.shade500,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 14,
+                  ),
                 ),
               ),
-            ),
+            // 광고 로드 실패 시 재시도
+            if (!adsRemoved && _rewardedAd == null && !_isAdLoading)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: TextButton(
+                  onPressed: _loadRewardedAd,
+                  child: const Text(
+                    '다시 시도',
+                    style: TextStyle(color: Color(0xFF9C27B0)),
+                  ),
+                ),
+              ),
+            if (fortuneState.error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Text(
+                  fortuneState.error!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.errorColor,
+                  ),
+                ),
+              ),
           ],
         ),
       ),

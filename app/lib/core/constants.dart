@@ -56,6 +56,10 @@ class AppConstants {
       ? 'ca-app-pub-2707874353926722/7002886688'
       : 'ca-app-pub-2707874353926722/9489449225';
 
+  static String get adMobFortuneRewarded => Platform.isIOS
+      ? 'ca-app-pub-2707874353926722/1502498596'
+      : 'ca-app-pub-2707874353926722/4787137481';
+
   // Hive Keys - Ads
   static const String adsRemovedKey = 'adsRemoved';
 }
