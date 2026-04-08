@@ -25,12 +25,14 @@ class MainShell extends ConsumerStatefulWidget {
   ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends ConsumerState<MainShell> {
+class _MainShellState extends ConsumerState<MainShell>
+    with WidgetsBindingObserver {
   DateTime? _lastBackPressed;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future.microtask(() {
       if (!mounted) return;
       ref.read(badgeProvider.notifier).fetchBadges();
@@ -50,8 +52,17 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     PushNotificationService.onCoupleLeft = null;
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // 앱 포그라운드 복귀 시 소켓 재연결 보장
+      ref.read(chatProvider.notifier).ensureConnected();
+    }
   }
 
   void _onCoupleLeft() {

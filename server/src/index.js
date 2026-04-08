@@ -404,7 +404,17 @@ server.listen(PORT, '0.0.0.0', () => {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down...');
+
+  // 모든 소켓 클라이언트에게 서버 종료 알림 후 연결 해제
+  io.emit('server:restart');
+  io.disconnectSockets(true);
+
   await prisma.$disconnect();
-  server.close();
-  process.exit(0);
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+
+  // 5초 후 강제 종료
+  setTimeout(() => process.exit(0), 5000);
 });

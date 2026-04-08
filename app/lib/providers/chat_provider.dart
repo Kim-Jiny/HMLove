@@ -158,6 +158,7 @@ class ChatNotifier extends Notifier<ChatState> {
   late final Dio _dio;
   IO.Socket? _socket;
   bool _chatScreenActive = false;
+  bool _hasConnectedOnce = false;
 
   @override
   ChatState build() {
@@ -175,20 +176,36 @@ class ChatNotifier extends Notifier<ChatState> {
   void connect(String token) {
     _socket?.dispose();
 
+    _hasConnectedOnce = false;
+
     _socket = IO.io(
       AppConstants.socketUrl,
       IO.OptionBuilder()
-          .setTransports(['websocket'])
+          .setTransports(['websocket', 'polling'])
           .setAuth({'token': token})
+          .enableReconnection()
+          .setReconnectionAttempts(999999)
+          .setReconnectionDelay(1000)
+          .setReconnectionDelayMax(10000)
           .disableAutoConnect()
           .build(),
     );
 
     _socket!.onConnect((_) {
+      final wasConnectedBefore = _hasConnectedOnce;
+      _hasConnectedOnce = true;
       state = state.copyWith(isConnected: true);
+      // 재연결 시에만 누락된 메시지 동기화
+      if (wasConnectedBefore) {
+        _syncMissedMessages();
+      }
     });
 
     _socket!.onDisconnect((_) {
+      state = state.copyWith(isConnected: false);
+    });
+
+    _socket!.onConnectError((_) {
       state = state.copyWith(isConnected: false);
     });
 
@@ -329,6 +346,53 @@ class ChatNotifier extends Notifier<ChatState> {
     });
 
     _socket!.connect();
+  }
+
+  /// 재연결 후 누락 메시지 동기화
+  Future<void> _syncMissedMessages() async {
+    if (state.messages.isEmpty) return;
+    try {
+      final response = await _dio.get('/chat/messages', queryParameters: {
+        'limit': 30,
+      });
+      final data = response.data as Map<String, dynamic>;
+      final latest = (data['messages'] as List)
+          .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
+          .toList();
+
+      if (latest.isEmpty) return;
+
+      // 기존 메시지에 없는 새 메시지만 병합
+      final existingIds = state.messages.map((m) => m.id).toSet();
+      final newMessages = latest.where((m) => !existingIds.contains(m.id)).toList();
+
+      if (newMessages.isNotEmpty) {
+        state = state.copyWith(
+          messages: [...newMessages, ...state.messages],
+        );
+      }
+
+      // 채팅 화면 활성 시 읽음 처리
+      if (_chatScreenActive) {
+        markAsRead();
+      }
+      ref.read(badgeProvider.notifier).fetchBadges();
+    } catch (_) {}
+  }
+
+  /// 소켓 연결 상태 확인 및 재연결
+  void ensureConnected() {
+    final token = ApiClient.getAccessToken();
+    if (token == null) return;
+
+    if (_socket == null) {
+      connect(token);
+    } else if (!_socket!.connected) {
+      // 기존 소켓 정리 후 새 토큰으로 완전히 재연결
+      _socket!.dispose();
+      _socket = null;
+      connect(token);
+    }
   }
 
   /// Disconnect from the Socket.io server.
