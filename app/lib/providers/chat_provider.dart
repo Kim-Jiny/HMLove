@@ -5,6 +5,7 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../core/api_client.dart';
 import '../core/constants.dart';
 import 'badge_provider.dart';
+import 'calendar_provider.dart';
 import 'feed_provider.dart';
 import 'mission_provider.dart';
 
@@ -342,6 +343,18 @@ class ChatNotifier extends Notifier<ChatState> {
         final missionJson = map['mission'] as Map<String, dynamic>;
         final mission = Mission.fromJson(missionJson);
         ref.read(missionProvider.notifier).updateMissionFromSocket(mission);
+      }
+    });
+
+    // 캘린더 실시간 동기화 (상대방이 변경한 경우만)
+    _socket!.on('calendar:updated', (data) {
+      if (data != null) {
+        final map = data as Map<String, dynamic>;
+        final senderId = map['senderId'] as String?;
+        final myId = ApiClient.getUserId();
+        if (senderId != myId) {
+          ref.read(calendarProvider.notifier).refreshCurrentMonth();
+        }
       }
     });
 

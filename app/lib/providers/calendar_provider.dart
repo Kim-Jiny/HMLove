@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../core/api_client.dart';
 import '../core/device_calendar_service.dart';
+import '../core/widget_service.dart';
 import 'auth_provider.dart';
 
 // Calendar Event model
@@ -148,6 +149,15 @@ class CalendarNotifier extends Notifier<CalendarState> {
     return CalendarState(deviceCalendarEnabled: enabled);
   }
 
+  /// 현재 보고 있는 월의 데이터를 재조회 (소켓 실시간 동기화용).
+  /// 캘린더 화면을 아직 열지 않았으면 현재 달 기준으로 조회.
+  Future<void> refreshCurrentMonth() async {
+    final ym = _currentYearMonth.isNotEmpty
+        ? _currentYearMonth
+        : '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}';
+    await fetchEvents(ym);
+  }
+
   /// Fetch events for a given year-month (e.g. '2026-02').
   Future<void> fetchEvents(String yearMonth) async {
     _currentYearMonth = yearMonth;
@@ -168,6 +178,9 @@ class CalendarNotifier extends Notifier<CalendarState> {
                 .toList(),
           ));
       state = state.copyWith(events: events, moodMap: moodMap, isLoading: false);
+
+      // 위젯 캘린더 데이터 갱신
+      _updateWidgetCalendarEvents(events, yearMonth);
 
       // 기기 캘린더 연동
       if (state.deviceCalendarEnabled) {
@@ -318,6 +331,11 @@ class CalendarNotifier extends Notifier<CalendarState> {
         isLoading: false,
       );
 
+      // 위젯 캘린더 데이터 갱신
+      if (_currentYearMonth.isNotEmpty) {
+        _updateWidgetCalendarEvents(state.events, _currentYearMonth);
+      }
+
       // 기기 캘린더에도 추가
       _syncToDeviceCalendar(event.id, title, date, description);
 
@@ -367,6 +385,11 @@ class CalendarNotifier extends Notifier<CalendarState> {
 
       state = state.copyWith(events: updatedEvents, isLoading: false);
 
+      // 위젯 캘린더 데이터 갱신
+      if (_currentYearMonth.isNotEmpty) {
+        _updateWidgetCalendarEvents(state.events, _currentYearMonth);
+      }
+
       // 기기 캘린더에도 수정
       if (title != null && date != null) {
         _updateDeviceCalendarEvent(id, title, date, description);
@@ -407,6 +430,11 @@ class CalendarNotifier extends Notifier<CalendarState> {
       final updatedEvents =
           state.events.where((event) => event.id != id).toList();
       state = state.copyWith(events: updatedEvents, isLoading: false);
+
+      // 위젯 캘린더 데이터 갱신
+      if (_currentYearMonth.isNotEmpty) {
+        _updateWidgetCalendarEvents(state.events, _currentYearMonth);
+      }
 
       // 기기 캘린더에서도 삭제
       _deleteDeviceCalendarEvent(id);
@@ -565,6 +593,46 @@ class CalendarNotifier extends Notifier<CalendarState> {
       eventId: deviceEventId,
     );
     await DeviceCalendarService.deleteEventMapping(appEventId);
+  }
+
+  /// 위젯 캘린더 이벤트 데이터 갱신
+  Future<void> _updateWidgetCalendarEvents(
+      List<CalendarEvent> events, String yearMonth) async {
+    try {
+      // 위젯은 항상 현재 월만 표시 — 다른 월 데이터로 갱신하지 않음
+      final now = DateTime.now();
+      final currentYM =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}';
+      if (yearMonth != currentYM) return;
+
+      final widgetEvents = events
+          .where((e) => !e.isAuto)
+          .map((e) => {
+                'date': DateFormat('yyyy-MM-dd').format(e.date),
+                'title': e.title,
+                'color': e.color ?? _defaultColorForEventType(e.eventType, e.isAnniversary),
+                'isAnniversary': e.isAnniversary,
+                'eventType': e.eventType,
+              })
+          .toList();
+      await WidgetService.updateCalendarEvents(widgetEvents, yearMonth);
+    } catch (e) {
+      debugPrint('[Widget] updateCalendarEvents error: $e');
+    }
+  }
+
+  static String _defaultColorForEventType(String eventType, bool isAnniversary) {
+    if (isAnniversary) return '#E91E63'; // Pink
+    switch (eventType) {
+      case 'schedule':
+        return '#1976D2'; // Blue
+      case 'device':
+        return '#4CAF50'; // Green
+      case 'feed':
+        return '#FF9800'; // Orange
+      default:
+        return '#E91E63'; // Pink
+    }
   }
 
   /// Set the selected day.

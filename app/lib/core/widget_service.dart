@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:home_widget/home_widget.dart';
 
 /// App Group ID (iOS) - must match Widget Extension's App Group
@@ -7,6 +9,7 @@ const _appGroupId = 'group.com.jiny.hmlove';
 const _iosWidgetName = 'HMLoveWidget';
 const _androidWidgetName = 'HMLoveWidgetProvider';
 const _androidSmallWidgetName = 'HMLoveSmallWidgetProvider';
+const _androidCalendarWidgetName = 'HMLoveCalendarWidgetProvider';
 
 class WidgetService {
   WidgetService._();
@@ -75,15 +78,27 @@ class WidgetService {
     await _refresh();
   }
 
+  /// Update calendar events for large calendar widget
+  static Future<void> updateCalendarEvents(
+      List<Map<String, dynamic>> events, String yearMonth) async {
+    final jsonStr = jsonEncode(events);
+    await Future.wait([
+      HomeWidget.saveWidgetData('calendarEvents', jsonStr),
+      HomeWidget.saveWidgetData('calendarYearMonth', yearMonth),
+    ]);
+    await _refresh();
+  }
+
   static Future<void> _refresh() async {
+    // iOS는 동일 위젯 이름이므로 1회만 리로드, Android는 각 provider별 호출
     await HomeWidget.updateWidget(
       iOSName: _iosWidgetName,
       androidName: _androidWidgetName,
     );
-    await HomeWidget.updateWidget(
-      iOSName: _iosWidgetName,
-      androidName: _androidSmallWidgetName,
-    );
+    await Future.wait([
+      HomeWidget.updateWidget(androidName: _androidSmallWidgetName),
+      HomeWidget.updateWidget(androidName: _androidCalendarWidgetName),
+    ]);
   }
 
   static String _moodEmoji(String? key) {

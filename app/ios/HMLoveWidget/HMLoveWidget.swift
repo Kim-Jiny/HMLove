@@ -10,6 +10,33 @@ import SwiftUI
 
 // MARK: - Data
 
+struct CalendarEventData {
+    let date: Date
+    let title: String
+    let color: String
+    let isAnniversary: Bool
+    let eventType: String // "schedule", "anniversary", "feed"
+
+    var sortPriority: Int {
+        if isAnniversary { return 0 }
+        switch eventType {
+        case "schedule": return 1
+        case "device": return 2
+        default: return 3 // feed, etc.
+        }
+    }
+
+    static func defaultColor(eventType: String, isAnniversary: Bool) -> String {
+        if isAnniversary { return "#E91E63" }
+        switch eventType {
+        case "schedule": return "#1976D2"
+        case "device": return "#4CAF50"
+        case "feed": return "#FF9800"
+        default: return "#E91E63"
+        }
+    }
+}
+
 struct CoupleData {
     let isConnected: Bool
     let myName: String
@@ -21,6 +48,8 @@ struct CoupleData {
     let myMoodEmoji: String
     let partnerMoodEmoji: String
     let todaySchedule: String
+    let calendarEvents: [CalendarEventData]
+    let calendarYearMonth: String
 
     static let placeholder = CoupleData(
         isConnected: true,
@@ -32,7 +61,9 @@ struct CoupleData {
         nextAnniversaryDaysLeft: 135,
         myMoodEmoji: "🥰",
         partnerMoodEmoji: "😊",
-        todaySchedule: "데이트 약속"
+        todaySchedule: "데이트 약속",
+        calendarEvents: [],
+        calendarYearMonth: ""
     )
 
     static let notConnected = CoupleData(
@@ -41,7 +72,9 @@ struct CoupleData {
         daysTogether: 0, startDate: "",
         nextAnniversaryName: nil, nextAnniversaryDaysLeft: nil,
         myMoodEmoji: "", partnerMoodEmoji: "",
-        todaySchedule: ""
+        todaySchedule: "",
+        calendarEvents: [],
+        calendarYearMonth: ""
     )
 }
 
@@ -105,6 +138,8 @@ struct CoupleTimelineProvider: TimelineProvider {
         let now = Date()
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
         let yearMonth = formatter.string(from: now)
 
         guard let url = URL(string: "\(baseUrl)/calendar/\(yearMonth)") else {
@@ -127,6 +162,8 @@ struct CoupleTimelineProvider: TimelineProvider {
             // Find today's events
             let dayFormatter = DateFormatter()
             dayFormatter.dateFormat = "yyyy-MM-dd"
+            dayFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dayFormatter.calendar = Calendar(identifier: .gregorian)
             let todayStr = dayFormatter.string(from: now)
 
             let todayEvents = events.filter { event in
@@ -139,6 +176,16 @@ struct CoupleTimelineProvider: TimelineProvider {
 
             // Save to UserDefaults so local loadData also has it
             defaults.set(schedule, forKey: "todaySchedule")
+
+            // Save calendar events for large widget (filter out auto events only)
+            let widgetEvents = events.filter { event in
+                let isAuto = event["_auto"] as? Bool ?? false
+                return !isAuto
+            }
+            if let eventsJsonData = try? JSONSerialization.data(withJSONObject: widgetEvents) {
+                defaults.set(String(data: eventsJsonData, encoding: .utf8), forKey: "calendarEvents")
+                defaults.set(yearMonth, forKey: "calendarYearMonth")
+            }
 
             // Also update mood from server
             if let moods = json["moods"] as? [String: Any],
@@ -187,6 +234,8 @@ struct CoupleTimelineProvider: TimelineProvider {
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy.MM.dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
         if let startDate = formatter.date(from: startDateStr) {
             let calendar = Calendar.current
             let now = Date()
@@ -203,6 +252,43 @@ struct CoupleTimelineProvider: TimelineProvider {
             nextAnniversaryDaysLeft = defaults.object(forKey: "nextAnniversaryDaysLeft") as? Int
         }
 
+        // Parse calendar events
+        var calendarEvents: [CalendarEventData] = []
+        if let eventsJson = defaults.string(forKey: "calendarEvents"),
+           let jsonData = eventsJson.data(using: .utf8),
+           let eventsArray = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]] {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.calendar = Calendar(identifier: .gregorian)
+            let isoFormatter = ISO8601DateFormatter()
+            isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let isoFormatterNoFrac = ISO8601DateFormatter()
+            isoFormatterNoFrac.formatOptions = [.withInternetDateTime]
+            calendarEvents = eventsArray.compactMap { dict in
+                guard let dateStr = dict["date"] as? String,
+                      let title = dict["title"] as? String else { return nil }
+                // Try yyyy-MM-dd first, then ISO 8601 variants
+                let date = dateFormatter.date(from: String(dateStr.prefix(10)))
+                    ?? isoFormatter.date(from: dateStr)
+                    ?? isoFormatterNoFrac.date(from: dateStr)
+                guard let parsedDate = date else { return nil }
+                let isAnniversary = dict["isAnniversary"] as? Bool ?? false
+                let eventType = dict["eventType"] as? String ?? "schedule"
+                let rawColor = (dict["color"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+                let color = (rawColor?.isEmpty == false ? rawColor! : nil)
+                    ?? CalendarEventData.defaultColor(eventType: eventType, isAnniversary: isAnniversary)
+                return CalendarEventData(
+                    date: parsedDate,
+                    title: title,
+                    color: color,
+                    isAnniversary: isAnniversary,
+                    eventType: eventType
+                )
+            }
+        }
+        let calendarYearMonth = defaults.string(forKey: "calendarYearMonth") ?? ""
+
         return CoupleData(
             isConnected: true,
             myName: defaults.string(forKey: "myName") ?? "나",
@@ -213,7 +299,9 @@ struct CoupleTimelineProvider: TimelineProvider {
             nextAnniversaryDaysLeft: nextAnniversaryDaysLeft,
             myMoodEmoji: defaults.string(forKey: "myMoodEmoji") ?? "😶",
             partnerMoodEmoji: defaults.string(forKey: "partnerMoodEmoji") ?? "😶",
-            todaySchedule: defaults.string(forKey: "todaySchedule") ?? ""
+            todaySchedule: defaults.string(forKey: "todaySchedule") ?? "",
+            calendarEvents: calendarEvents,
+            calendarYearMonth: calendarYearMonth
         )
     }
 
@@ -383,6 +471,203 @@ struct MediumWidgetView: View {
     }
 }
 
+// MARK: - Large Widget (Calendar)
+
+struct LargeWidgetView: View {
+    let data: CoupleData
+
+    private let calendar = Calendar(identifier: .gregorian)
+    private let weekdaySymbols = ["일", "월", "화", "수", "목", "금", "토"]
+
+    private var displayDate: Date {
+        if !data.calendarYearMonth.isEmpty {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM"
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.calendar = Calendar(identifier: .gregorian)
+            if let date = formatter.date(from: data.calendarYearMonth) {
+                return date
+            }
+        }
+        return Date()
+    }
+
+    private var yearMonthText: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy년 M월"
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        return formatter.string(from: displayDate)
+    }
+
+    private var calendarDays: [CalendarDay] {
+        let components = calendar.dateComponents([.year, .month], from: displayDate)
+        guard let firstOfMonth = calendar.date(from: components),
+              let range = calendar.range(of: .day, in: .month, for: firstOfMonth) else {
+            return []
+        }
+
+        let firstWeekday = calendar.component(.weekday, from: firstOfMonth) - 1 // 0=Sun
+
+        // Previous month days
+        var days: [CalendarDay] = []
+        if firstWeekday > 0 {
+            let prevMonth = calendar.date(byAdding: .month, value: -1, to: firstOfMonth)!
+            let prevRange = calendar.range(of: .day, in: .month, for: prevMonth)!
+            let prevLastDay = prevRange.upperBound - 1
+            for i in 0..<firstWeekday {
+                let day = prevLastDay - firstWeekday + 1 + i
+                let date = calendar.date(from: DateComponents(
+                    year: calendar.component(.year, from: prevMonth),
+                    month: calendar.component(.month, from: prevMonth),
+                    day: day
+                ))!
+                days.append(CalendarDay(day: day, date: date, isCurrentMonth: false))
+            }
+        }
+
+        // Current month days
+        for day in range {
+            let date = calendar.date(from: DateComponents(
+                year: components.year, month: components.month, day: day
+            ))!
+            days.append(CalendarDay(day: day, date: date, isCurrentMonth: true))
+        }
+
+        // Next month days to fill 6 rows
+        let remaining = 42 - days.count
+        if remaining > 0 {
+            let nextMonth = calendar.date(byAdding: .month, value: 1, to: firstOfMonth)!
+            for day in 1...remaining {
+                let date = calendar.date(from: DateComponents(
+                    year: calendar.component(.year, from: nextMonth),
+                    month: calendar.component(.month, from: nextMonth),
+                    day: day
+                ))!
+                days.append(CalendarDay(day: day, date: date, isCurrentMonth: false))
+            }
+        }
+
+        return days
+    }
+
+    private func eventsForDate(_ date: Date) -> [CalendarEventData] {
+        data.calendarEvents
+            .filter { calendar.isDate($0.date, inSameDayAs: date) }
+            .sorted { $0.sortPriority < $1.sortPriority }
+    }
+
+    private func isToday(_ date: Date) -> Bool {
+        calendar.isDateInToday(date)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Top bar: couple name + D-Day
+            HStack {
+                Text("\(data.myName) ♥ \(data.partnerName)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color(hex: "E91E63"))
+                Spacer()
+                Text("\(data.daysTogether)일")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(Color(hex: "C2185B"))
+                if let name = data.nextAnniversaryName,
+                   let daysLeft = data.nextAnniversaryDaysLeft {
+                    Text("· \(name) D-\(daysLeft)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Color(hex: "9E9E9E"))
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+
+            // Month header
+            Text(yearMonthText)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(Color(hex: "424242"))
+                .padding(.bottom, 3)
+
+            // Weekday headers
+            HStack(spacing: 0) {
+                ForEach(0..<7, id: \.self) { index in
+                    Text(weekdaySymbols[index])
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(index == 0 ? Color(hex: "E91E63") : Color(hex: "9E9E9E"))
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 2)
+
+            // Calendar grid 6x7
+            let days = calendarDays
+            VStack(spacing: 0) {
+                ForEach(0..<6, id: \.self) { row in
+                    HStack(spacing: 0) {
+                        ForEach(0..<7, id: \.self) { col in
+                            let index = row * 7 + col
+                            if index < days.count {
+                                let dayItem = days[index]
+                                let dayEvents = dayItem.isCurrentMonth ? Array(eventsForDate(dayItem.date).prefix(5)) : []
+                                let today = dayItem.isCurrentMonth && isToday(dayItem.date)
+
+                                VStack(spacing: 0) {
+                                    ZStack {
+                                        if today {
+                                            Circle()
+                                                .fill(Color(hex: "E91E63"))
+                                                .frame(width: 14, height: 14)
+                                        }
+                                        Text("\(dayItem.day)")
+                                            .font(.system(size: 10, weight: today ? .bold : .regular))
+                                            .foregroundColor(
+                                                today ? .white :
+                                                !dayItem.isCurrentMonth ? Color(hex: "BDBDBD") :
+                                                col == 0 ? Color(hex: "E91E63") :
+                                                Color(hex: "424242")
+                                            )
+                                    }
+                                    .frame(height: 14)
+
+                                    ForEach(Array(dayEvents.enumerated()), id: \.offset) { _, event in
+                                        Text(event.title)
+                                            .font(.system(size: 6, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
+                                            .padding(.horizontal, 1)
+                                            .frame(maxWidth: .infinity, minHeight: 8, maxHeight: 8)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 1.5)
+                                                    .fill(Color(hex: event.color.replacingOccurrences(of: "#", with: "")))
+                                            )
+                                            .clipped()
+                                    }
+
+                                    Spacer(minLength: 0)
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 4)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.bottom, 4)
+    }
+}
+
+struct CalendarDay {
+    let day: Int
+    let date: Date
+    let isCurrentMonth: Bool
+}
+
 // MARK: - Widget Configuration
 
 struct HMLoveWidget: Widget {
@@ -412,7 +697,7 @@ struct HMLoveWidget: Widget {
         }
         .configurationDisplayName("우리연애")
         .description("D-Day와 오늘의 기분을 확인하세요")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
         .contentMarginsDisabled()
     }
 }
@@ -448,6 +733,8 @@ struct WidgetView: View {
                 SmallWidgetView(data: entry.data)
             case .systemMedium:
                 MediumWidgetView(data: entry.data)
+            case .systemLarge:
+                LargeWidgetView(data: entry.data)
             default:
                 MediumWidgetView(data: entry.data)
             }

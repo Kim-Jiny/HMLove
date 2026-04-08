@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requireCouple } from '../middleware/auth.js';
 import prisma from '../utils/prisma.js';
-import { notifyPartner } from '../utils/firebase.js';
+import { notifyPartner, notifyPartnerSilent } from '../utils/firebase.js';
 import { getAutoAnniversariesForMonth } from '../utils/anniversary.js';
 
 const router = Router();
@@ -139,13 +139,22 @@ router.post('/', async (req, res) => {
       },
     });
 
-    // 상대방에게 푸시 알림
+    // 소켓으로 상대방 실시간 갱신
+    const io = req.app.get('io');
+    io.to(`couple:${req.user.coupleId}`).emit('calendar:updated', {
+      action: 'created',
+      senderId: req.user.id,
+      event: event,
+    });
+
+    // 상대방에게 푸시 알림 + 사일런트 푸시 (위젯 갱신 용도, DB 1회 조회로 통합)
     notifyPartner({
       userId: req.user.id,
       coupleId: req.user.coupleId,
       title: req.user.nickname || '상대방',
       body: `새 일정: ${title}`,
       data: { type: 'calendar' },
+      silentData: { type: 'calendar_sync' },
     });
 
     const eventType = event.isAnniversary ? 'anniversary' : 'schedule';
@@ -182,6 +191,17 @@ router.put('/:id', async (req, res) => {
       },
     });
 
+    // 소켓으로 상대방 실시간 갱신
+    const io = req.app.get('io');
+    io.to(`couple:${req.user.coupleId}`).emit('calendar:updated', {
+      action: 'updated',
+      senderId: req.user.id,
+      event: event,
+    });
+
+    // 사일런트 푸시 (위젯 갱신 용도)
+    notifyPartnerSilent({ userId: req.user.id, coupleId: req.user.coupleId, data: { type: 'calendar_sync' } });
+
     const eventType = event.isAnniversary ? 'anniversary' : 'schedule';
     res.json({ event: { ...event, eventType } });
   } catch (err) {
@@ -201,6 +221,18 @@ router.delete('/:id', async (req, res) => {
     }
 
     await prisma.calendarEvent.delete({ where: { id } });
+
+    // 소켓으로 상대방 실시간 갱신
+    const io = req.app.get('io');
+    io.to(`couple:${req.user.coupleId}`).emit('calendar:updated', {
+      action: 'deleted',
+      senderId: req.user.id,
+      eventId: id,
+    });
+
+    // 사일런트 푸시 (위젯 갱신 용도)
+    notifyPartnerSilent({ userId: req.user.id, coupleId: req.user.coupleId, data: { type: 'calendar_sync' } });
+
     res.json({ message: '일정이 삭제되었습니다.' });
   } catch (err) {
     console.error('Delete calendar event error:', err);

@@ -19,6 +19,18 @@ const upload = multer({
   },
 });
 
+function getUploadedPhotoFile(req) {
+  if (req.file) return req.file;
+
+  const imageFile = req.files?.image?.[0];
+  if (imageFile) return imageFile;
+
+  const photoFile = req.files?.photo?.[0];
+  if (photoFile) return photoFile;
+
+  return null;
+}
+
 function extractExifGps(buffer) {
   try {
     const parser = ExifParser.create(buffer);
@@ -72,10 +84,16 @@ router.get('/map', async (req, res) => {
       },
       select: {
         id: true,
+        coupleId: true,
+        authorId: true,
+        imageUrl: true,
         latitude: true,
         longitude: true,
+        caption: true,
+        address: true,
         thumbnailUrl: true,
         takenAt: true,
+        createdAt: true,
       },
       orderBy: { takenAt: 'desc' },
     });
@@ -88,14 +106,21 @@ router.get('/map', async (req, res) => {
 });
 
 // POST /photo
-router.post('/', upload.single('photo'), async (req, res) => {
+router.post(
+  '/',
+  upload.fields([
+    { name: 'photo', maxCount: 1 },
+    { name: 'image', maxCount: 1 },
+  ]),
+  async (req, res) => {
   try {
-    if (!req.file) {
+    const uploadedFile = getUploadedPhotoFile(req);
+    if (!uploadedFile) {
       return res.status(400).json({ error: '사진을 첨부해주세요.' });
     }
 
     const { caption } = req.body;
-    const buffer = req.file.buffer;
+    const buffer = uploadedFile.buffer;
     const timestamp = Date.now();
     const rand = Math.random().toString(36).slice(2);
 
@@ -104,7 +129,7 @@ router.post('/', upload.single('photo'), async (req, res) => {
 
     // 원본 업로드
     const fileName = `photos/${timestamp}-${rand}.jpg`;
-    const imageUrl = await uploadFile(buffer, fileName, req.file.mimetype);
+    const imageUrl = await uploadFile(buffer, fileName, uploadedFile.mimetype);
 
     // 썸네일 생성 + 업로드
     const thumbBuffer = await sharp(buffer)
@@ -130,7 +155,8 @@ router.post('/', upload.single('photo'), async (req, res) => {
       },
     });
 
-    res.status(201).json({ photo });
+    // 하위 호환: 구버전 앱은 top-level photo 객체를, 신버전은 nested photo를 읽을 수 있음
+    res.status(201).json({ ...photo, photo });
   } catch (err) {
     console.error('Upload photo error:', err);
     res.status(500).json({ error: '사진 업로드에 실패했습니다.' });

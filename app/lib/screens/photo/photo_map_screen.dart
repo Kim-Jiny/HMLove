@@ -22,6 +22,7 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
   final Completer<GoogleMapController> _mapController = Completer();
   bool _isMapView = true;
   Set<Marker> _markers = {};
+  String _markerSignature = '';
 
   static const LatLng _defaultCenter = LatLng(37.5665, 126.9780); // Seoul
 
@@ -239,12 +240,22 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
   @override
   Widget build(BuildContext context) {
     final photoState = ref.watch(photoProvider);
-    final photos = photoState.mapPhotos ?? [];
+    final photos = photoState.mapPhotos;
+    final markerPhotos = photos
+        .where((photo) => photo.latitude != null && photo.longitude != null)
+        .toList();
+    final markerSignature = markerPhotos
+        .map((photo) =>
+            '${photo.id}:${photo.latitude}:${photo.longitude}:${photo.imageUrl}')
+        .join('|');
 
-    // Build markers when photos change
-    if (photos.isNotEmpty && _markers.isEmpty) {
+    // Rebuild markers whenever the underlying map photo set changes.
+    if (markerSignature != _markerSignature) {
+      _markerSignature = markerSignature;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _buildMarkers(photos);
+        if (mounted) {
+          _buildMarkers(markerPhotos);
+        }
       });
     }
 

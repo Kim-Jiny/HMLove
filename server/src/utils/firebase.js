@@ -88,6 +88,71 @@ export async function sendPushNotification({ token, title, body, data, sound = t
 }
 
 /**
+ * Send a silent (data-only) push notification — no visible notification.
+ * Used to trigger background tasks like widget refresh.
+ */
+export async function sendSilentPush({ token, data }) {
+  if (!token) return;
+
+  try {
+    // FCM data 값은 반드시 string이어야 함
+    const stringData = {};
+    for (const key of Object.keys(data || {})) {
+      stringData[key] = typeof data[key] === 'string' ? data[key] : String(data[key]);
+    }
+
+    await admin.messaging().send({
+      token,
+      data: stringData,
+      android: { priority: 'high' },
+      apns: {
+        headers: {
+          'apns-push-type': 'background',
+          'apns-priority': '5',
+        },
+        payload: {
+          aps: { 'content-available': 1 },
+        },
+      },
+    });
+    console.log(`[Push] Silent push sent to token: ${token.substring(0, 20)}...`);
+  } catch (err) {
+    if (err.code === 'messaging/registration-token-not-registered' ||
+        err.code === 'messaging/invalid-registration-token') {
+      console.log('[Push] Invalid token, removing from DB');
+      const prisma = (await import('./prisma.js')).default;
+      await prisma.user.updateMany({
+        where: { fcmToken: token },
+        data: { fcmToken: null },
+      });
+    } else {
+      console.error('[Push] Silent push error:', err.message);
+    }
+  }
+}
+
+/**
+ * 커플 상대방에게 사일런트 푸시를 보내는 헬퍼 (알림 설정 무시, notification 없음)
+ */
+export async function notifyPartnerSilent({ userId, coupleId, data }) {
+  try {
+    const prisma = (await import('./prisma.js')).default;
+    const partner = await prisma.user.findFirst({
+      where: {
+        coupleId,
+        id: { not: userId },
+      },
+      select: { fcmToken: true },
+    });
+    if (!partner?.fcmToken) return;
+
+    await sendSilentPush({ token: partner.fcmToken, data });
+  } catch (err) {
+    console.error('[Push] notifyPartnerSilent error:', err.message);
+  }
+}
+
+/**
  * 커플 상대방에게 푸시 알림을 보내는 헬퍼 함수
  * + Notification DB에 기록 저장 (chat 제외)
  */
@@ -105,7 +170,7 @@ const _typeToPrefKey = {
   fight: 'noti_fight',
 };
 
-export async function notifyPartner({ userId, coupleId, title, body, data }) {
+export async function notifyPartner({ userId, coupleId, title, body, data, silentData }) {
   try {
     const prisma = (await import('./prisma.js')).default;
     const partner = await prisma.user.findFirst({
@@ -122,11 +187,22 @@ export async function notifyPartner({ userId, coupleId, title, body, data }) {
     const type = data?.type;
 
     // 전체 알림 OFF면 보내지 않음
-    if (prefs.noti_all === false) return;
+    if (prefs.noti_all === false) {
+      // 알림 OFF여도 사일런트 푸시는 전송 (위젯 갱신용, 사용자에게 안 보임)
+      if (silentData && partner.fcmToken) {
+        await sendSilentPush({ token: partner.fcmToken, data: silentData });
+      }
+      return;
+    }
 
     // 카테고리별 알림 OFF면 보내지 않음
     const prefKey = _typeToPrefKey[type];
-    if (prefKey && prefs[prefKey] === false) return;
+    if (prefKey && prefs[prefKey] === false) {
+      if (silentData && partner.fcmToken) {
+        await sendSilentPush({ token: partner.fcmToken, data: silentData });
+      }
+      return;
+    }
 
     // 채팅은 알림 DB에 저장하지 않음
     if (type && type !== 'chat') {
@@ -146,6 +222,11 @@ export async function notifyPartner({ userId, coupleId, title, body, data }) {
       const sound = prefKey ? prefs[`${prefKey}_sound`] !== false : true;
 
       await sendPushNotification({ token: partner.fcmToken, title, body, data, sound });
+
+      // 동일 partner 토큰으로 사일런트 푸시도 전송 (DB 재조회 없음)
+      if (silentData) {
+        await sendSilentPush({ token: partner.fcmToken, data: silentData });
+      }
     }
   } catch (err) {
     console.error('[Push] notifyPartner error:', err.message);

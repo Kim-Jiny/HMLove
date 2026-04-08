@@ -25,6 +25,7 @@ const _typeToKeyPrefix = <String, String>{
 
 class PushNotificationService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  static bool _initialized = false;
 
   /// 커플 해제 알림 수신 시 콜백 (MainShell에서 등록)
   static void Function()? onCoupleLeft;
@@ -41,6 +42,8 @@ class PushNotificationService {
 
   /// 권한 요청 + 토큰 비교 후 필요시 서버 업데이트 + 알림 탭 핸들링
   static Future<void> initialize() async {
+    if (_initialized) return;
+
     // 로그인 안 된 상태면 스킵
     final accessToken = ApiClient.getAccessToken();
     if (accessToken == null) return;
@@ -58,6 +61,7 @@ class PushNotificationService {
       return;
     }
 
+    _initialized = true;
     debugPrint('[Push] Permission granted');
 
     // 포그라운드 시스템 푸시 억제 (혹시 main에서 호출 안 됐을 경우 대비)
@@ -78,6 +82,11 @@ class PushNotificationService {
 
       if (message.data['type'] == 'couple_left') {
         onCoupleLeft?.call();
+        return;
+      }
+      if (message.data['type'] == 'calendar_sync') {
+        // 포그라운드에서는 소켓 이벤트가 데이터 갱신 + 위젯 갱신을 처리하므로
+        // 사일런트 푸시에서는 배너만 억제하고 위젯 중복 갱신하지 않음
         return;
       }
       _showInAppBanner(message);

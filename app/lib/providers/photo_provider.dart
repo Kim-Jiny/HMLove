@@ -9,40 +9,51 @@ import '../core/api_client.dart';
 class Photo {
   final String id;
   final String imageUrl;
+  final String? thumbnailUrl;
   final String? caption;
   final double? latitude;
   final double? longitude;
-  final String? location;
+  final String? address;
   final String coupleId;
-  final String uploadedBy;
+  final String authorId;
   final DateTime createdAt;
-  final DateTime updatedAt;
+  final DateTime? updatedAt;
 
   const Photo({
     required this.id,
     required this.imageUrl,
+    this.thumbnailUrl,
     this.caption,
     this.latitude,
     this.longitude,
-    this.location,
+    this.address,
     required this.coupleId,
-    required this.uploadedBy,
+    required this.authorId,
     required this.createdAt,
-    required this.updatedAt,
+    this.updatedAt,
   });
 
   factory Photo.fromJson(Map<String, dynamic> json) {
+    final imageUrl = (json['imageUrl'] ?? json['thumbnailUrl']) as String? ?? '';
+    final createdAtRaw = json['createdAt'] ?? json['takenAt'];
+    final updatedAtRaw = json['updatedAt'];
+
     return Photo(
       id: json['id'] as String,
-      imageUrl: json['imageUrl'] as String,
+      imageUrl: imageUrl,
+      thumbnailUrl: json['thumbnailUrl'] as String?,
       caption: json['caption'] as String?,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
-      location: json['location'] as String?,
-      coupleId: json['coupleId'] as String,
-      uploadedBy: json['uploadedBy'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      address: (json['address'] ?? json['location']) as String?,
+      coupleId: json['coupleId'] as String? ?? '',
+      authorId: (json['uploadedBy'] ?? json['authorId']) as String? ?? '',
+      createdAt: createdAtRaw != null
+          ? DateTime.parse(createdAtRaw as String)
+          : DateTime.now(),
+      updatedAt: updatedAtRaw != null
+          ? DateTime.parse(updatedAtRaw as String)
+          : null,
     );
   }
 
@@ -50,14 +61,15 @@ class Photo {
     return {
       'id': id,
       'imageUrl': imageUrl,
+      'thumbnailUrl': thumbnailUrl,
       'caption': caption,
       'latitude': latitude,
       'longitude': longitude,
-      'location': location,
+      'address': address,
       'coupleId': coupleId,
-      'uploadedBy': uploadedBy,
+      'authorId': authorId,
       'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
     };
   }
 }
@@ -182,9 +194,14 @@ class PhotoNotifier extends Notifier<PhotoState> {
         ),
       );
 
-      final photo = Photo.fromJson(response.data as Map<String, dynamic>);
+      final data = response.data as Map<String, dynamic>;
+      final photoJson = data['photo'] as Map<String, dynamic>? ?? data;
+      final photo = Photo.fromJson(photoJson);
       state = state.copyWith(
         photos: [photo, ...state.photos],
+        mapPhotos: photo.latitude != null && photo.longitude != null
+            ? [photo, ...state.mapPhotos.where((p) => p.id != photo.id)]
+            : state.mapPhotos,
         isLoading: false,
       );
       return true;
