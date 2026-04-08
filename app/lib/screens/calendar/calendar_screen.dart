@@ -23,6 +23,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
+  bool _suppressBackgroundResize = false;
 
   @override
   void initState() {
@@ -114,8 +115,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
-  void _showAddEventSheet() {
-    showModalBottomSheet(
+  Future<void> _showAddEventSheet() async {
+    if (mounted) {
+      setState(() => _suppressBackgroundResize = true);
+    }
+    final action = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -153,10 +157,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               title: '일정 추가',
               subtitle: '기념일이나 약속을 추가하세요',
               color: AppTheme.primaryColor,
-              onTap: () {
-                Navigator.pop(context);
-                _showCreateEventDialog();
-              },
+              onTap: () => Navigator.pop(context, 'event'),
             ),
             const SizedBox(height: 12),
             _AddOptionTile(
@@ -164,18 +165,30 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               title: '편지 쓰기',
               subtitle: '사랑하는 사람에게 편지를 보내세요',
               color: const Color(0xFFFF9800),
-              onTap: () {
-                Navigator.pop(context);
-                final selectedDate = _selectedDay ?? DateTime.now();
-                final dateStr = DateFormat('yyyy-MM-dd').format(selectedDate);
-                context.push('/letter/write?date=$dateStr');
-              },
+              onTap: () => Navigator.pop(context, 'letter'),
             ),
             const SizedBox(height: 12),
           ],
         ),
       ),
     );
+
+    if (mounted) {
+      setState(() => _suppressBackgroundResize = false);
+    }
+
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case 'event':
+        await _showCreateEventDialog();
+        break;
+      case 'letter':
+        final selectedDate = _selectedDay ?? DateTime.now();
+        final dateStr = DateFormat('yyyy-MM-dd').format(selectedDate);
+        context.push('/letter/write?date=$dateStr');
+        break;
+    }
   }
 
   void _showEventDetail(CalendarEvent event) {
@@ -356,124 +369,135 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text(
-            '일정 수정',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: titleController,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: '제목',
-                    hintText: '일정 제목을 입력하세요',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: descriptionController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: '설명 (선택)',
-                    hintText: '일정에 대한 설명을 입력하세요',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
+        builder: (context, setDialogState) {
+          final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+          return AnimatedPadding(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            padding: EdgeInsets.only(bottom: bottomInset),
+            child: AlertDialog(
+              scrollable: true,
+              title: const Text(
+                '일정 수정',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text('날짜: '),
-                    Text(
-                      DateFormat('yyyy년 M월 d일').format(event.date),
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    TextField(
+                      controller: titleController,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: '제목',
+                        hintText: '일정 제목을 입력하세요',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: descriptionController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: '설명 (선택)',
+                        hintText: '일정에 대한 설명을 입력하세요',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Text('날짜: '),
+                        Text(
+                          DateFormat('yyyy년 M월 d일').format(event.date),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    CheckboxListTile(
+                      value: isAnniversary,
+                      onChanged: (v) =>
+                          setDialogState(() => isAnniversary = v ?? false),
+                      title: const Text('기념일로 표시',
+                          style: TextStyle(fontSize: 14)),
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                    DropdownButtonFormField<String>(
+                      value: repeatType,
+                      decoration: const InputDecoration(
+                        labelText: '반복',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'NONE', child: Text('반복 없음')),
+                        DropdownMenuItem(value: 'YEARLY', child: Text('매년')),
+                        DropdownMenuItem(value: 'MONTHLY', child: Text('매월')),
+                      ],
+                      onChanged: (v) =>
+                          setDialogState(() => repeatType = v ?? 'NONE'),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                CheckboxListTile(
-                  value: isAnniversary,
-                  onChanged: (v) =>
-                      setDialogState(() => isAnniversary = v ?? false),
-                  title:
-                      const Text('기념일로 표시', style: TextStyle(fontSize: 14)),
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('취소'),
                 ),
-                DropdownButtonFormField<String>(
-                  value: repeatType,
-                  decoration: const InputDecoration(
-                    labelText: '반복',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'NONE', child: Text('반복 없음')),
-                    DropdownMenuItem(value: 'YEARLY', child: Text('매년')),
-                    DropdownMenuItem(value: 'MONTHLY', child: Text('매월')),
-                  ],
-                  onChanged: (v) =>
-                      setDialogState(() => repeatType = v ?? 'NONE'),
+                FilledButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          final title = titleController.text.trim();
+                          if (title.isEmpty) return;
+
+                          setDialogState(() => isSubmitting = true);
+
+                          final success = await ref
+                              .read(calendarProvider.notifier)
+                              .updateEvent(
+                                id: event.id,
+                                title: title,
+                                description:
+                                    descriptionController.text.trim().isEmpty
+                                        ? null
+                                        : descriptionController.text.trim(),
+                                isAnniversary: isAnniversary,
+                                repeatType: repeatType,
+                              );
+
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                            if (success) {
+                              showTopSnackBar(outerContext, '일정이 수정되었습니다');
+                            } else {
+                              final error = ref.read(calendarProvider).error;
+                              showTopSnackBar(outerContext,
+                                  error ?? '일정 수정에 실패했습니다',
+                                  isError: true);
+                            }
+                          }
+                        },
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('수정'),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: isSubmitting
-                  ? null
-                  : () async {
-                      final title = titleController.text.trim();
-                      if (title.isEmpty) return;
-
-                      setDialogState(() => isSubmitting = true);
-
-                      final success = await ref
-                          .read(calendarProvider.notifier)
-                          .updateEvent(
-                            id: event.id,
-                            title: title,
-                            description:
-                                descriptionController.text.trim().isEmpty
-                                    ? null
-                                    : descriptionController.text.trim(),
-                            isAnniversary: isAnniversary,
-                            repeatType: repeatType,
-                          );
-
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        if (success) {
-                          showTopSnackBar(outerContext, '일정이 수정되었습니다');
-                        } else {
-                          final error = ref.read(calendarProvider).error;
-                          showTopSnackBar(outerContext, error ?? '일정 수정에 실패했습니다', isError: true);
-                        }
-                      }
-                    },
-              child: isSubmitting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('수정'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  void _showCreateEventDialog() {
+  Future<void> _showCreateEventDialog() async {
     final titleController = TextEditingController();
     final descriptionController = TextEditingController();
     bool isAnniversary = false;
@@ -481,126 +505,194 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     bool isSubmitting = false;
     final outerContext = context;
 
-    showDialog(
+    if (mounted) {
+      setState(() => _suppressBackgroundResize = true);
+    }
+
+    await showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text(
-            '새 일정',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: titleController,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: '제목',
-                    hintText: '일정 제목을 입력하세요',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: descriptionController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: '설명 (선택)',
-                    hintText: '일정에 대한 설명을 입력하세요',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
+        builder: (context, setDialogState) {
+          final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+          return SafeArea(
+            child: AnimatedPadding(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(bottom: bottomInset),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('날짜: '),
-                    Text(
-                      _selectedDay != null
-                          ? DateFormat('yyyy년 M월 d일').format(_selectedDay!)
-                          : '선택 안 됨',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      '새 일정',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: titleController,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: '제목',
+                        hintText: '일정 제목을 입력하세요',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: descriptionController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: '설명 (선택)',
+                        hintText: '일정에 대한 설명을 입력하세요',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Text('날짜: '),
+                        Text(
+                          _selectedDay != null
+                              ? DateFormat('yyyy년 M월 d일').format(_selectedDay!)
+                              : '선택 안 됨',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    CheckboxListTile(
+                      value: isAnniversary,
+                      onChanged: (v) =>
+                          setDialogState(() => isAnniversary = v ?? false),
+                      title: const Text('기념일로 표시',
+                          style: TextStyle(fontSize: 14)),
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                    DropdownButtonFormField<String>(
+                      value: repeatType,
+                      decoration: const InputDecoration(
+                        labelText: '반복',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'NONE', child: Text('반복 없음')),
+                        DropdownMenuItem(value: 'YEARLY', child: Text('매년')),
+                        DropdownMenuItem(value: 'MONTHLY', child: Text('매월')),
+                      ],
+                      onChanged: (v) =>
+                          setDialogState(() => repeatType = v ?? 'NONE'),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 48,
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: OutlinedButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text('취소'),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SizedBox(
+                            height: 48,
+                            child: FilledButton(
+                              style: FilledButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () async {
+                                      final title = titleController.text.trim();
+                                      if (title.isEmpty) return;
+
+                                      setDialogState(() => isSubmitting = true);
+
+                                      final date = _selectedDay ?? DateTime.now();
+                                      final success = await ref
+                                          .read(calendarProvider.notifier)
+                                          .createEvent(
+                                            title: title,
+                                            date: date,
+                                            description: descriptionController
+                                                    .text
+                                                    .trim()
+                                                    .isEmpty
+                                                ? null
+                                                : descriptionController.text.trim(),
+                                            isAnniversary: isAnniversary,
+                                            repeatType: repeatType,
+                                          );
+
+                                      if (context.mounted) {
+                                        Navigator.pop(context);
+                                        if (success) {
+                                          showTopSnackBar(
+                                              outerContext, '일정이 추가되었습니다');
+                                        } else {
+                                          final error = ref.read(calendarProvider).error;
+                                          showTopSnackBar(
+                                            outerContext,
+                                            error ?? '일정 추가에 실패했습니다',
+                                            isError: true,
+                                          );
+                                        }
+                                      }
+                                    },
+                              child: isSubmitting
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text('추가'),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                CheckboxListTile(
-                  value: isAnniversary,
-                  onChanged: (v) =>
-                      setDialogState(() => isAnniversary = v ?? false),
-                  title: const Text('기념일로 표시', style: TextStyle(fontSize: 14)),
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                ),
-                DropdownButtonFormField<String>(
-                  value: repeatType,
-                  decoration: const InputDecoration(
-                    labelText: '반복',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'NONE', child: Text('반복 없음')),
-                    DropdownMenuItem(value: 'YEARLY', child: Text('매년')),
-                    DropdownMenuItem(value: 'MONTHLY', child: Text('매월')),
-                  ],
-                  onChanged: (v) =>
-                      setDialogState(() => repeatType = v ?? 'NONE'),
-                ),
-              ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: isSubmitting
-                  ? null
-                  : () async {
-                      final title = titleController.text.trim();
-                      if (title.isEmpty) return;
-
-                      setDialogState(() => isSubmitting = true);
-
-                      final date = _selectedDay ?? DateTime.now();
-                      final success = await ref
-                          .read(calendarProvider.notifier)
-                          .createEvent(
-                            title: title,
-                            date: date,
-                            description:
-                                descriptionController.text.trim().isEmpty
-                                    ? null
-                                    : descriptionController.text.trim(),
-                            isAnniversary: isAnniversary,
-                            repeatType: repeatType,
-                          );
-
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        if (success) {
-                          showTopSnackBar(outerContext, '일정이 추가되었습니다');
-                        } else {
-                          final error = ref.read(calendarProvider).error;
-                          showTopSnackBar(outerContext, error ?? '일정 추가에 실패했습니다', isError: true);
-                        }
-                      }
-                    },
-              child: isSubmitting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text('추가'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
+
+    if (mounted) {
+      setState(() => _suppressBackgroundResize = false);
+    }
   }
 
   @override
@@ -610,6 +702,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final missionCompletedDates = ref.watch(missionProvider).completedDates;
 
     return Scaffold(
+      resizeToAvoidBottomInset: !_suppressBackgroundResize,
       appBar: AppBar(
         title: const Text('캘린더'),
         actions: [
