@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Solid white rounded-rect background used as the calendar widget root
+    when the user has chosen a custom color/alpha. Tinted at runtime via
+    RemoteViews.setColorStateList(..., "setBackgroundTintList", ...) on
+    API 31+. On older APIs, setBackgroundColor replaces this drawable
+    entirely and the corners are lost — acceptable fallback.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#FFFFFFFF" />
+    <corners android:radius="20dp" />
+</shape>

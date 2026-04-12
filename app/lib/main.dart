@@ -14,6 +14,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import 'core/ad_service.dart';
+import 'core/api_client.dart';
 import 'core/constants.dart';
 import 'core/notification_sound_service.dart';
 import 'core/push_notification_service.dart';
@@ -21,6 +22,7 @@ import 'core/router.dart';
 import 'core/theme.dart';
 import 'core/widget_service.dart';
 import 'firebase_options.dart';
+import 'providers/auth_provider.dart';
 
 String _defaultWidgetEventColor(String eventType, bool isAnniversary) {
   if (isAnniversary) return '#E91E63';
@@ -83,7 +85,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
               'calendarEvents',
               jsonEncode(widgetEvents),
             );
-            await HomeWidget.saveWidgetData('calendarYearMonth', ym);
+            await HomeWidget.saveWidgetData(
+              'calendarEvents_$ym',
+              jsonEncode(widgetEvents),
+            );
           }
         } finally {
           client.close();
@@ -140,11 +145,51 @@ void main() async {
   );
 }
 
-class HMLoveApp extends ConsumerWidget {
+class HMLoveApp extends ConsumerStatefulWidget {
   const HMLoveApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HMLoveApp> createState() => _HMLoveAppState();
+}
+
+class _HMLoveAppState extends ConsumerState<HMLoveApp>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    // Wire the API client's force-logout callback to the auth provider so
+    // persistent server failures can kick the user back to /login.
+    ApiClient.onForceLogout = (reason) async {
+      await ref.read(authProvider.notifier).forceLogout(reason);
+    };
+  }
+
+  @override
+  void dispose() {
+    ApiClient.onForceLogout = null;
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // When the user returns to the app after a backend redeploy, re-verify
+      // the session. checkAuthStatus() internally clears tokens on failure
+      // which flips AuthStatus to unauthenticated → GoRouter sends them to
+      // /login. Only re-verify if the user is currently logged in.
+      final authState = ref.read(authProvider);
+      if (authState.status == AuthStatus.authenticated) {
+        ref.read(authProvider.notifier).checkAuthStatus();
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
 
     return GestureDetector(

@@ -32,19 +32,74 @@
             android:textSize="11sp"
             android:textStyle="bold"
             android:singleLine="true" />
+
+        <TextView
+            android:id="@+id/cal_settings_btn"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginStart="6dp"
+            android:gravity="center"
+            android:text="⚙"
+            android:textColor="#9E9E9E"
+            android:textSize="14sp"
+            android:background="@drawable/widget_calendar_nav_btn_bg" />
     </LinearLayout>
 
-    <!-- Month header -->
-    <TextView
-        android:id="@+id/cal_month_title"
+    <!-- Month header: prev / title / today / next -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"
-        android:textColor="#424242"
-        android:textSize="13sp"
-        android:textStyle="bold"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
         android:paddingTop="4dp"
-        android:paddingBottom="4dp" />
+        android:paddingBottom="4dp">
+
+        <TextView
+            android:id="@+id/cal_prev_month"
+            android:layout_width="28dp"
+            android:layout_height="24dp"
+            android:gravity="center"
+            android:text="◀"
+            android:textColor="#E91E63"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:background="@drawable/widget_calendar_nav_btn_bg" />
+
+        <TextView
+            android:id="@+id/cal_month_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textColor="#424242"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/cal_today_month"
+            android:layout_width="wrap_content"
+            android:layout_height="24dp"
+            android:gravity="center"
+            android:text="오늘"
+            android:textColor="#E91E63"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:background="@drawable/widget_calendar_nav_btn_bg" />
+
+        <TextView
+            android:id="@+id/cal_next_month"
+            android:layout_width="28dp"
+            android:layout_height="24dp"
+            android:gravity="center"
+            android:text="▶"
+            android:textColor="#E91E63"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/widget_calendar_nav_btn_bg" />
+    </LinearLayout>
 
     <!-- Weekday headers -->
     <LinearLayout

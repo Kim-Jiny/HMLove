@@ -76,6 +76,15 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_calendar_info" />
         </receiver>
+
+        <!-- Settings activity for calendar widget (background color/alpha).
+             Launched only via PendingIntent created by HMLoveCalendarWidgetProvider,
+             which runs with this app's UID, so exported=false is sufficient. -->
+        <activity
+            android:name=".CalendarWidgetSettingsActivity"
+            android:exported="false"
+            android:theme="@style/WidgetSettingsDialogTheme"
+            android:excludeFromRecents="true" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

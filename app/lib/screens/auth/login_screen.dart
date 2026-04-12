@@ -19,6 +19,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    // If the user landed here because of a forced logout (session expired or
+    // server unreachable), show the reason once as a SnackBar so they know
+    // why they're being asked to log in again.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final reason =
+          ref.read(authProvider.notifier).consumeForceLogoutReason();
+      if (reason != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(reason),
+            duration: const Duration(seconds: 4),
+            backgroundColor: AppTheme.primaryColor,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();

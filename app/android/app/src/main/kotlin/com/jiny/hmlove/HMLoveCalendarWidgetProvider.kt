@@ -3,16 +3,25 @@ package com.jiny.hmlove
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetPlugin
 import org.json.JSONArray
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.ConcurrentHashMap
 
 data class WidgetEventInfo(
     val title: String,
@@ -31,12 +40,276 @@ data class WidgetEventInfo(
 
 class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
 
+    companion object {
+        const val ACTION_PREV_MONTH = "com.jiny.hmlove.CALENDAR_PREV_MONTH"
+        const val ACTION_NEXT_MONTH = "com.jiny.hmlove.CALENDAR_NEXT_MONTH"
+        const val ACTION_TODAY_MONTH = "com.jiny.hmlove.CALENDAR_TODAY_MONTH"
+        private val MONTH_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM")
+        private const val PREF_KEY_CALENDAR_EVENT_MONTHS = "widgetCalendarEventMonths"
+
+        // Guard against spamming the server when the same month is in-flight.
+        private val inFlightFetches = ConcurrentHashMap.newKeySet<String>()
+
+        // Cooldown applied after a failed server fetch for a specific month so the
+        // 30-minute widget update cycle doesn't retry a permanently-failing request
+        // (e.g. expired auth token) on every tick.
+        private const val FETCH_FAIL_COOLDOWN_MS = 15 * 60 * 1000L  // 15 minutes
+        private const val PREF_KEY_FETCH_FAIL_PREFIX = "widgetFetchFail_"
+    }
+
     private fun launchAppIntent(context: Context): PendingIntent {
         val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
         return PendingIntent.getActivity(
             context, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+    }
+
+    private fun navPendingIntent(context: Context, action: String, requestCode: Int): PendingIntent {
+        val intent = Intent(context, HMLoveCalendarWidgetProvider::class.java).apply {
+            this.action = action
+        }
+        return PendingIntent.getBroadcast(
+            context, requestCode, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun settingsPendingIntent(context: Context): PendingIntent {
+        val intent = Intent(context, CalendarWidgetSettingsActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return PendingIntent.getActivity(
+            context, 10, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    /**
+     * Apply user-chosen background color/alpha to the widget root.
+     *
+     * If the user hasn't set a custom color, leave the default gradient drawable
+     * (declared in widget_calendar.xml) untouched. Otherwise swap to a tintable
+     * rounded-rect drawable and tint it via setBackgroundTintList on API 31+.
+     * On older APIs we fall back to setBackgroundColor — corners are lost, but
+     * the color is honored.
+     */
+    private fun applyCustomBackground(
+        views: RemoteViews,
+        prefs: SharedPreferences
+    ) {
+        if (!prefs.contains(CalendarWidgetSettingsActivity.PREF_KEY_BG_ARGB)) return
+        val argb = prefs.getInt(
+            CalendarWidgetSettingsActivity.PREF_KEY_BG_ARGB,
+            0xFFFFFFFF.toInt()
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            views.setInt(
+                R.id.widget_root,
+                "setBackgroundResource",
+                R.drawable.widget_background_tintable
+            )
+            views.setColorStateList(
+                R.id.widget_root,
+                "setBackgroundTintList",
+                ColorStateList.valueOf(argb)
+            )
+        } else {
+            views.setInt(R.id.widget_root, "setBackgroundColor", argb)
+        }
+    }
+
+    /**
+     * Parse an events-JSON string (the widget's serialized event blob) and
+     * accumulate the decoded events into [into], keyed by `yyyy-MM-dd` date.
+     * Used to merge server events and device events from separate keys into
+     * a single per-date map at render time.
+     */
+    private fun parseEventsInto(
+        json: String,
+        into: MutableMap<String, MutableList<WidgetEventInfo>>
+    ) {
+        try {
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val date = obj.getString("date").take(10)
+                val title = obj.optString("title", "")
+                val color = obj.optString("color", "#E91E63")
+                val isAnniversary = obj.optBoolean("isAnniversary", false)
+                val eventType = obj.optString("eventType", "schedule")
+                into.getOrPut(date) { mutableListOf() }.add(
+                    WidgetEventInfo(title, color, isAnniversary, eventType)
+                )
+            }
+        } catch (_: Exception) {
+            // Malformed JSON is non-fatal — skip the blob.
+        }
+    }
+
+    /**
+     * Is this month within the post-failure cooldown? Callers should skip the
+     * background fetch to avoid hammering the server when auth/network is broken.
+     */
+    private fun isFetchOnCooldown(prefs: SharedPreferences, yearMonth: String): Boolean {
+        val lastFail = prefs.getLong(PREF_KEY_FETCH_FAIL_PREFIX + yearMonth, 0L)
+        if (lastFail == 0L) return false
+        return System.currentTimeMillis() - lastFail < FETCH_FAIL_COOLDOWN_MS
+    }
+
+    private fun trackCachedMonth(
+        prefs: SharedPreferences,
+        storageKey: String,
+        yearMonth: String
+    ) {
+        try {
+            val existing = prefs.getString(storageKey, null)
+            val months = mutableSetOf<String>()
+            if (!existing.isNullOrEmpty()) {
+                val arr = JSONArray(existing)
+                for (i in 0 until arr.length()) {
+                    val value = arr.optString(i, "")
+                    if (value.isNotEmpty()) months.add(value)
+                }
+            }
+            if (months.add(yearMonth)) {
+                val sorted = months.toMutableList().sorted()
+                prefs.edit()
+                    .putString(storageKey, JSONArray(sorted).toString())
+                    .apply()
+            }
+        } catch (_: Exception) {
+            prefs.edit()
+                .putString(storageKey, JSONArray(listOf(yearMonth)).toString())
+                .apply()
+        }
+    }
+
+    /**
+     * Background fetch of a month's events from the server when it isn't in the
+     * per-month cache. Re-runs onUpdate on the main thread once events are saved
+     * so the widget re-renders with the fetched data. On failure, stamps a
+     * cooldown marker so subsequent 30-minute update ticks don't re-hammer a
+     * permanently-failing request.
+     */
+    private fun fetchMonthFromServer(context: Context, yearMonth: String) {
+        if (!inFlightFetches.add(yearMonth)) return  // Already fetching this month
+        val appContext = context.applicationContext
+
+        Thread {
+            var conn: HttpURLConnection? = null
+            var succeeded = false
+            try {
+                val prefs = HomeWidgetPlugin.getData(appContext)
+                val token = prefs.getString("authToken", "") ?: ""
+                val baseUrl = (prefs.getString("apiBaseUrl", "") ?: "").trimEnd('/')
+                if (token.isEmpty() || baseUrl.isEmpty()) {
+                    // Not a server failure — user simply isn't logged in.
+                    // Don't stamp a cooldown; let it retry when creds appear.
+                    succeeded = true
+                    return@Thread
+                }
+
+                val url = URL("$baseUrl/calendar/$yearMonth")
+                conn = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    setRequestProperty("Authorization", "Bearer $token")
+                    setRequestProperty("Accept", "application/json")
+                    connectTimeout = 10000
+                    readTimeout = 10000
+                }
+                if (conn.responseCode !in 200..299) return@Thread
+
+                val body = conn.inputStream.bufferedReader().use { it.readText() }
+                val json = JSONObject(body)
+                val eventsArr = json.optJSONArray("events") ?: JSONArray()
+
+                // Filter out _auto events (generated anniversaries) — widget renders
+                // explicit events only, matching Dart's _updateWidgetCalendarEvents.
+                val filtered = JSONArray()
+                for (i in 0 until eventsArr.length()) {
+                    val ev = eventsArr.optJSONObject(i) ?: continue
+                    if (ev.optBoolean("_auto", false)) continue
+                    filtered.put(ev)
+                }
+
+                prefs.edit()
+                    .putString("calendarEvents_$yearMonth", filtered.toString())
+                    .remove(PREF_KEY_FETCH_FAIL_PREFIX + yearMonth)
+                    .apply()
+                trackCachedMonth(prefs, PREF_KEY_CALENDAR_EVENT_MONTHS, yearMonth)
+                succeeded = true
+
+                // Re-render on main thread.
+                Handler(Looper.getMainLooper()).post {
+                    try {
+                        val appWidgetManager = AppWidgetManager.getInstance(appContext)
+                        val ids = appWidgetManager.getAppWidgetIds(
+                            ComponentName(appContext, HMLoveCalendarWidgetProvider::class.java)
+                        )
+                        if (ids.isNotEmpty()) {
+                            onUpdate(appContext, appWidgetManager, ids)
+                        }
+                    } catch (_: Exception) {}
+                }
+            } catch (_: Exception) {
+                // Swallow — cooldown below prevents hammering on permanent failures.
+            } finally {
+                try { conn?.disconnect() } catch (_: Exception) {}
+                if (!succeeded) {
+                    try {
+                        HomeWidgetPlugin.getData(appContext)
+                            .edit()
+                            .putLong(PREF_KEY_FETCH_FAIL_PREFIX + yearMonth, System.currentTimeMillis())
+                            .apply()
+                    } catch (_: Exception) {}
+                }
+                inFlightFetches.remove(yearMonth)
+            }
+        }.start()
+    }
+
+    override fun onReceive(context: Context, intent: Intent) {
+        super.onReceive(context, intent)
+        when (intent.action) {
+            ACTION_PREV_MONTH, ACTION_NEXT_MONTH, ACTION_TODAY_MONTH -> {
+                try {
+                    val prefs = HomeWidgetPlugin.getData(context)
+                    val currentMonth = YearMonth.now()
+                    val cached = prefs.getString("calendarYearMonth", "") ?: ""
+                    val base = if (cached.isNotEmpty()) {
+                        try {
+                            YearMonth.parse(cached, MONTH_FORMATTER)
+                        } catch (_: Exception) {
+                            currentMonth
+                        }
+                    } else {
+                        currentMonth
+                    }
+                    val newMonth = when (intent.action) {
+                        ACTION_PREV_MONTH -> base.minusMonths(1)
+                        ACTION_NEXT_MONTH -> base.plusMonths(1)
+                        else -> currentMonth
+                    }
+                    // Explicit user navigation bypasses the fetch cooldown — the
+                    // user is asking for that month's data right now.
+                    prefs.edit()
+                        .putString("calendarYearMonth", newMonth.format(MONTH_FORMATTER))
+                        .remove(PREF_KEY_FETCH_FAIL_PREFIX + newMonth.format(MONTH_FORMATTER))
+                        .apply()
+
+                    val appWidgetManager = AppWidgetManager.getInstance(context)
+                    val ids = appWidgetManager.getAppWidgetIds(
+                        ComponentName(context, HMLoveCalendarWidgetProvider::class.java)
+                    )
+                    if (ids.isNotEmpty()) {
+                        onUpdate(context, appWidgetManager, ids)
+                    }
+                } catch (_: Exception) {
+                    // Swallow — widget will retry on next update cycle
+                }
+            }
+        }
     }
 
     override fun onUpdate(
@@ -58,6 +331,29 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
 
                 val views = RemoteViews(context.packageName, R.layout.widget_calendar)
                 views.setOnClickPendingIntent(R.id.widget_root, launchAppIntent(context))
+
+                // Month navigation buttons
+                views.setOnClickPendingIntent(
+                    R.id.cal_prev_month,
+                    navPendingIntent(context, ACTION_PREV_MONTH, 1)
+                )
+                views.setOnClickPendingIntent(
+                    R.id.cal_today_month,
+                    navPendingIntent(context, ACTION_TODAY_MONTH, 2)
+                )
+                views.setOnClickPendingIntent(
+                    R.id.cal_next_month,
+                    navPendingIntent(context, ACTION_NEXT_MONTH, 3)
+                )
+
+                // Settings button (background color / alpha)
+                views.setOnClickPendingIntent(
+                    R.id.cal_settings_btn,
+                    settingsPendingIntent(context)
+                )
+
+                // Apply custom background color / alpha if user has configured it.
+                applyCustomBackground(views, prefs)
 
                 val myName = prefs.getString("myName", "나") ?: "나"
                 val partnerName = prefs.getString("partnerName", "상대방") ?: "상대방"
@@ -82,16 +378,14 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                 views.setTextViewText(R.id.cal_dday_info, ddayText)
 
                 // Determine display month.
-                // If cached month is stale, prefer the real current month so the widget
-                // doesn't stay stuck on the previous month until the app is opened again.
+                // Widget owns its own month state via prev/next/today buttons.
+                // Dart pushes events for whatever month it fetches into `calendarEvents_{ym}`.
                 val calendarYearMonth = prefs.getString("calendarYearMonth", "") ?: ""
-                val monthFormatter = DateTimeFormatter.ofPattern("yyyy-MM")
                 val currentMonth = YearMonth.now()
                 val displayMonth = if (calendarYearMonth.isNotEmpty()) {
                     try {
-                        val cachedMonth = YearMonth.parse(calendarYearMonth, monthFormatter)
-                        if (cachedMonth == currentMonth) cachedMonth else currentMonth
-                    } catch (e: Exception) {
+                        YearMonth.parse(calendarYearMonth, MONTH_FORMATTER)
+                    } catch (_: Exception) {
                         currentMonth
                     }
                 } else {
@@ -100,23 +394,43 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
 
                 views.setTextViewText(R.id.cal_month_title, "${displayMonth.year}년 ${displayMonth.monthValue}월")
 
-                // Parse calendar events — multiple per date, sorted by priority
-                val eventsJson = prefs.getString("calendarEvents", "[]") ?: "[]"
-                val eventDates = mutableMapOf<String, MutableList<WidgetEventInfo>>()
-                try {
-                    val jsonArray = JSONArray(eventsJson)
-                    for (i in 0 until jsonArray.length()) {
-                        val obj = jsonArray.getJSONObject(i)
-                        val date = obj.getString("date").take(10)
-                        val title = obj.optString("title", "")
-                        val color = obj.optString("color", "#E91E63")
-                        val isAnniversary = obj.optBoolean("isAnniversary", false)
-                        val eventType = obj.optString("eventType", "schedule")
-                        val info = WidgetEventInfo(title, color, isAnniversary, eventType)
-                        eventDates.getOrPut(date) { mutableListOf() }.add(info)
+                // Parse calendar events for the displayed month.
+                // Prefer per-month cache; fall back to the generic blob (legacy).
+                val displayMonthKey = displayMonth.format(MONTH_FORMATTER)
+                val perMonthJson = prefs.getString("calendarEvents_$displayMonthKey", null)
+                val eventsJson = perMonthJson
+                    ?: if (displayMonth == currentMonth) {
+                        prefs.getString("calendarEvents", "[]") ?: "[]"
+                    } else {
+                        "[]"
                     }
-                } catch (_: Exception) {}
-                // Sort each date's events by priority
+
+                // Trigger a native server fetch in the background if this month
+                // has never been cached AND we aren't inside a post-failure cooldown.
+                // Widget renders immediately with whatever is available now, and
+                // re-renders once the fetch completes.
+                if (perMonthJson == null && !isFetchOnCooldown(prefs, displayMonthKey)) {
+                    fetchMonthFromServer(context, displayMonthKey)
+                }
+                val eventDates = mutableMapOf<String, MutableList<WidgetEventInfo>>()
+                parseEventsInto(eventsJson, eventDates)
+
+                // Merge device calendar overlay, if the user has device sync
+                // enabled. These events live under a separate per-month key so
+                // a server-side fetch doesn't accidentally wipe them.
+                val deviceCalendarEnabled = prefs.getBoolean("deviceCalendarEnabled", false)
+                if (deviceCalendarEnabled) {
+                    val deviceJson = prefs.getString(
+                        "deviceCalendarEvents_$displayMonthKey",
+                        null
+                    )
+                    if (deviceJson != null) {
+                        parseEventsInto(deviceJson, eventDates)
+                    }
+                }
+
+                // Sort each date's events by priority (anniversary → schedule →
+                // device → feed) now that server + device events are combined.
                 for ((_, list) in eventDates) {
                     list.sortBy { it.sortPriority }
                 }

@@ -206,6 +206,8 @@ class CalendarNotifier extends Notifier<CalendarState> {
     if (enabled) {
       await DeviceCalendarService.setSyncEnabled(true);
       state = state.copyWith(deviceCalendarEnabled: true);
+      // 위젯도 기기 캘린더 오버레이를 켜도록 알림
+      await WidgetService.setDeviceCalendarEnabled(true);
 
       // 선택된 캘린더 없으면 전체 선택
       var ids = DeviceCalendarService.getSelectedCalendarIds();
@@ -221,6 +223,14 @@ class CalendarNotifier extends Notifier<CalendarState> {
     } else {
       await DeviceCalendarService.setSyncEnabled(false);
       state = state.copyWith(deviceCalendarEnabled: false, deviceEvents: []);
+      // 위젯에서도 기기 캘린더 이벤트가 더 이상 병합되지 않도록 플래그 끄기.
+      // 캐시된 per-month 데이터는 남아있어도 플래그가 false면 위젯이 무시함.
+      await WidgetService.setDeviceCalendarEnabled(false);
+      if (_currentYearMonth.isNotEmpty) {
+        // 현재 달의 오버레이를 즉시 비워 깜빡임을 줄임.
+        await WidgetService.updateDeviceCalendarEvents(
+            const [], _currentYearMonth);
+      }
     }
   }
 
@@ -255,6 +265,8 @@ class CalendarNotifier extends Notifier<CalendarState> {
       final calendarIds = DeviceCalendarService.getSelectedCalendarIds();
       if (calendarIds.isEmpty) {
         state = state.copyWith(deviceEvents: []);
+        // 선택된 기기 캘린더가 없으면 위젯의 오버레이도 비움.
+        await WidgetService.updateDeviceCalendarEvents(const [], yearMonth);
         return;
       }
 
@@ -282,9 +294,31 @@ class CalendarNotifier extends Notifier<CalendarState> {
       }).toList();
 
       state = state.copyWith(deviceEvents: calendarEvents);
+
+      // 위젯에도 per-month 오버레이로 동일한 데이터 푸시.
+      await WidgetService.updateDeviceCalendarEvents(
+        _toWidgetEventJson(calendarEvents),
+        yearMonth,
+      );
     } catch (e) {
       debugPrint('[DeviceCalendar] fetchDeviceEvents error: $e');
     }
+  }
+
+  /// [CalendarEvent] 리스트를 위젯이 읽기 편한 JSON-ish 맵 리스트로 변환.
+  /// server events / device events 양쪽에서 재사용.
+  List<Map<String, dynamic>> _toWidgetEventJson(List<CalendarEvent> events) {
+    return events
+        .where((e) => !e.isAuto)
+        .map((e) => {
+              'date': DateFormat('yyyy-MM-dd').format(e.date),
+              'title': e.title,
+              'color': e.color ??
+                  _defaultColorForEventType(e.eventType, e.isAnniversary),
+              'isAnniversary': e.isAnniversary,
+              'eventType': e.eventType,
+            })
+        .toList();
   }
 
   /// 기본 쓰기 캘린더 ID
@@ -596,26 +630,17 @@ class CalendarNotifier extends Notifier<CalendarState> {
   }
 
   /// 위젯 캘린더 이벤트 데이터 갱신
+  ///
+  /// 위젯의 이전/다음 달 이동을 지원하기 위해, 앱에서 조회한 모든 월의 이벤트를
+  /// `calendarEvents_{yearMonth}` 키로 캐싱한다. 위젯 측에서는 표시 중인 달에
+  /// 해당하는 키를 우선 읽고, 없으면 비워 둔다.
   Future<void> _updateWidgetCalendarEvents(
       List<CalendarEvent> events, String yearMonth) async {
     try {
-      // 위젯은 항상 현재 월만 표시 — 다른 월 데이터로 갱신하지 않음
-      final now = DateTime.now();
-      final currentYM =
-          '${now.year}-${now.month.toString().padLeft(2, '0')}';
-      if (yearMonth != currentYM) return;
-
-      final widgetEvents = events
-          .where((e) => !e.isAuto)
-          .map((e) => {
-                'date': DateFormat('yyyy-MM-dd').format(e.date),
-                'title': e.title,
-                'color': e.color ?? _defaultColorForEventType(e.eventType, e.isAnniversary),
-                'isAnniversary': e.isAnniversary,
-                'eventType': e.eventType,
-              })
-          .toList();
-      await WidgetService.updateCalendarEvents(widgetEvents, yearMonth);
+      await WidgetService.updateCalendarEvents(
+        _toWidgetEventJson(events),
+        yearMonth,
+      );
     } catch (e) {
       debugPrint('[Widget] updateCalendarEvents error: $e');
     }

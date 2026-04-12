@@ -7,6 +7,91 @@
 
 import WidgetKit
 import SwiftUI
+import AppIntents
+
+// MARK: - Calendar Month Navigation Intents (iOS 17+)
+
+private let calendarAppGroupId = "group.com.jiny.hmlove"
+private let calendarMonthKey = "calendarYearMonth"
+private let calendarEventMonthsKey = "widgetCalendarEventMonths"
+
+@available(iOS 16.0, *)
+private func calendarMonthFormatter() -> DateFormatter {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM"
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.calendar = Calendar(identifier: .gregorian)
+    return formatter
+}
+
+@available(iOS 16.0, *)
+private func shiftCalendarWidgetMonth(by months: Int) {
+    guard let defaults = UserDefaults(suiteName: calendarAppGroupId) else { return }
+    let formatter = calendarMonthFormatter()
+    let cached = defaults.string(forKey: calendarMonthKey) ?? ""
+    let base = cached.isEmpty ? Date() : (formatter.date(from: cached) ?? Date())
+    let calendar = Calendar(identifier: .gregorian)
+    guard let newDate = calendar.date(byAdding: .month, value: months, to: base) else { return }
+    defaults.set(formatter.string(from: newDate), forKey: calendarMonthKey)
+}
+
+@available(iOS 16.0, *)
+private func resetCalendarWidgetMonthToToday() {
+    guard let defaults = UserDefaults(suiteName: calendarAppGroupId) else { return }
+    defaults.set(calendarMonthFormatter().string(from: Date()), forKey: calendarMonthKey)
+}
+
+private func trackCachedMonth(defaults: UserDefaults, storageKey: String, yearMonth: String) {
+    let existing = defaults.string(forKey: storageKey) ?? ""
+    let data = existing.data(using: .utf8)
+    let decoded = (data.flatMap {
+        try? JSONSerialization.jsonObject(with: $0) as? [String]
+    }) ?? []
+    var months = Set(decoded.filter { !$0.isEmpty })
+    if months.insert(yearMonth).inserted {
+        let sorted = months.sorted()
+        if let jsonData = try? JSONSerialization.data(withJSONObject: sorted),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            defaults.set(jsonString, forKey: storageKey)
+        }
+    }
+}
+
+@available(iOS 17.0, *)
+struct PrevMonthIntent: AppIntent {
+    static var title: LocalizedStringResource = "이전 달"
+    static var description = IntentDescription("캘린더 위젯에서 이전 달로 이동합니다.")
+
+    func perform() async throws -> some IntentResult {
+        shiftCalendarWidgetMonth(by: -1)
+        WidgetCenter.shared.reloadTimelines(ofKind: "HMLoveWidget")
+        return .result()
+    }
+}
+
+@available(iOS 17.0, *)
+struct NextMonthIntent: AppIntent {
+    static var title: LocalizedStringResource = "다음 달"
+    static var description = IntentDescription("캘린더 위젯에서 다음 달로 이동합니다.")
+
+    func perform() async throws -> some IntentResult {
+        shiftCalendarWidgetMonth(by: 1)
+        WidgetCenter.shared.reloadTimelines(ofKind: "HMLoveWidget")
+        return .result()
+    }
+}
+
+@available(iOS 17.0, *)
+struct TodayMonthIntent: AppIntent {
+    static var title: LocalizedStringResource = "이번 달"
+    static var description = IntentDescription("캘린더 위젯에서 오늘이 포함된 달로 이동합니다.")
+
+    func perform() async throws -> some IntentResult {
+        resetCalendarWidgetMonthToToday()
+        WidgetCenter.shared.reloadTimelines(ofKind: "HMLoveWidget")
+        return .result()
+    }
+}
 
 // MARK: - Data
 
@@ -140,7 +225,18 @@ struct CoupleTimelineProvider: TimelineProvider {
         formatter.dateFormat = "yyyy-MM"
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
-        let yearMonth = formatter.string(from: now)
+
+        // Fetch the month currently displayed in the widget (may differ from
+        // the real current month due to user navigation via prev/next buttons).
+        let displayedYearMonth: String = {
+            let cached = defaults.string(forKey: "calendarYearMonth") ?? ""
+            if !cached.isEmpty, formatter.date(from: cached) != nil {
+                return cached
+            }
+            return formatter.string(from: now)
+        }()
+        let yearMonth = displayedYearMonth
+        let currentYearMonth = formatter.string(from: now)
 
         guard let url = URL(string: "\(baseUrl)/calendar/\(yearMonth)") else {
             completion(nil)
@@ -159,32 +255,42 @@ struct CoupleTimelineProvider: TimelineProvider {
                 return
             }
 
-            // Find today's events
+            // Find today's events (only meaningful when fetching the current month)
             let dayFormatter = DateFormatter()
             dayFormatter.dateFormat = "yyyy-MM-dd"
             dayFormatter.locale = Locale(identifier: "en_US_POSIX")
             dayFormatter.calendar = Calendar(identifier: .gregorian)
             let todayStr = dayFormatter.string(from: now)
 
-            let todayEvents = events.filter { event in
-                guard let dateStr = event["date"] as? String else { return false }
-                return dateStr.hasPrefix(todayStr)
+            if yearMonth == currentYearMonth {
+                let todayEvents = events.filter { event in
+                    guard let dateStr = event["date"] as? String else { return false }
+                    return dateStr.hasPrefix(todayStr)
+                }
+
+                let titles = todayEvents.compactMap { $0["title"] as? String }
+                let schedule = Array(titles.prefix(3)).map { "• \($0)" }.joined(separator: "\n")
+                defaults.set(schedule, forKey: "todaySchedule")
             }
 
-            let titles = todayEvents.compactMap { $0["title"] as? String }
-            let schedule = Array(titles.prefix(3)).map { "• \($0)" }.joined(separator: "\n")
-
-            // Save to UserDefaults so local loadData also has it
-            defaults.set(schedule, forKey: "todaySchedule")
-
-            // Save calendar events for large widget (filter out auto events only)
+            // Save calendar events for large widget (filter out auto events only).
+            // Cache per-month so navigation (prev/next) can render without re-fetching.
             let widgetEvents = events.filter { event in
                 let isAuto = event["_auto"] as? Bool ?? false
                 return !isAuto
             }
-            if let eventsJsonData = try? JSONSerialization.data(withJSONObject: widgetEvents) {
-                defaults.set(String(data: eventsJsonData, encoding: .utf8), forKey: "calendarEvents")
-                defaults.set(yearMonth, forKey: "calendarYearMonth")
+            if let eventsJsonData = try? JSONSerialization.data(withJSONObject: widgetEvents),
+               let jsonString = String(data: eventsJsonData, encoding: .utf8) {
+                defaults.set(jsonString, forKey: "calendarEvents_\(yearMonth)")
+                trackCachedMonth(
+                    defaults: defaults,
+                    storageKey: calendarEventMonthsKey,
+                    yearMonth: yearMonth
+                )
+                if yearMonth == currentYearMonth {
+                    // Preserve legacy key for backwards compat
+                    defaults.set(jsonString, forKey: "calendarEvents")
+                }
             }
 
             // Also update mood from server
@@ -252,42 +358,29 @@ struct CoupleTimelineProvider: TimelineProvider {
             nextAnniversaryDaysLeft = defaults.object(forKey: "nextAnniversaryDaysLeft") as? Int
         }
 
-        // Parse calendar events
-        var calendarEvents: [CalendarEventData] = []
-        if let eventsJson = defaults.string(forKey: "calendarEvents"),
-           let jsonData = eventsJson.data(using: .utf8),
-           let eventsArray = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]] {
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd"
-            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-            dateFormatter.calendar = Calendar(identifier: .gregorian)
-            let isoFormatter = ISO8601DateFormatter()
-            isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            let isoFormatterNoFrac = ISO8601DateFormatter()
-            isoFormatterNoFrac.formatOptions = [.withInternetDateTime]
-            calendarEvents = eventsArray.compactMap { dict in
-                guard let dateStr = dict["date"] as? String,
-                      let title = dict["title"] as? String else { return nil }
-                // Try yyyy-MM-dd first, then ISO 8601 variants
-                let date = dateFormatter.date(from: String(dateStr.prefix(10)))
-                    ?? isoFormatter.date(from: dateStr)
-                    ?? isoFormatterNoFrac.date(from: dateStr)
-                guard let parsedDate = date else { return nil }
-                let isAnniversary = dict["isAnniversary"] as? Bool ?? false
-                let eventType = dict["eventType"] as? String ?? "schedule"
-                let rawColor = (dict["color"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
-                let color = (rawColor?.isEmpty == false ? rawColor! : nil)
-                    ?? CalendarEventData.defaultColor(eventType: eventType, isAnniversary: isAnniversary)
-                return CalendarEventData(
-                    date: parsedDate,
-                    title: title,
-                    color: color,
-                    isAnniversary: isAnniversary,
-                    eventType: eventType
-                )
-            }
-        }
+        // Parse calendar events for the currently displayed month.
+        // Prefer per-month cache (calendarEvents_{ym}); fall back to legacy blob.
         let calendarYearMonth = defaults.string(forKey: "calendarYearMonth") ?? ""
+        let perMonthEventsJson: String? = {
+            if !calendarYearMonth.isEmpty {
+                return defaults.string(forKey: "calendarEvents_\(calendarYearMonth)")
+            }
+            return nil
+        }()
+        let resolvedEventsJson = perMonthEventsJson ?? defaults.string(forKey: "calendarEvents")
+        var calendarEvents: [CalendarEventData] =
+            Self.parseWidgetEvents(resolvedEventsJson)
+
+        // Merge device calendar overlay, if the user has device sync enabled.
+        // Device events live under a separate per-month key so a server-side
+        // timeline refresh doesn't accidentally wipe them.
+        let deviceCalendarEnabled = defaults.bool(forKey: "deviceCalendarEnabled")
+        if deviceCalendarEnabled && !calendarYearMonth.isEmpty {
+            let deviceJson = defaults.string(
+                forKey: "deviceCalendarEvents_\(calendarYearMonth)"
+            )
+            calendarEvents.append(contentsOf: Self.parseWidgetEvents(deviceJson))
+        }
 
         return CoupleData(
             isConnected: true,
@@ -303,6 +396,50 @@ struct CoupleTimelineProvider: TimelineProvider {
             calendarEvents: calendarEvents,
             calendarYearMonth: calendarYearMonth
         )
+    }
+
+    /// Decode the widget-serialized event JSON blob into [CalendarEventData].
+    /// Used for both the server events blob and the device-calendar overlay
+    /// so the two can share a single parser.
+    private static func parseWidgetEvents(_ json: String?) -> [CalendarEventData] {
+        guard let json = json,
+              let data = json.data(using: .utf8),
+              let array = try? JSONSerialization.jsonObject(with: data)
+                as? [[String: Any]] else {
+            return []
+        }
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.calendar = Calendar(identifier: .gregorian)
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let isoFormatterNoFrac = ISO8601DateFormatter()
+        isoFormatterNoFrac.formatOptions = [.withInternetDateTime]
+        return array.compactMap { dict in
+            guard let dateStr = dict["date"] as? String,
+                  let title = dict["title"] as? String else { return nil }
+            let date = dateFormatter.date(from: String(dateStr.prefix(10)))
+                ?? isoFormatter.date(from: dateStr)
+                ?? isoFormatterNoFrac.date(from: dateStr)
+            guard let parsedDate = date else { return nil }
+            let isAnniversary = dict["isAnniversary"] as? Bool ?? false
+            let eventType = dict["eventType"] as? String ?? "schedule"
+            let rawColor = (dict["color"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let color = (rawColor?.isEmpty == false ? rawColor! : nil)
+                ?? CalendarEventData.defaultColor(
+                    eventType: eventType,
+                    isAnniversary: isAnniversary
+                )
+            return CalendarEventData(
+                date: parsedDate,
+                title: title,
+                color: color,
+                isAnniversary: isAnniversary,
+                eventType: eventType
+            )
+        }
     }
 
     /// Calculate next anniversary from start date (matches Dart logic)
@@ -561,6 +698,63 @@ struct LargeWidgetView: View {
         calendar.isDateInToday(date)
     }
 
+    @ViewBuilder
+    private var monthHeader: some View {
+        if #available(iOS 17.0, *) {
+            HStack(spacing: 0) {
+                Button(intent: PrevMonthIntent()) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(Color(hex: "E91E63"))
+                        .frame(width: 26, height: 22)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color(hex: "E91E63").opacity(0.1))
+                        )
+                }
+                .buttonStyle(.plain)
+
+                Spacer(minLength: 6)
+
+                Text(yearMonthText)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(Color(hex: "424242"))
+
+                Spacer(minLength: 6)
+
+                Button(intent: TodayMonthIntent()) {
+                    Text("오늘")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(Color(hex: "E91E63"))
+                        .padding(.horizontal, 8)
+                        .frame(height: 22)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color(hex: "E91E63").opacity(0.1))
+                        )
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 4)
+
+                Button(intent: NextMonthIntent()) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(Color(hex: "E91E63"))
+                        .frame(width: 26, height: 22)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color(hex: "E91E63").opacity(0.1))
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        } else {
+            Text(yearMonthText)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(Color(hex: "424242"))
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Top bar: couple name + D-Day
@@ -583,10 +777,9 @@ struct LargeWidgetView: View {
             .padding(.top, 8)
             .padding(.bottom, 4)
 
-            // Month header
-            Text(yearMonthText)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundColor(Color(hex: "424242"))
+            // Month header with prev / title / today / next navigation
+            monthHeader
+                .padding(.horizontal, 10)
                 .padding(.bottom, 3)
 
             // Weekday headers

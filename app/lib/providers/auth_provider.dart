@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
+import '../core/widget_service.dart';
 import '../models/user.dart';
 import 'couple_provider.dart';
 
@@ -15,11 +16,16 @@ class AuthState {
   final String? error;
   final bool isLoading;
 
+  /// One-shot message shown on the login screen after a forced logout
+  /// (e.g. "서버에 연결할 수 없습니다"). Cleared by [AuthNotifier.consumeForceLogoutReason].
+  final String? forceLogoutReason;
+
   const AuthState({
     this.status = AuthStatus.initial,
     this.user,
     this.error,
     this.isLoading = false,
+    this.forceLogoutReason,
   });
 
   AuthState copyWith({
@@ -27,12 +33,14 @@ class AuthState {
     User? user,
     String? error,
     bool? isLoading,
+    String? forceLogoutReason,
   }) {
     return AuthState(
       status: status ?? this.status,
       user: user ?? this.user,
       error: error,
       isLoading: isLoading ?? this.isLoading,
+      forceLogoutReason: forceLogoutReason ?? this.forceLogoutReason,
     );
   }
 }
@@ -47,13 +55,26 @@ class AuthNotifier extends Notifier<AuthState> {
     return const AuthState();
   }
 
-  /// Check if user is already authenticated (on app start).
+  /// Check if user is already authenticated. Called on app startup (from the
+  /// splash screen) and on app resume (from the root widget observer).
+  ///
+  /// Error handling strategy:
+  ///   • 401/403 → auth is genuinely rejected → clear tokens, logout.
+  ///   • Network error / timeout / 5xx (no response, or no status code) →
+  ///     the server is temporarily unreachable, NOT an auth problem. Leave
+  ///     the session alone so the user can keep using the app when the
+  ///     server recovers.
+  ///   • Any other error on startup (status == initial) → fall back to the
+  ///     original conservative behavior: clear tokens so the user sees /login
+  ///     instead of a stuck splash.
   Future<void> checkAuthStatus() async {
     final token = ApiClient.getAccessToken();
     if (token == null) {
       state = state.copyWith(status: AuthStatus.unauthenticated);
       return;
     }
+
+    final wasAuthenticated = state.status == AuthStatus.authenticated;
 
     try {
       final response = await _dio.get('/auth/me');
@@ -74,8 +95,56 @@ class AuthNotifier extends Notifier<AuthState> {
         status: AuthStatus.authenticated,
         user: user,
       );
-    } catch (e) {
+    } on DioException catch (e) {
+      // While this method was awaiting /auth/me the Dio interceptor may have
+      // already run the 401-refresh-failed path, which triggers forceLogout
+      // and sets both the unauthenticated status AND a forceLogoutReason.
+      // Respect that and exit — otherwise we'd overwrite the reason with null.
+      if (state.status == AuthStatus.unauthenticated &&
+          state.forceLogoutReason != null) {
+        return;
+      }
+
+      final code = e.response?.statusCode;
+      final isAuthDenied = code == 401 || code == 403;
+
+      if (isAuthDenied) {
+        await ApiClient.clearTokens();
+        await WidgetService.clearData();
+        state = AuthState(
+          status: AuthStatus.unauthenticated,
+          forceLogoutReason: wasAuthenticated
+              ? '세션이 만료되었어요. 다시 로그인해주세요.'
+              : null,
+        );
+        return;
+      }
+
+      // Network-level failure (timeout, connection refused, 5xx, no status).
+      if (wasAuthenticated) {
+        // Mid-session re-check: server is temporarily down. Do NOT touch the
+        // session — the user stays logged in and can retry when the server
+        // comes back. Individual screens will show their own error states.
+        return;
+      }
+
+      // Startup check with a network error — keep the original conservative
+      // behavior so the user sees /login instead of a stuck splash.
       await ApiClient.clearTokens();
+      await WidgetService.clearData();
+      state = state.copyWith(status: AuthStatus.unauthenticated);
+    } catch (_) {
+      // Same race guard as above.
+      if (state.status == AuthStatus.unauthenticated &&
+          state.forceLogoutReason != null) {
+        return;
+      }
+
+      // Non-Dio error (parse error, etc.). Treat as auth-dead only on startup;
+      // leave mid-session users alone.
+      if (wasAuthenticated) return;
+      await ApiClient.clearTokens();
+      await WidgetService.clearData();
       state = state.copyWith(status: AuthStatus.unauthenticated);
     }
   }
@@ -187,7 +256,52 @@ class AuthNotifier extends Notifier<AuthState> {
   /// Logout.
   Future<void> logout() async {
     await ApiClient.clearTokens();
+    await WidgetService.clearData();
     state = const AuthState(status: AuthStatus.unauthenticated);
+  }
+
+  /// Force logout triggered by persistent server/auth failure (e.g. the
+  /// server was redeployed and the session is no longer valid).
+  ///
+  /// Unlike [logout] this:
+  ///  - does NOT hit any `/auth/logout` endpoint (the server is the problem)
+  ///  - stashes a [reason] message so the login screen can show a banner
+  ///  - is a no-op if the user is already unauthenticated (prevents redundant
+  ///    state churn when multiple in-flight requests fail at once)
+  Future<void> forceLogout(String reason) async {
+    if (state.status == AuthStatus.unauthenticated) {
+      // Keep the reason fresh even if we're already unauthenticated so the
+      // login screen still shows the banner.
+      if (state.forceLogoutReason != reason) {
+        state = state.copyWith(forceLogoutReason: reason);
+      }
+      return;
+    }
+    await ApiClient.clearTokens();
+    await WidgetService.clearData();
+    state = AuthState(
+      status: AuthStatus.unauthenticated,
+      forceLogoutReason: reason,
+    );
+  }
+
+  /// Read-and-clear the force-logout reason. Called by the login screen
+  /// after it has shown the banner to the user so the message doesn't
+  /// reappear on subsequent visits to the screen.
+  ///
+  /// Bypasses [AuthState.copyWith] because its `??` fallback cannot express
+  /// "set this field to null".
+  String? consumeForceLogoutReason() {
+    final reason = state.forceLogoutReason;
+    if (reason == null) return null;
+    state = AuthState(
+      status: state.status,
+      user: state.user,
+      error: state.error,
+      isLoading: state.isLoading,
+      forceLogoutReason: null,
+    );
+    return reason;
   }
 
   /// Update user profile.
