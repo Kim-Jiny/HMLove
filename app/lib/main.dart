@@ -101,47 +101,82 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   }
 }
 
+/// Run [task] with a hard timeout. On timeout or any error, log and return
+/// normally so startup never hangs on a single misbehaving plugin.
+Future<void> _guardedInit(
+  String label,
+  Future<void> Function() task, {
+  Duration timeout = const Duration(seconds: 4),
+}) async {
+  try {
+    await task().timeout(timeout);
+  } catch (e) {
+    debugPrint('[init] $label skipped: $e');
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  // 포그라운드에서 시스템 푸시 즉시 억제 (iOS) — 최대한 빨리 호출
-  await PushNotificationService.suppressForegroundNotifications();
-
-  // Initialize Hive
-  await Hive.initFlutter();
-  await Hive.openBox(AppConstants.authBox);
-  await Hive.openBox(AppConstants.settingsBox);
-  await Hive.openBox(AppConstants.cacheBox);
-
-  // Initialize Korean locale data
-  await initializeDateFormatting('ko_KR', null);
-
-  // Initialize timeago Korean locale
+  // 필수: Hive + 로케일은 스플래시/라우터가 바로 의존하므로 runApp 이전에 완료.
+  await _guardedInit('Hive', () async {
+    await Hive.initFlutter();
+    await Hive.openBox(AppConstants.authBox);
+    await Hive.openBox(AppConstants.settingsBox);
+    await Hive.openBox(AppConstants.cacheBox);
+  });
+  await _guardedInit(
+    'dateFormatting',
+    () => initializeDateFormatting('ko_KR', null),
+  );
   timeago.setLocaleMessages('ko', timeago.KoMessages());
 
-  // Initialize Home Widget
-  await WidgetService.initialize();
-
-  // Initialize notification sounds
-  await NotificationSoundService.initialize();
-
-  // Initialize AdMob
-  await AdService.initialize();
-
-  // Initialize Naver Map SDK
-  await FlutterNaverMap().init(
-    clientId: AppConstants.naverMapClientId,
-    onAuthFailed: (ex) => debugPrint('[NaverMap] Auth failed: ${ex.code} - ${ex.message}'),
-  );
+  // Firebase 는 background handler 등록 때문에 runApp 전에 필요하지만,
+  // 일부 디바이스에서 막히는 경우가 보고되어 타임아웃으로 보호.
+  await _guardedInit('Firebase', () async {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  });
 
   runApp(
     const ProviderScope(
       child: HMLoveApp(),
     ),
+  );
+
+  // 스플래시 빠져나온 뒤 백그라운드로 나머지 초기화. 실패해도 앱은 진행.
+  // 순서: FCM 억제 → 위젯 → 사운드 → AdMob → NaverMap
+  // (AdMob, NaverMap 은 폴드/특정 디바이스에서 블록 보고 있어 반드시 비차단으로)
+  // ignore: unawaited_futures
+  _initDeferred();
+}
+
+Future<void> _initDeferred() async {
+  await _guardedInit(
+    'FCM suppressForeground',
+    PushNotificationService.suppressForegroundNotifications,
+  );
+  await _guardedInit('home_widget', WidgetService.initialize);
+  await _guardedInit(
+    'notificationSound',
+    NotificationSoundService.initialize,
+  );
+  await _guardedInit(
+    'AdMob',
+    AdService.initialize,
+    timeout: const Duration(seconds: 8),
+  );
+  await _guardedInit(
+    'NaverMap',
+    () => FlutterNaverMap().init(
+      clientId: AppConstants.naverMapClientId,
+      onAuthFailed: (ex) => debugPrint(
+        '[NaverMap] Auth failed: ${ex.code} - ${ex.message}',
+      ),
+    ),
+    timeout: const Duration(seconds: 8),
   );
 }
 
