@@ -51,7 +51,7 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
+      mc alias set myminio http://hmlove-minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
       mc mb --ignore-existing myminio/hmlove;
       mc anonymous set download myminio/hmlove;
       exit 0;
@@ -80,7 +80,7 @@ services:
       - ./firebase-service-account.json:/app/firebase-service-account.json:ro
     environment:
       - DATABASE_URL=postgresql://hmlove:${DB_PASSWORD}@hmlove-db:5432/hmlove?sslmode=disable
-      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ENDPOINT=http://hmlove-minio:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
       - MINIO_BUCKET=hmlove

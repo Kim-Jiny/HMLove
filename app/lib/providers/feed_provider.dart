@@ -40,15 +40,26 @@ class Feed {
 
   bool get hasImages => imageUrls.isNotEmpty;
 
+  static List<String> parseImageUrls(Map<String, dynamic> json) {
+    final imageUrls = json['imageUrls'];
+    if (imageUrls is List) {
+      return imageUrls.whereType<String>().where((e) => e.isNotEmpty).toList();
+    }
+
+    final imageUrl = json['imageUrl'];
+    if (imageUrl is String && imageUrl.isNotEmpty) {
+      return [imageUrl];
+    }
+
+    return const [];
+  }
+
   factory Feed.fromJson(Map<String, dynamic> json) {
     final author = json['author'] as Map<String, dynamic>?;
     return Feed(
       id: json['id'] as String,
       content: json['content'] as String? ?? '',
-      imageUrls: (json['imageUrls'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
-          const [],
+      imageUrls: parseImageUrls(json),
       type: json['type'] as String?,
       coupleId: json['coupleId'] as String,
       authorId: json['authorId'] as String,
@@ -170,6 +181,20 @@ class FeedNotifier extends Notifier<FeedState> {
     return const FeedState();
   }
 
+  String _extractErrorMessage(Object data, String fallback) {
+    if (data is Map) {
+      final message = data['message'];
+      if (message is String && message.isNotEmpty) {
+        return message;
+      }
+      final error = data['error'];
+      if (error is String && error.isNotEmpty) {
+        return error;
+      }
+    }
+    return fallback;
+  }
+
   Future<void> fetchFeeds({bool refresh = false}) async {
     if (state.isLoading) return;
     if (!refresh && !state.hasMore) return;
@@ -178,10 +203,8 @@ class FeedNotifier extends Notifier<FeedState> {
 
     try {
       final cursor = refresh ? null : state.nextCursor;
-      final queryParams = <String, dynamic>{
-        'limit': 20,
-        if (cursor != null) 'cursor': cursor,
-      };
+      final queryParams = <String, dynamic>{'limit': 20};
+      if (cursor != null) queryParams['cursor'] = cursor;
 
       final response = await _dio.get('/feed', queryParameters: queryParams);
       final data = response.data as Map<String, dynamic>;
@@ -208,8 +231,10 @@ class FeedNotifier extends Notifier<FeedState> {
         );
       }
     } on DioException catch (e) {
-      final message =
-          e.response?.data?['message'] as String? ?? '피드를 불러오지 못했습니다';
+      final message = _extractErrorMessage(
+        e.response?.data,
+        '피드를 불러오지 못했습니다',
+      );
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(
@@ -227,11 +252,11 @@ class FeedNotifier extends Notifier<FeedState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final response = await _dio.post('/feed', data: {
-        'content': content,
-        if (imageUrls.isNotEmpty) 'imageUrls': imageUrls,
-        if (type != null) 'type': type,
-      });
+      final payload = <String, dynamic>{'content': content};
+      if (imageUrls.isNotEmpty) payload['imageUrls'] = imageUrls;
+      if (type != null) payload['type'] = type;
+
+      final response = await _dio.post('/feed', data: payload);
 
       final data = response.data as Map<String, dynamic>;
       final feedJson = data['feed'] as Map<String, dynamic>? ?? data;
@@ -242,8 +267,10 @@ class FeedNotifier extends Notifier<FeedState> {
       );
       return true;
     } on DioException catch (e) {
-      final message =
-          e.response?.data?['message'] as String? ?? '피드 작성에 실패했습니다';
+      final message = _extractErrorMessage(
+        e.response?.data,
+        '피드 작성에 실패했습니다',
+      );
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -264,8 +291,10 @@ class FeedNotifier extends Notifier<FeedState> {
       state = state.copyWith(feeds: updatedFeeds, isLoading: false);
       return true;
     } on DioException catch (e) {
-      final message =
-          e.response?.data?['message'] as String? ?? '피드 삭제에 실패했습니다';
+      final message = _extractErrorMessage(
+        e.response?.data,
+        '피드 삭제에 실패했습니다',
+      );
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {

@@ -69,18 +69,10 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
     if (source == ImageSource.gallery) {
       final remaining = 5 - imageUrls.length;
       if (remaining <= 0) return;
-      picked = await picker.pickMultiImage(
-        maxWidth: 1080,
-        maxHeight: 1080,
-        imageQuality: 70,
-        limit: remaining,
-      );
+      picked = await picker.pickMultiImage(limit: remaining);
     } else {
       final single = await picker.pickImage(
         source: ImageSource.camera,
-        maxWidth: 1080,
-        maxHeight: 1080,
-        imageQuality: 70,
       );
       if (single != null) picked = [single];
     }
@@ -96,18 +88,45 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
           await MultipartFile.fromFile(file.path, filename: file.name),
         ));
       }
-      final res = await dio.post('/feed/upload', data: formData);
-      final urls = (res.data['imageUrls'] as List<dynamic>)
-          .map((e) => e as String)
-          .toList();
+      final res = await dio.post(
+        '/feed/upload',
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+      );
+      final data = res.data;
+      final urls = <String>[
+        if (data is Map<String, dynamic>) ...Feed.parseImageUrls(data),
+        if (data is Map<String, dynamic> && data['urls'] is List)
+          ...(data['urls'] as List).whereType<String>(),
+        if (data is Map<String, dynamic> && data['images'] is List)
+          ...(data['images'] as List).whereType<String>(),
+      ].where((e) => e.isNotEmpty).toSet().toList();
+
+      if (urls.isEmpty) {
+        throw const FormatException('No uploaded image URLs in response');
+      }
+
       setModalState(() {
         imageUrls.addAll(urls);
         _isUploadingImages = false;
       });
+    } on DioException catch (e) {
+      setModalState(() => _isUploadingImages = false);
+      if (mounted) {
+        final data = e.response?.data;
+        final message = data is Map<String, dynamic>
+            ? (data['message'] ?? data['error']) as String?
+            : null;
+        showTopSnackBar(
+          context,
+          message ?? '이미지 업로드에 실패했습니다',
+          isError: true,
+        );
+      }
     } catch (e) {
       setModalState(() => _isUploadingImages = false);
       if (mounted) {
-        showTopSnackBar(context, '이미지 업로드에 실패했습니다', isError: true);
+        showTopSnackBar(context, '이미지 업로드에 실패했습니다: $e', isError: true);
       }
     }
   }
