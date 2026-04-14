@@ -2,6 +2,11 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Prisma config requires DATABASE_URL to exist during `prisma generate`,
+# even though client generation itself does not need a live database.
+ARG DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/placeholder
+ENV DATABASE_URL=${DATABASE_URL}
+
 # 비-root 사용자 생성
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
