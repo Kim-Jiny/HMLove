@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
@@ -191,12 +192,21 @@ class FeedNotifier extends Notifier<FeedState> {
       final newCursor = data['nextCursor'] as String?;
       final hasMore = data['hasMore'] as bool? ?? (newCursor != null);
 
-      state = state.copyWith(
-        feeds: refresh ? feeds : [...state.feeds, ...feeds],
-        nextCursor: newCursor,
-        hasMore: hasMore,
-        isLoading: false,
-      );
+      if (refresh) {
+        state = FeedState(
+          feeds: feeds,
+          nextCursor: newCursor,
+          hasMore: hasMore,
+          isLoading: false,
+        );
+      } else {
+        state = FeedState(
+          feeds: [...state.feeds, ...feeds],
+          nextCursor: newCursor,
+          hasMore: hasMore,
+          isLoading: false,
+        );
+      }
     } on DioException catch (e) {
       final message =
           e.response?.data?['message'] as String? ?? '피드를 불러오지 못했습니다';
@@ -292,23 +302,32 @@ class FeedNotifier extends Notifier<FeedState> {
     final newLiked = !feed.isLiked;
     final newCount = feed.likeCount + (newLiked ? 1 : -1);
 
-    final updatedFeeds = [...state.feeds];
-    updatedFeeds[idx] = feed.copyWith(isLiked: newLiked, likeCount: newCount);
-    state = state.copyWith(feeds: updatedFeeds);
+    final optimisticFeeds = [...state.feeds];
+    optimisticFeeds[idx] = feed.copyWith(isLiked: newLiked, likeCount: newCount);
+    state = state.copyWith(feeds: optimisticFeeds);
 
     try {
       final response = await _dio.post('/feed/$feedId/like');
       final data = response.data as Map<String, dynamic>;
-      // Sync with server response
-      updatedFeeds[idx] = feed.copyWith(
+      // Re-read state after await to avoid stale list
+      final currentIdx = state.feeds.indexWhere((f) => f.id == feedId);
+      if (currentIdx == -1) return;
+      final currentFeeds = [...state.feeds];
+      currentFeeds[currentIdx] = state.feeds[currentIdx].copyWith(
         isLiked: data['isLiked'] as bool,
         likeCount: data['likeCount'] as int,
       );
-      state = state.copyWith(feeds: updatedFeeds);
+      state = state.copyWith(feeds: currentFeeds);
     } catch (_) {
-      // Revert on error
-      updatedFeeds[idx] = feed;
-      state = state.copyWith(feeds: updatedFeeds);
+      // Re-read state and revert
+      final currentIdx = state.feeds.indexWhere((f) => f.id == feedId);
+      if (currentIdx == -1) return;
+      final revertFeeds = [...state.feeds];
+      revertFeeds[currentIdx] = state.feeds[currentIdx].copyWith(
+        isLiked: feed.isLiked,
+        likeCount: feed.likeCount,
+      );
+      state = state.copyWith(feeds: revertFeeds);
     }
   }
 
@@ -368,7 +387,9 @@ class FeedNotifier extends Notifier<FeedState> {
       final updatedFeeds = [...state.feeds];
       updatedFeeds[idx] = updatedFeed;
       state = state.copyWith(feeds: updatedFeeds);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[Feed] refreshSingleFeed error: $e');
+    }
   }
 }
 

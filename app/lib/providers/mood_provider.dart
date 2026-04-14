@@ -111,7 +111,7 @@ class MoodNotifier extends Notifier<MoodState> {
         }
       }
 
-      state = state.copyWith(
+      state = MoodState(
         myMood: myMood,
         partnerMood: partnerMood,
         isLoading: false,

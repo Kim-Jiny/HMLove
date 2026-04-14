@@ -7,6 +7,7 @@ import prisma from '../utils/prisma.js';
 import { uploadFile } from '../utils/storage.js';
 import { getZodiacSign, getChineseZodiac } from '../utils/zodiac.js';
 import { authenticate } from '../middleware/auth.js';
+import { authLimiter } from '../middleware/rateLimit.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -19,6 +20,10 @@ const upload = multer({
 
 const router = Router();
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PASSWORD_MIN_LENGTH = 8;
+const NICKNAME_MAX_LENGTH = 20;
+
 function generateAccessToken(userId) {
   return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '1h' });
 }
@@ -28,12 +33,31 @@ function generateRefreshToken(userId) {
 }
 
 // POST /auth/register
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   try {
     const { email, password, nickname, birthDate } = req.body;
 
     if (!email || !password || !nickname) {
       return res.status(400).json({ error: '이메일, 비밀번호, 닉네임을 입력해주세요.' });
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      return res.status(400).json({ error: '올바른 이메일 형식이 아닙니다.' });
+    }
+
+    if (password.length < PASSWORD_MIN_LENGTH) {
+      return res.status(400).json({ error: `비밀번호는 최소 ${PASSWORD_MIN_LENGTH}자 이상이어야 합니다.` });
+    }
+
+    if (nickname.trim().length === 0 || nickname.length > NICKNAME_MAX_LENGTH) {
+      return res.status(400).json({ error: `닉네임은 1~${NICKNAME_MAX_LENGTH}자 이내로 입력해주세요.` });
+    }
+
+    if (birthDate) {
+      const birth = new Date(birthDate);
+      if (isNaN(birth.getTime()) || birth > new Date()) {
+        return res.status(400).json({ error: '올바른 생년월일을 입력해주세요.' });
+      }
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -69,12 +93,16 @@ router.post('/register', async (req, res) => {
 });
 
 // POST /auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: '이메일과 비밀번호를 입력해주세요.' });
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      return res.status(400).json({ error: '올바른 이메일 형식이 아닙니다.' });
     }
 
     const user = await prisma.user.findUnique({
@@ -282,10 +310,16 @@ router.patch('/profile', authenticate, async (req, res) => {
     const data = {};
 
     if (nickname && nickname.trim().length > 0) {
+      if (nickname.length > NICKNAME_MAX_LENGTH) {
+        return res.status(400).json({ error: `닉네임은 ${NICKNAME_MAX_LENGTH}자 이내로 입력해주세요.` });
+      }
       data.nickname = nickname.trim();
     }
     if (birthDate) {
       const birth = new Date(birthDate);
+      if (isNaN(birth.getTime()) || birth > new Date()) {
+        return res.status(400).json({ error: '올바른 생년월일을 입력해주세요.' });
+      }
       data.birthDate = birth;
       data.zodiacSign = getZodiacSign(birth);
       data.chineseZodiac = getChineseZodiac(birth);

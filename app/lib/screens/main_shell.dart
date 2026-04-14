@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/api_client.dart';
+import '../core/connectivity_service.dart';
 import '../core/push_notification_service.dart';
 import '../core/router.dart';
 import '../core/theme.dart';
@@ -132,7 +133,12 @@ class _MainShellState extends ConsumerState<MainShell>
         );
       },
       child: Scaffold(
-      body: widget.navigationShell,
+      body: Column(
+        children: [
+          const OfflineBanner(),
+          Expanded(child: widget.navigationShell),
+        ],
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [

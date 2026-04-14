@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,11 +48,13 @@ class ApiClient {
     );
 
     dio.interceptors.add(_AuthInterceptor(dio));
-    dio.interceptors.add(LogInterceptor(
-      requestBody: true,
-      responseBody: true,
-      logPrint: (obj) => print('[API] $obj'),
-    ));
+    if (kDebugMode) {
+      dio.interceptors.add(LogInterceptor(
+        requestBody: true,
+        responseBody: true,
+        logPrint: (obj) => debugPrint('[API] $obj'),
+      ));
+    }
 
     return dio;
   }
@@ -86,6 +90,8 @@ class ApiClient {
     await box.delete(AppConstants.refreshTokenKey);
     await box.delete(AppConstants.userIdKey);
     await box.delete(AppConstants.coupleIdKey);
+    // 위젯 확장의 토큰도 정리
+    WidgetService.clearData();
   }
 
   /// Save user ID to Hive.
@@ -115,7 +121,10 @@ class ApiClient {
 
 class _AuthInterceptor extends Interceptor {
   final Dio _dio;
-  bool _isRefreshing = false;
+
+  /// When a refresh is in flight, all subsequent 401 handlers await this
+  /// Completer instead of firing their own refresh request.
+  Completer<String?>? _refreshCompleter;
 
   // Timestamp of the last force-logout trigger, used to debounce re-triggers
   // when several in-flight 401 responses arrive back-to-back.
@@ -135,23 +144,34 @@ class _AuthInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
-    final bool userIsLoggedIn = ApiClient.getAccessToken() != null;
-
-    // We only care about 401 — a real "the server rejected your credentials"
-    // response. Network failures, timeouts, and 5xx errors are passed through
-    // untouched so the caller can surface a retry UI without logging the user
-    // out (the server being temporarily unreachable is NOT an auth problem).
-    if (err.response?.statusCode != 401 || _isRefreshing) {
+    if (err.response?.statusCode != 401) {
       return handler.next(err);
     }
 
-    _isRefreshing = true;
+    // Another 401 handler is already refreshing — wait for it.
+    if (_refreshCompleter != null) {
+      final newToken = await _refreshCompleter!.future;
+      if (newToken != null) {
+        final options = err.requestOptions;
+        options.headers['Authorization'] = 'Bearer $newToken';
+        try {
+          final retryResponse = await _dio.fetch(options);
+          return handler.resolve(retryResponse);
+        } catch (_) {
+          return handler.next(err);
+        }
+      }
+      return handler.next(err);
+    }
 
-    // No refresh token means the session is unrecoverable — force logout if
-    // the user was actually logged in.
+    // This is the first 401 — take ownership of the refresh.
+    _refreshCompleter = Completer<String?>();
+
+    final bool userIsLoggedIn = ApiClient.getAccessToken() != null;
     final refreshToken = ApiClient.getRefreshToken();
     if (refreshToken == null) {
-      _isRefreshing = false;
+      _refreshCompleter!.complete(null);
+      _refreshCompleter = null;
       if (userIsLoggedIn) {
         await ApiClient.clearTokens();
         await _maybeTriggerForceLogout('세션이 만료되었어요. 다시 로그인해주세요.');
@@ -159,12 +179,6 @@ class _AuthInterceptor extends Interceptor {
       return handler.next(err);
     }
 
-    // Attempt to refresh the access token on a fresh Dio so we don't re-enter
-    // this interceptor. Two outcomes:
-    //   • Server responded with an HTTP status (2xx → success, non-2xx →
-    //     refresh was actively rejected → force logout).
-    //   • No response at all (network/connection error) → leave the session
-    //     alone; the user is probably just offline.
     final refreshDio = Dio(BaseOptions(
       baseUrl: AppConstants.apiBaseUrl,
       headers: {'Content-Type': 'application/json'},
@@ -177,19 +191,17 @@ class _AuthInterceptor extends Interceptor {
         data: {'refreshToken': refreshToken},
       );
     } on DioException catch (refreshErr) {
-      _isRefreshing = false;
+      _refreshCompleter!.complete(null);
+      _refreshCompleter = null;
       final refreshCode = refreshErr.response?.statusCode;
       if (refreshCode != null) {
-        // Server answered with an error code → refresh genuinely rejected.
         await ApiClient.clearTokens();
         await _maybeTriggerForceLogout('세션이 만료되었어요. 다시 로그인해주세요.');
       }
-      // Otherwise: network/timeout while trying to refresh. Do NOT touch
-      // auth state — the server is just temporarily unreachable.
       return handler.next(err);
     } catch (_) {
-      // Unexpected non-Dio error — conservatively leave auth alone.
-      _isRefreshing = false;
+      _refreshCompleter!.complete(null);
+      _refreshCompleter = null;
       return handler.next(err);
     }
 
@@ -198,24 +210,27 @@ class _AuthInterceptor extends Interceptor {
         final newAccessToken = refreshResponse.data['accessToken'] as String;
         final box = Hive.box(AppConstants.authBox);
         await box.put(AppConstants.accessTokenKey, newAccessToken);
+        WidgetService.saveAuthInfo(newAccessToken, AppConstants.apiBaseUrl);
 
-        // Retry the original request with the new token.
+        // Unblock all waiting 401 handlers with the new token.
+        _refreshCompleter!.complete(newAccessToken);
+        _refreshCompleter = null;
+
+        // Retry the original request.
         final options = err.requestOptions;
         options.headers['Authorization'] = 'Bearer $newAccessToken';
-
         final retryResponse = await _dio.fetch(options);
-        _isRefreshing = false;
         return handler.resolve(retryResponse);
       } catch (_) {
-        // Retry of the original request failed — let it surface as an error,
-        // but don't force logout (the refresh itself succeeded).
-        _isRefreshing = false;
+        _refreshCompleter!.complete(null);
+        _refreshCompleter = null;
         return handler.next(err);
       }
     }
 
     // Non-200 refresh response → server rejected the refresh token.
-    _isRefreshing = false;
+    _refreshCompleter!.complete(null);
+    _refreshCompleter = null;
     await ApiClient.clearTokens();
     await _maybeTriggerForceLogout('세션이 만료되었어요. 다시 로그인해주세요.');
     return handler.next(err);

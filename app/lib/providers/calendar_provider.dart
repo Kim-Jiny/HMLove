@@ -45,7 +45,7 @@ class CalendarEvent {
     return CalendarEvent(
       id: json['id'] as String,
       title: json['title'] as String,
-      date: DateTime.parse(json['date'] as String),
+      date: DateTime.parse(json['date'] as String).toLocal(),
       description: json['description'] as String?,
       isAnniversary: json['isAnniversary'] as bool? ?? false,
       repeatType: json['repeatType'] as String?,

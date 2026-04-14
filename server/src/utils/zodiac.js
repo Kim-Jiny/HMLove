@@ -3,6 +3,8 @@
  */
 export function getZodiacSign(birthDate) {
   const date = new Date(birthDate);
+  if (isNaN(date.getTime())) return null;
+
   const month = date.getMonth() + 1;
   const day = date.getDate();
 
@@ -25,8 +27,16 @@ export function getZodiacSign(birthDate) {
   for (const sign of signs) {
     const [sm, sd] = sign.start;
     const [em, ed] = sign.end;
-    if ((month === sm && day >= sd) || (month === em && day <= ed)) {
-      return sign.name;
+    if (sm === em) {
+      // 같은 달 범위
+      if (month === sm && day >= sd && day <= ed) {
+        return sign.name;
+      }
+    } else {
+      // 다른 달에 걸친 범위
+      if ((month === sm && day >= sd) || (month === em && day <= ed)) {
+        return sign.name;
+      }
     }
   }
 
@@ -38,6 +48,8 @@ export function getZodiacSign(birthDate) {
  */
 export function getChineseZodiac(birthDate) {
   const date = new Date(birthDate);
+  if (isNaN(date.getTime())) return null;
+
   const year = date.getFullYear();
 
   const animals = [

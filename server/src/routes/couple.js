@@ -63,39 +63,45 @@ router.post('/join', async (req, res) => {
       return res.status(400).json({ error: '초대 코드를 입력해주세요.' });
     }
 
-    const couple = await prisma.couple.findUnique({
-      where: { inviteCode },
-      include: { users: true },
-    });
+    // 트랜잭션으로 race condition 방지
+    const updated = await prisma.$transaction(async (tx) => {
+      const couple = await tx.couple.findUnique({
+        where: { inviteCode },
+        include: { users: true },
+      });
 
-    if (!couple) {
-      return res.status(404).json({ error: '유효하지 않은 초대 코드입니다.' });
-    }
+      if (!couple) {
+        throw Object.assign(new Error('유효하지 않은 초대 코드입니다.'), { statusCode: 404 });
+      }
 
-    if (couple.users.length >= 2) {
-      return res.status(400).json({ error: '이미 커플이 완성되었습니다.' });
-    }
+      if (couple.users.length >= 2) {
+        throw Object.assign(new Error('이미 커플이 완성되었습니다.'), { statusCode: 400 });
+      }
 
-    await prisma.user.update({
-      where: { id: req.user.id },
-      data: { coupleId: couple.id },
-    });
+      await tx.user.update({
+        where: { id: req.user.id },
+        data: { coupleId: couple.id },
+      });
 
-    const updated = await prisma.couple.findUnique({
-      where: { id: couple.id },
-      include: {
-        users: {
-          select: {
-            id: true, email: true, nickname: true, profileImage: true,
-            birthDate: true, zodiacSign: true, chineseZodiac: true,
-            createdAt: true, updatedAt: true,
+      return tx.couple.findUnique({
+        where: { id: couple.id },
+        include: {
+          users: {
+            select: {
+              id: true, email: true, nickname: true, profileImage: true,
+              birthDate: true, zodiacSign: true, chineseZodiac: true,
+              createdAt: true, updatedAt: true,
+            },
           },
         },
-      },
-    });
+      });
+    }, { isolationLevel: 'Serializable' });
 
     res.json({ couple: updated });
   } catch (err) {
+    if (err.statusCode) {
+      return res.status(err.statusCode).json({ error: err.message });
+    }
     console.error('Join couple error:', err);
     res.status(500).json({ error: '커플 연결에 실패했습니다.' });
   }
@@ -232,6 +238,8 @@ router.get('/info', requireCouple, async (req, res) => {
     const diffTime = now.getTime() - new Date(couple.startDate).getTime();
     const daysTogether = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
+    // 커플 정보는 자주 변하지 않음 — 5분 캐시
+    res.set('Cache-Control', 'private, max-age=300');
     res.json({ couple, daysTogether });
   } catch (err) {
     console.error('Get couple info error:', err);

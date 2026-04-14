@@ -74,10 +74,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     _isInitialized = true;
 
     final notifier = ref.read(chatProvider.notifier);
-    final token = ApiClient.getAccessToken();
-    if (token != null) {
-      notifier.connect(token);
-    }
+    // MainShell이 이미 connect() 담당 — 여기선 연결 보장만
+    notifier.ensureConnected();
     await notifier.fetchHistory();
     notifier.markAsRead();
   }
@@ -97,14 +95,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // 포그라운드 복귀 → 소켓 재연결 + 최신 메시지 가져오기
+      // MainShell이 ensureConnected() 담당 — 여기선 히스토리/읽음만 처리
       final notifier = ref.read(chatProvider.notifier);
-      final token = ApiClient.getAccessToken();
-      if (token != null) {
-        notifier.connect(token);
-      }
       notifier.fetchHistory();
-      // 채팅 탭이 활성 상태일 때만 읽음 처리
       if (notifier.isChatScreenActive) {
         notifier.markAsRead();
       }

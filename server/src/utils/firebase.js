@@ -36,6 +36,33 @@ export async function sendPushNotification({ token, title, body, data, sound = t
   if (!token) return;
 
   try {
+    // 실제 미읽음 알림 개수 조회
+    let badgeCount = 1;
+    try {
+      const prisma = (await import('./prisma.js')).default;
+      const user = await prisma.user.findFirst({
+        where: { fcmToken: token },
+        select: { id: true, coupleId: true },
+      });
+      if (user) {
+        const [unreadMessages, unreadNotifications] = await Promise.all([
+          prisma.message.count({
+            where: {
+              coupleId: user.coupleId,
+              senderId: { not: user.id },
+              isRead: false,
+            },
+          }),
+          prisma.notification.count({
+            where: { userId: user.id, isRead: false },
+          }),
+        ]);
+        badgeCount = unreadMessages + unreadNotifications;
+      }
+    } catch {
+      // 뱃지 조회 실패 시 기본값 1 사용
+    }
+
     // data 필드에 title/body도 포함 (클라이언트 폴백용)
     // FCM data 값은 반드시 string이어야 함
     const mergedData = {
@@ -64,7 +91,7 @@ export async function sendPushNotification({ token, title, body, data, sound = t
       apns: {
         payload: {
           aps: {
-            badge: 1,
+            badge: badgeCount,
             ...(sound ? { sound: 'default' } : {}),
           },
         },

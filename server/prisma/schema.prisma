@@ -35,6 +35,8 @@ model User {
   feedComments     FeedComment[]   @relation("commentAuthor")
   inquiries        Inquiry[]
   notifications    Notification[]
+
+  @@index([coupleId])
 }
 
 model Couple {
@@ -82,9 +84,9 @@ model CoupleMission {
 model CalendarEvent {
   id          String   @id @default(uuid())
   coupleId    String
-  couple      Couple   @relation(fields: [coupleId], references: [id])
+  couple      Couple   @relation(fields: [coupleId], references: [id], onDelete: Cascade)
   authorId    String
-  author      User     @relation("eventAuthor", fields: [authorId], references: [id])
+  author      User     @relation("eventAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   title       String
   description String?
   date        DateTime
@@ -93,6 +95,8 @@ model CalendarEvent {
   color       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([coupleId, date])
 }
 
 enum RepeatType {
@@ -104,9 +108,9 @@ enum RepeatType {
 model Feed {
   id        String   @id @default(uuid())
   coupleId  String
-  couple    Couple   @relation(fields: [coupleId], references: [id])
+  couple    Couple   @relation(fields: [coupleId], references: [id], onDelete: Cascade)
   authorId  String
-  author    User     @relation("feedAuthor", fields: [authorId], references: [id])
+  author    User     @relation("feedAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   content   String
   imageUrls String[]  @default([])
   type      FeedType @default(DIARY)
@@ -115,6 +119,8 @@ model Feed {
 
   likes     FeedLike[]
   comments  FeedComment[]
+
+  @@index([coupleId, createdAt])
 }
 
 model FeedLike {
@@ -122,7 +128,7 @@ model FeedLike {
   feedId    String
   feed      Feed     @relation(fields: [feedId], references: [id], onDelete: Cascade)
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
   @@unique([feedId, userId])
@@ -133,9 +139,11 @@ model FeedComment {
   feedId    String
   feed      Feed     @relation(fields: [feedId], references: [id], onDelete: Cascade)
   authorId  String
-  author    User     @relation("commentAuthor", fields: [authorId], references: [id])
+  author    User     @relation("commentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   content   String
   createdAt DateTime @default(now())
+
+  @@index([feedId])
 }
 
 enum FeedType {
@@ -147,23 +155,24 @@ enum FeedType {
 model Mood {
   id        String   @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   coupleId  String
-  couple    Couple   @relation(fields: [coupleId], references: [id])
+  couple    Couple   @relation(fields: [coupleId], references: [id], onDelete: Cascade)
   emoji     String
   message   String?
   date      DateTime @db.Date
   createdAt DateTime @default(now())
 
   @@unique([userId, date])
+  @@index([coupleId, date])
 }
 
 model Fight {
   id         String   @id @default(uuid())
   coupleId   String
-  couple     Couple   @relation(fields: [coupleId], references: [id])
+  couple     Couple   @relation(fields: [coupleId], references: [id], onDelete: Cascade)
   authorId   String
-  author     User     @relation("fightAuthor", fields: [authorId], references: [id])
+  author     User     @relation("fightAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   date       DateTime
   reason     String
   resolution String?
@@ -171,12 +180,14 @@ model Fight {
   isResolved Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  @@index([coupleId])
 }
 
 model Fortune {
   id          String   @id @default(uuid())
   coupleId    String
-  couple      Couple   @relation(fields: [coupleId], references: [id])
+  couple      Couple   @relation(fields: [coupleId], references: [id], onDelete: Cascade)
   date        DateTime @db.Date
   generalLuck String
   coupleLuck  String
@@ -195,22 +206,25 @@ model Fortune {
 model Message {
   id        String   @id @default(uuid())
   coupleId  String
-  couple    Couple   @relation(fields: [coupleId], references: [id])
+  couple    Couple   @relation(fields: [coupleId], references: [id], onDelete: Cascade)
   senderId  String
-  sender    User     @relation("sender", fields: [senderId], references: [id])
+  sender    User     @relation("sender", fields: [senderId], references: [id], onDelete: Cascade)
   content   String?
   imageUrls String[] @default([])
   isRead    Boolean  @default(false)
   isEdited  Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([coupleId, createdAt])
+  @@index([coupleId, isRead])
 }
 
 model Photo {
   id           String   @id @default(uuid())
   coupleId     String
-  couple       Couple   @relation(fields: [coupleId], references: [id])
+  couple       Couple   @relation(fields: [coupleId], references: [id], onDelete: Cascade)
   authorId     String
-  author       User     @relation("photoAuthor", fields: [authorId], references: [id])
+  author       User     @relation("photoAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   imageUrl     String
   thumbnailUrl String?
   caption      String?
@@ -219,16 +233,18 @@ model Photo {
   address      String?
   takenAt      DateTime?
   createdAt    DateTime @default(now())
+
+  @@index([coupleId])
 }
 
 model Letter {
   id           String       @id @default(uuid())
   coupleId     String
-  couple       Couple       @relation(fields: [coupleId], references: [id])
+  couple       Couple       @relation(fields: [coupleId], references: [id], onDelete: Cascade)
   writerId     String
-  writer       User         @relation("letterWriter", fields: [writerId], references: [id])
+  writer       User         @relation("letterWriter", fields: [writerId], references: [id], onDelete: Cascade)
   receiverId   String
-  receiver     User         @relation("letterReceiver", fields: [receiverId], references: [id])
+  receiver     User         @relation("letterReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
   title        String
   content      String
   deliveryDate DateTime
@@ -236,6 +252,9 @@ model Letter {
   isRead       Boolean      @default(false)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
+
+  @@index([coupleId])
+  @@index([status, deliveryDate])
 }
 
 enum LetterStatus {
@@ -247,7 +266,7 @@ enum LetterStatus {
 model Inquiry {
   id          String        @id @default(uuid())
   userId      String
-  user        User          @relation(fields: [userId], references: [id])
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   category    String        // bug, feature, account, other
   title       String
   content     String

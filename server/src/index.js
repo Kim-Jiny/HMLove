@@ -9,8 +9,9 @@ import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import path from 'path';
 
+import { globalLimiter } from './middleware/rateLimit.js';
 import prisma from './utils/prisma.js';
-import { sendPushNotification } from './utils/firebase.js';
+import { sendPushNotification, notifyPartner } from './utils/firebase.js';
 import { getUpcomingAnniversaries } from './utils/anniversary.js';
 import authRoutes from './routes/auth.js';
 import coupleRoutes from './routes/couple.js';
@@ -30,6 +31,7 @@ import missionRoutes from './routes/mission.js';
 import mapRoutes from './routes/map.js';
 
 const app = express();
+app.set('trust proxy', 1);
 const server = createServer(app);
 
 // Socket.io 설정
@@ -44,13 +46,43 @@ const io = new Server(server, {
 // io 객체를 라우트에서 사용할 수 있도록 공유
 app.set('io', io);
 
+// 채팅 푸시 debounce: 3초 내 같은 유저 → 같은 상대 메시지를 묶어서 1개 알림
+const _chatPushTimers = new Map(); // key: `${senderId}:${partnerId}`
+function debouncedChatPush({ senderId, partnerId, token, senderNickname, body }) {
+  const key = `${senderId}:${partnerId}`;
+  const existing = _chatPushTimers.get(key);
+
+  if (existing) {
+    existing.count++;
+    existing.lastBody = body;
+    clearTimeout(existing.timer);
+  } else {
+    _chatPushTimers.set(key, { count: 1, lastBody: body });
+  }
+
+  const entry = _chatPushTimers.get(key);
+  entry.timer = setTimeout(() => {
+    const pushBody = entry.count > 1
+      ? `${entry.count}개의 새 메시지`
+      : entry.lastBody;
+    sendPushNotification({
+      token,
+      title: senderNickname || '상대방',
+      body: pushBody,
+      data: { type: 'chat', coupleId: '' },
+    });
+    _chatPushTimers.delete(key);
+  }, 3000);
+}
+
 // Middleware
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',
   credentials: true,
 }));
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(morgan('dev'));
+app.use(globalLimiter);
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -59,9 +91,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.resolve('uploads')));
 app.use(express.static(path.resolve('public')));
 
-// Admin 페이지 라우트 (인라인 스크립트 허용을 위해 CSP 해제)
+// Admin 페이지 라우트 (인라인 스크립트 허용)
 app.get('/admin', (req, res) => {
-  res.removeHeader('Content-Security-Policy');
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;");
   res.sendFile(path.resolve('public/admin.html'));
 });
 
@@ -103,22 +135,28 @@ io.use((socket, next) => {
 });
 
 io.on('connection', async (socket) => {
-  console.log(`Socket connected: ${socket.userId}`);
+  try {
+    console.log(`Socket connected: ${socket.userId}`);
 
-  // 사용자의 커플 룸에 참여
-  const user = await prisma.user.findUnique({
-    where: { id: socket.userId },
-    select: { coupleId: true, nickname: true },
-  });
+    // 사용자의 커플 룸에 참여
+    const user = await prisma.user.findUnique({
+      where: { id: socket.userId },
+      select: { coupleId: true, nickname: true },
+    });
 
-  if (user?.coupleId) {
-    const room = `couple:${user.coupleId}`;
-    socket.join(room);
-    socket.coupleId = user.coupleId;
-    socket.nickname = user.nickname;
+    if (user?.coupleId) {
+      const room = `couple:${user.coupleId}`;
+      socket.join(room);
+      socket.coupleId = user.coupleId;
+      socket.nickname = user.nickname;
 
-    // 상대방에게 온라인 알림
-    socket.to(room).emit('partner:online', { userId: socket.userId });
+      // 상대방에게 온라인 알림
+      socket.to(room).emit('partner:online', { userId: socket.userId });
+    }
+  } catch (err) {
+    console.error('Socket connection setup error:', err);
+    socket.disconnect(true);
+    return;
   }
 
   // 메시지 전송
@@ -127,8 +165,9 @@ io.on('connection', async (socket) => {
       if (!socket.coupleId) return;
 
       const { content, imageUrls } = data;
-      const urls = Array.isArray(imageUrls) ? imageUrls : [];
+      const urls = Array.isArray(imageUrls) ? imageUrls.slice(0, 5) : [];
       if (!content && urls.length === 0) return;
+      if (typeof content === 'string' && content.length > 5000) return;
 
       const message = await prisma.message.create({
         data: {
@@ -146,13 +185,13 @@ io.on('connection', async (socket) => {
       const payload = { ...message, _tempId: data._tempId || null };
       io.to(room).emit('message:new', payload);
 
-      // 상대방에게 푸시 알림
+      // 상대방에게 푸시 알림 (debounce 적용)
       const partner = await prisma.user.findFirst({
         where: {
           coupleId: socket.coupleId,
           id: { not: socket.userId },
         },
-        select: { fcmToken: true },
+        select: { id: true, fcmToken: true },
       });
       if (partner?.fcmToken) {
         let pushBody;
@@ -167,11 +206,12 @@ io.on('connection', async (socket) => {
         } else {
           pushBody = content;
         }
-        sendPushNotification({
+        debouncedChatPush({
+          senderId: socket.userId,
+          partnerId: partner.id,
           token: partner.fcmToken,
-          title: socket.nickname || '상대방',
+          senderNickname: socket.nickname,
           body: pushBody,
-          data: { type: 'chat', coupleId: socket.coupleId },
         });
       }
     } catch (err) {
@@ -245,19 +285,30 @@ io.on('connection', async (socket) => {
     }
   });
 
-  // 타이핑 표시
+  // 타이핑 표시 (5초 타임아웃으로 자동 해제)
   socket.on('typing:start', () => {
     if (!socket.coupleId) return;
     socket.to(`couple:${socket.coupleId}`).emit('typing:start', { userId: socket.userId });
+    // 기존 타이머 초기화
+    if (socket._typingTimer) clearTimeout(socket._typingTimer);
+    socket._typingTimer = setTimeout(() => {
+      socket.to(`couple:${socket.coupleId}`).emit('typing:stop', { userId: socket.userId });
+      socket._typingTimer = null;
+    }, 5000);
   });
 
   socket.on('typing:stop', () => {
     if (!socket.coupleId) return;
+    if (socket._typingTimer) {
+      clearTimeout(socket._typingTimer);
+      socket._typingTimer = null;
+    }
     socket.to(`couple:${socket.coupleId}`).emit('typing:stop', { userId: socket.userId });
   });
 
   // 연결 해제
   socket.on('disconnect', () => {
+    if (socket._typingTimer) clearTimeout(socket._typingTimer);
     console.log(`Socket disconnected: ${socket.userId}`);
     if (socket.coupleId) {
       socket.to(`couple:${socket.coupleId}`).emit('partner:offline', { userId: socket.userId });
@@ -286,7 +337,6 @@ async function deliverScheduledLetters() {
       });
 
       // 수신자에게 푸시 알림
-      const { notifyPartner } = await import('./utils/firebase.js');
       notifyPartner({
         userId: letter.writerId,
         coupleId: letter.writer.coupleId,
@@ -302,7 +352,7 @@ async function deliverScheduledLetters() {
   }
 }
 
-setInterval(deliverScheduledLetters, 60 * 1000); // 1분마다
+const letterInterval = setInterval(deliverScheduledLetters, 60 * 1000); // 1분마다
 
 // 기념일 리마인드 스케줄러 (1시간마다 체크)
 async function sendAnniversaryReminders() {
@@ -390,7 +440,7 @@ async function sendAnniversaryReminders() {
   }
 }
 
-setInterval(sendAnniversaryReminders, 3600 * 1000); // 1시간마다
+const anniversaryInterval = setInterval(sendAnniversaryReminders, 3600 * 1000); // 1시간마다
 
 // 서버 시작
 const PORT = process.env.PORT || 4000;
@@ -405,12 +455,17 @@ server.listen(PORT, '0.0.0.0', () => {
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down...');
 
+  // 스케줄러 정리
+  clearInterval(letterInterval);
+  clearInterval(anniversaryInterval);
+
   // 모든 소켓 클라이언트에게 서버 종료 알림 후 연결 해제
   io.emit('server:restart');
   io.disconnectSockets(true);
 
-  await prisma.$disconnect();
-  server.close(() => {
+  // 서버 먼저 닫고 DB 연결 해제
+  server.close(async () => {
+    await prisma.$disconnect();
     console.log('Server closed');
     process.exit(0);
   });

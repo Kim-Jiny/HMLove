@@ -22,7 +22,7 @@ class Couple {
     return Couple(
       id: json['id'] as String,
       inviteCode: json['inviteCode'] as String,
-      startDate: DateTime.parse(json['startDate'] as String),
+      startDate: DateTime.parse(json['startDate'] as String).toLocal(),
       users: usersList != null
           ? usersList
               .map((e) => User.fromJson(e as Map<String, dynamic>))
@@ -46,7 +46,10 @@ class Couple {
 
   /// Returns the number of days since the couple started dating.
   int get daysTogether {
-    return DateTime.now().difference(startDate).inDays + 1;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final start = DateTime(startDate.year, startDate.month, startDate.day);
+    return today.difference(start).inDays + 1;
   }
 
   /// Returns the partner user given the current user's ID.

@@ -18,17 +18,24 @@ const _typeToKeyPrefix = <String, String>{
   'feed_comment': 'noti_feed',
   'calendar': 'noti_calendar',
   'anniversary': 'noti_anniversary',
+  'anniversary_remind': 'noti_anniversary',
   'letter': 'noti_letter',
   'mood': 'noti_mood',
   'fight': 'noti_fight',
+  'notice': 'noti_all',
 };
 
 class PushNotificationService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   static bool _initialized = false;
 
-  /// 커플 해제 알림 수신 시 콜백 (MainShell에서 등록)
+  /// 커�� 해제 알림 수신 시 콜백 (MainShell에서 등록)
   static void Function()? onCoupleLeft;
+
+  /// 로그아웃 시 호출 — 다음 로그인에서 토큰 재동기화
+  static void reset() {
+    _initialized = false;
+  }
 
   /// 앱 시작 시 즉시 호출 — 포그라운드 시스템 푸시 억제 (iOS)
   static Future<void> suppressForegroundNotifications() async {
@@ -148,6 +155,12 @@ class PushNotificationService {
         break;
       case 'fortune':
         GoRouter.of(context).push('/fortune');
+        break;
+      case 'anniversary_remind':
+        GoRouter.of(context).go('/calendar');
+        break;
+      case 'notice':
+        GoRouter.of(context).go('/more');
         break;
       case 'inquiry':
         GoRouter.of(context).go('/more');

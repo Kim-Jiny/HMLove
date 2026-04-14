@@ -280,6 +280,12 @@ router.get('/:id/comments', async (req, res) => {
   try {
     const { id } = req.params;
 
+    // 커플 소속 확인
+    const feed = await prisma.feed.findUnique({ where: { id }, select: { coupleId: true } });
+    if (!feed || feed.coupleId !== req.user.coupleId) {
+      return res.status(404).json({ error: '피드를 찾을 수 없습니다.' });
+    }
+
     const comments = await prisma.feedComment.findMany({
       where: { feedId: id },
       orderBy: { createdAt: 'asc' },

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 
@@ -361,12 +362,19 @@ class ChatNotifier extends Notifier<ChatState> {
     _socket!.connect();
   }
 
-  /// 재연결 후 누락 메시지 동기화
+  /// 재연결 후 누락 메시지 동기화 — 마지막 메시지 ID 기반 after 파라미터 사용
   Future<void> _syncMissedMessages() async {
     if (state.messages.isEmpty) return;
     try {
+      // temp- 접두사가 아닌 서버 메시지 중 가장 최근 것
+      final lastServerMsg = state.messages
+          .where((m) => !m.id.startsWith('temp-'))
+          .firstOrNull;
+      if (lastServerMsg == null) return;
+
       final response = await _dio.get('/chat/messages', queryParameters: {
-        'limit': 30,
+        'after': lastServerMsg.id,
+        'limit': 100,
       });
       final data = response.data as Map<String, dynamic>;
       final latest = (data['messages'] as List)
@@ -390,7 +398,9 @@ class ChatNotifier extends Notifier<ChatState> {
         markAsRead();
       }
       ref.read(badgeProvider.notifier).fetchBadges();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[Chat] syncMissedMessages error: $e');
+    }
   }
 
   /// 소켓 연결 상태 확인 및 재연결
@@ -630,12 +640,32 @@ class ChatNotifier extends Notifier<ChatState> {
       final newCursor = data['nextCursor'] as String?;
       final hasMore = data['hasMore'] as bool? ?? (newCursor != null);
 
-      state = state.copyWith(
-        messages: cursor == null ? messages : [...state.messages, ...messages],
-        nextCursor: newCursor,
-        hasMore: hasMore,
-        isLoading: false,
-      );
+      if (cursor == null) {
+        state = ChatState(
+          messages: messages,
+          nextCursor: newCursor,
+          hasMore: hasMore,
+          isLoading: false,
+          isConnected: state.isConnected,
+          partnerTyping: state.partnerTyping,
+          partnerOnline: state.partnerOnline,
+        );
+      } else {
+        state = ChatState(
+          messages: [...state.messages, ...messages],
+          nextCursor: newCursor,
+          hasMore: hasMore,
+          isLoading: false,
+          isConnected: state.isConnected,
+          partnerTyping: state.partnerTyping,
+          partnerOnline: state.partnerOnline,
+          isSearchMode: state.isSearchMode,
+          searchResults: state.searchResults,
+          currentSearchIndex: state.currentSearchIndex,
+          highlightedMessageId: state.highlightedMessageId,
+          isSearching: state.isSearching,
+        );
+      }
     } on DioException catch (e) {
       final message =
           e.response?.data?['message'] as String? ?? '메시지를 불러오지 못했습니다';

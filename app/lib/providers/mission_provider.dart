@@ -91,8 +91,9 @@ class MissionNotifier extends Notifier<MissionState> {
       final weekly = data['weekly'] != null
           ? Mission.fromJson(data['weekly'] as Map<String, dynamic>)
           : null;
-      state = state.copyWith(daily: daily, weekly: weekly, isLoading: false);
-    } catch (_) {
+      state = MissionState(daily: daily, weekly: weekly, isLoading: false, completedDates: state.completedDates);
+    } catch (e) {
+      debugPrint('[Mission] fetchTodayMissions error: $e');
       state = state.copyWith(isLoading: false);
     }
   }
@@ -110,7 +111,8 @@ class MissionNotifier extends Notifier<MissionState> {
       }
       _refreshCalendar();
       return true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[Mission] completeMission error: $e');
       return false;
     }
   }
@@ -128,7 +130,8 @@ class MissionNotifier extends Notifier<MissionState> {
       }
       _refreshCalendar();
       return true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[Mission] cancelMission error: $e');
       return false;
     }
   }

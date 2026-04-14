@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -205,8 +206,8 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
                           children: [
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                imageUrls[index],
+                              child: CachedNetworkImage(
+                                imageUrl: imageUrls[index],
                                 width: 100,
                                 height: 100,
                                 fit: BoxFit.cover,
@@ -772,11 +773,11 @@ class _ImageCarouselState extends State<_ImageCarousel> {
           context,
           imageUrl: widget.imageUrls.first,
         ),
-        child: Image.network(
-          widget.imageUrls.first,
+        child: CachedNetworkImage(
+          imageUrl: widget.imageUrls.first,
           width: double.infinity,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          errorWidget: (_, __, ___) => Container(
             height: 300,
             color: Colors.grey.shade100,
             child: const Center(
@@ -805,11 +806,11 @@ class _ImageCarouselState extends State<_ImageCarousel> {
                     imageUrls: widget.imageUrls,
                     initialIndex: index,
                   ),
-                  child: Image.network(
-                    widget.imageUrls[index],
+                  child: CachedNetworkImage(
+                    imageUrl: widget.imageUrls[index],
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorWidget: (_, __, ___) => Container(
                       color: Colors.grey.shade100,
                       child: const Center(
                         child: Icon(Icons.image_not_supported_outlined,
@@ -1193,10 +1194,10 @@ class _GridTile extends StatelessWidget {
       return Stack(
         fit: StackFit.expand,
         children: [
-          Image.network(
-            feed.imageUrls.first,
+          CachedNetworkImage(
+            imageUrl: feed.imageUrls.first,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
+            errorWidget: (_, __, ___) => Container(
               color: Colors.grey.shade200,
               child: const Icon(Icons.image_not_supported_outlined,
                   color: AppTheme.textHint),

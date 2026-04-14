@@ -78,30 +78,24 @@ router.get('/', async (req, res) => {
     const mondayStr = monday.toISOString().split('T')[0];
 
     // Upsert daily mission
-    let daily = await prisma.coupleMission.findUnique({
+    const dailyPick = pickMission(DAILY_MISSIONS, coupleId, todayStr);
+    const daily = await prisma.coupleMission.upsert({
       where: { coupleId_type_date: { coupleId, type: 'DAILY', date: today } },
+      update: {},
+      create: { coupleId, type: 'DAILY', date: today, title: dailyPick.title, description: dailyPick.description, emoji: dailyPick.emoji },
     });
-    if (!daily) {
-      const pick = pickMission(DAILY_MISSIONS, coupleId, todayStr);
-      daily = await prisma.coupleMission.create({
-        data: { coupleId, type: 'DAILY', date: today, title: pick.title, description: pick.description, emoji: pick.emoji },
-      });
-    }
 
     // Upsert weekly mission
-    let weekly = await prisma.coupleMission.findUnique({
+    const weeklyPick = pickMission(WEEKLY_MISSIONS, coupleId, mondayStr);
+    const weekly = await prisma.coupleMission.upsert({
       where: { coupleId_type_date: { coupleId, type: 'WEEKLY', date: monday } },
+      update: {},
+      create: { coupleId, type: 'WEEKLY', date: monday, title: weeklyPick.title, description: weeklyPick.description, emoji: weeklyPick.emoji },
     });
-    if (!weekly) {
-      const pick = pickMission(WEEKLY_MISSIONS, coupleId, mondayStr);
-      weekly = await prisma.coupleMission.create({
-        data: { coupleId, type: 'WEEKLY', date: monday, title: pick.title, description: pick.description, emoji: pick.emoji },
-      });
-    }
 
     res.json({ daily, weekly });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ error: '처리에 실패했습니다.' });
   }
 });
 
@@ -139,7 +133,7 @@ router.patch('/:id/complete', async (req, res) => {
 
     res.json({ mission: updated });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ error: '처리에 실패했습니다.' });
   }
 });
 
@@ -165,7 +159,7 @@ router.patch('/:id/cancel', async (req, res) => {
 
     res.json({ mission: updated });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ error: '처리에 실패했습니다.' });
   }
 });
 
@@ -203,7 +197,7 @@ router.get('/calendar', async (req, res) => {
 
     res.json({ completedDates: byDate });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ error: '처리에 실패했습니다.' });
   }
 });
 
@@ -233,7 +227,7 @@ router.get('/history', async (req, res) => {
       nextCursor: hasMore ? missions[missions.length - 1].id : null,
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ error: '처리에 실패했습니다.' });
   }
 });
 

@@ -217,8 +217,8 @@ class _HMLoveAppState extends ConsumerState<HMLoveApp>
             return MediaQuery(
               data: mediaQuery.copyWith(
                 textScaler: mediaQuery.textScaler.clamp(
-                  minScaleFactor: 0.0,
-                  maxScaleFactor: 0.8,
+                  minScaleFactor: 0.8,
+                  maxScaleFactor: 1.2,
                 ),
               ),
               child: child!,

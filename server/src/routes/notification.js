@@ -27,7 +27,7 @@ router.get('/', async (req, res) => {
       nextCursor: hasMore ? notifications[notifications.length - 1].id : null,
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ error: '처리에 실패했습니다.' });
   }
 });
 
@@ -39,7 +39,7 @@ router.get('/unread-count', async (req, res) => {
     });
     res.json({ count });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ error: '처리에 실패했습니다.' });
   }
 });
 
@@ -52,20 +52,24 @@ router.patch('/read-all', async (req, res) => {
     });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ error: '처리에 실패했습니다.' });
   }
 });
 
 // 개별 읽음 처리
 router.patch('/:id/read', async (req, res) => {
   try {
+    const notification = await prisma.notification.findUnique({ where: { id: req.params.id } });
+    if (!notification || notification.userId !== req.user.id) {
+      return res.status(404).json({ error: '알림을 찾을 수 없습니다.' });
+    }
     await prisma.notification.update({
       where: { id: req.params.id },
       data: { isRead: true },
     });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ error: '알림 읽음 처리에 실패했습니다.' });
   }
 });
 

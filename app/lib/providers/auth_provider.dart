@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
+import '../core/push_notification_service.dart';
 import '../core/widget_service.dart';
 import '../models/user.dart';
 import 'couple_provider.dart';
@@ -257,6 +258,7 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> logout() async {
     await ApiClient.clearTokens();
     await WidgetService.clearData();
+    PushNotificationService.reset();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
@@ -279,6 +281,7 @@ class AuthNotifier extends Notifier<AuthState> {
     }
     await ApiClient.clearTokens();
     await WidgetService.clearData();
+    PushNotificationService.reset();
     state = AuthState(
       status: AuthStatus.unauthenticated,
       forceLogoutReason: reason,

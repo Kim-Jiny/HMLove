@@ -25,9 +25,9 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { adminId: admin.id, username: admin.username },
+      { adminId: admin.id, username: admin.username, type: 'admin' },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' },
+      { expiresIn: '24h' },
     );
 
     res.json({ token, username: admin.username });
@@ -45,7 +45,7 @@ function adminAuth(req, res, next) {
   }
   try {
     const payload = jwt.verify(auth.slice(7), process.env.JWT_SECRET);
-    if (!payload.adminId) throw new Error('Not admin token');
+    if (!payload.adminId || payload.type !== 'admin') throw new Error('Not admin token');
     req.admin = payload;
     next();
   } catch {

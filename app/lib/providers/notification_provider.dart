@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
@@ -93,7 +94,9 @@ class NotificationNotifier extends Notifier<NotificationState> {
       final response = await _dio.get('/notification/unread-count');
       final count = (response.data as Map<String, dynamic>)['count'] as int? ?? 0;
       state = state.copyWith(unreadCount: count);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[Notification] fetchUnreadCount error: $e');
+    }
   }
 
   Future<void> fetchNotifications({bool refresh = false}) async {
@@ -112,19 +115,23 @@ class NotificationNotifier extends Notifier<NotificationState> {
           .map((e) => AppNotification.fromJson(e as Map<String, dynamic>))
           .toList();
 
+      final newCursor = data['nextCursor'] as String?;
+      final hasMore = data['hasMore'] as bool? ?? false;
       if (refresh) {
-        state = state.copyWith(
+        state = NotificationState(
           notifications: list,
-          hasMore: data['hasMore'] as bool? ?? false,
-          nextCursor: data['nextCursor'] as String?,
+          hasMore: hasMore,
+          nextCursor: newCursor,
           isLoading: false,
+          unreadCount: state.unreadCount,
         );
       } else {
-        state = state.copyWith(
+        state = NotificationState(
           notifications: [...state.notifications, ...list],
-          hasMore: data['hasMore'] as bool? ?? false,
-          nextCursor: data['nextCursor'] as String?,
+          hasMore: hasMore,
+          nextCursor: newCursor,
           isLoading: false,
+          unreadCount: state.unreadCount,
         );
       }
     } catch (_) {
@@ -139,7 +146,9 @@ class NotificationNotifier extends Notifier<NotificationState> {
         notifications: state.notifications.map((n) => n.copyWith(isRead: true)).toList(),
         unreadCount: 0,
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[Notification] markAllRead error: $e');
+    }
   }
 
   Future<void> markRead(String id) async {
@@ -152,7 +161,9 @@ class NotificationNotifier extends Notifier<NotificationState> {
         }).toList(),
         unreadCount: (state.unreadCount - 1).clamp(0, 999),
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[Notification] markRead error: $e');
+    }
   }
 }
 

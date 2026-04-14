@@ -130,7 +130,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/fight/write',
         builder: (context, state) => FightWriteScreen(
-          fight: state.extra as Fight?,
+          fight: state.extra is Fight ? state.extra as Fight : null,
         ),
       ),
 
@@ -142,7 +142,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/letter/write',
         builder: (context, state) => LetterWriteScreen(
-          letter: state.extra as Letter?,
+          letter: state.extra is Letter ? state.extra as Letter : null,
         ),
       ),
       GoRoute(

@@ -46,10 +46,11 @@ function extractExifGps(buffer) {
   }
 }
 
-// GET /photo?from=2026-01-01&to=2026-02-28
+// GET /photo?from=2026-01-01&to=2026-02-28&cursor=xxx&limit=20
 router.get('/', async (req, res) => {
   try {
-    const { from, to } = req.query;
+    const { from, to, cursor } = req.query;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
     const where = { coupleId: req.user.coupleId };
 
     if (from || to) {
@@ -61,12 +62,18 @@ router.get('/', async (req, res) => {
     const photos = await prisma.photo.findMany({
       where,
       orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
       include: {
         author: { select: { id: true, nickname: true } },
       },
     });
 
-    res.json({ photos });
+    const hasMore = photos.length > limit;
+    if (hasMore) photos.pop();
+    const nextCursor = hasMore ? photos[photos.length - 1].id : null;
+
+    res.json({ photos, hasMore, nextCursor });
   } catch (err) {
     console.error('Get photos error:', err);
     res.status(500).json({ error: '사진 조회에 실패했습니다.' });
@@ -127,12 +134,15 @@ router.post(
     // EXIF GPS 추출
     const exif = extractExifGps(buffer);
 
-    // 원본 업로드
+    // 원본 EXIF 회전 적용 후 업로드
+    const rotatedBuffer = await sharp(buffer)
+      .rotate()
+      .toBuffer();
     const fileName = `photos/${timestamp}-${rand}.jpg`;
-    const imageUrl = await uploadFile(buffer, fileName, uploadedFile.mimetype);
+    const imageUrl = await uploadFile(rotatedBuffer, fileName, uploadedFile.mimetype);
 
     // 썸네일 생성 + 업로드
-    const thumbBuffer = await sharp(buffer)
+    const thumbBuffer = await sharp(rotatedBuffer)
       .resize(300, 300, { fit: 'cover' })
       .jpeg({ quality: 80 })
       .toBuffer();

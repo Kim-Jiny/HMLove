@@ -10,9 +10,12 @@ function isDelivered(letter) {
   return new Date(letter.deliveryDate) <= new Date();
 }
 
-// GET /letter
+// GET /letter?cursor=xxx&limit=20
 router.get('/', async (req, res) => {
   try {
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    const cursor = req.query.cursor;
+
     const letters = await prisma.letter.findMany({
       where: {
         coupleId: req.user.coupleId,
@@ -22,11 +25,17 @@ router.get('/', async (req, res) => {
         ],
       },
       orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
       include: {
         writer: { select: { id: true, nickname: true } },
         receiver: { select: { id: true, nickname: true } },
       },
     });
+
+    const hasMore = letters.length > limit;
+    if (hasMore) letters.pop();
+    const nextCursor = hasMore ? letters[letters.length - 1].id : null;
 
     // 아직 배달되지 않은 상대방의 편지 내용 숨기기
     const sanitized = letters.map((letter) => {
@@ -44,7 +53,7 @@ router.get('/', async (req, res) => {
       };
     });
 
-    res.json({ letters: sanitized });
+    res.json({ letters: sanitized, hasMore, nextCursor });
   } catch (err) {
     console.error('Get letters error:', err);
     res.status(500).json({ error: '편지 목록 조회에 실패했습니다.' });

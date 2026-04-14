@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
@@ -129,10 +130,10 @@ class _ChatMediaGalleryScreenState extends State<ChatMediaGalleryScreen> {
                 final item = _items[index];
                 return GestureDetector(
                   onTap: () => _openViewer(context, index),
-                  child: Image.network(
-                    item.imageUrl,
+                  child: CachedNetworkImage(
+                    imageUrl: item.imageUrl,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorWidget: (_, __, ___) => Container(
                       color: Colors.grey.shade200,
                       child: const Icon(Icons.broken_image,
                           color: AppTheme.textHint),

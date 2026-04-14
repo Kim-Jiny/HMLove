@@ -107,6 +107,8 @@ router.get('/:yearMonth', async (req, res) => {
 
     const allEvents = [...events, ...autoEvents, ...feedEvents].sort((a, b) => a.date - b.date);
 
+    // 캘린더는 실시간 소켓으로 갱신됨 — 1분 캐시
+    res.set('Cache-Control', 'private, max-age=60');
     res.json({ events: allEvents, moods: moodMap });
   } catch (err) {
     console.error('Get calendar events error:', err);

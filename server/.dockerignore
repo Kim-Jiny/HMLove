@@ -1,5 +1,8 @@
 node_modules
 .env
+.env.production
 uploads
 .git
 *.md
+firebase-service-account.json
+docker-compose.yml

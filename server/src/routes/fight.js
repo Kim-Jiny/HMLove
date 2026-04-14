@@ -6,10 +6,11 @@ import { notifyPartner } from '../utils/firebase.js';
 const router = Router();
 router.use(authenticate, requireCouple);
 
-// GET /fight?isResolved=true
+// GET /fight?isResolved=true&cursor=xxx&limit=20
 router.get('/', async (req, res) => {
   try {
-    const { isResolved } = req.query;
+    const { isResolved, cursor } = req.query;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
 
     const where = { coupleId: req.user.coupleId };
     if (isResolved !== undefined) {
@@ -19,12 +20,18 @@ router.get('/', async (req, res) => {
     const fights = await prisma.fight.findMany({
       where,
       orderBy: { date: 'desc' },
+      take: limit + 1,
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
       include: {
         author: { select: { id: true, nickname: true } },
       },
     });
 
-    res.json({ fights });
+    const hasMore = fights.length > limit;
+    if (hasMore) fights.pop();
+    const nextCursor = hasMore ? fights[fights.length - 1].id : null;
+
+    res.json({ fights, hasMore, nextCursor });
   } catch (err) {
     console.error('Get fights error:', err);
     res.status(500).json({ error: '다툼 기록 조회에 실패했습니다.' });

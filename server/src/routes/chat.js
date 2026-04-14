@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
 import { authenticate, requireCouple } from '../middleware/auth.js';
+import { uploadLimiter } from '../middleware/rateLimit.js';
 import prisma from '../utils/prisma.js';
 import { uploadFile } from '../utils/storage.js';
 
@@ -34,14 +35,38 @@ router.get('/unread-count', async (req, res) => {
   }
 });
 
-// GET /chat/messages?cursor=xxx&limit=30
+// GET /chat/messages?cursor=xxx&limit=30&after=messageId
 router.get('/messages', async (req, res) => {
   try {
-    const { cursor, limit = '30' } = req.query;
+    const { cursor, after, limit = '30' } = req.query;
     const take = Math.min(parseInt(limit), 100);
 
+    const where = { coupleId: req.user.coupleId };
+
+    // after: 특정 메시지 이후의 새 메시지만 조회 (재연결 시 누락 동기화용)
+    if (after) {
+      const afterMsg = await prisma.message.findUnique({
+        where: { id: after },
+        select: { createdAt: true },
+      });
+      if (afterMsg) {
+        where.createdAt = { gt: afterMsg.createdAt };
+      }
+
+      const messages = await prisma.message.findMany({
+        where,
+        take: take,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          sender: { select: { id: true, nickname: true, profileImage: true } },
+        },
+      });
+
+      return res.json({ messages, hasMore: false, nextCursor: null });
+    }
+
     const messages = await prisma.message.findMany({
-      where: { coupleId: req.user.coupleId },
+      where,
       take: take + 1,
       ...(cursor && { cursor: { id: cursor }, skip: 1 }),
       orderBy: { createdAt: 'desc' },
@@ -55,7 +80,7 @@ router.get('/messages', async (req, res) => {
 
     const nextCursor = hasNext ? messages[messages.length - 1].id : null;
 
-    res.json({ messages, nextCursor });
+    res.json({ messages, nextCursor, hasMore: hasNext });
   } catch (err) {
     console.error('Get messages error:', err);
     res.status(500).json({ error: '메시지 조회에 실패했습니다.' });
@@ -82,7 +107,7 @@ router.patch('/read', async (req, res) => {
 });
 
 // POST /chat/upload — 채팅 이미지 업로드 (최대 5장)
-router.post('/upload', upload.fields([{ name: 'images', maxCount: 5 }, { name: 'image', maxCount: 5 }]), async (req, res) => {
+router.post('/upload', uploadLimiter, upload.fields([{ name: 'images', maxCount: 5 }, { name: 'image', maxCount: 5 }]), async (req, res) => {
   try {
     const files = req.files?.['images'] || req.files?.['image'] || [];
     req.files = files;

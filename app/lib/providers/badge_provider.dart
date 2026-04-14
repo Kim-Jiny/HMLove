@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -35,10 +36,9 @@ class BadgeNotifier extends Notifier<BadgeState> {
   }
 
   Future<void> fetchBadges() async {
-    await Future.wait([
-      _fetchChatUnread(),
-      _fetchFeedUnseen(),
-    ]);
+    // 순차 실행으로 race condition 방지
+    await _fetchChatUnread();
+    await _fetchFeedUnseen();
   }
 
   Future<void> _fetchChatUnread() async {
@@ -46,7 +46,9 @@ class BadgeNotifier extends Notifier<BadgeState> {
       final response = await _dio.get('/chat/unread-count');
       final count = (response.data as Map<String, dynamic>)['count'] as int? ?? 0;
       state = state.copyWith(unreadChatCount: count);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[Badge] fetchChatUnread error: $e');
+    }
   }
 
   Future<void> _fetchFeedUnseen() async {
@@ -59,7 +61,9 @@ class BadgeNotifier extends Notifier<BadgeState> {
       final response = await _dio.get('/feed/unread-count', queryParameters: queryParams);
       final count = (response.data as Map<String, dynamic>)['count'] as int? ?? 0;
       state = state.copyWith(unseenFeedCount: count);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[Badge] fetchFeedUnseen error: $e');
+    }
   }
 
   void clearChatBadge() {
