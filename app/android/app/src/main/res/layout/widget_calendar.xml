@@ -109,6 +109,7 @@
         android:paddingBottom="2dp">
 
         <TextView
+            android:id="@+id/cal_weekday_sun"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -118,6 +119,7 @@
             android:textSize="10sp"
             android:textStyle="bold" />
         <TextView
+            android:id="@+id/cal_weekday_mon"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -127,6 +129,7 @@
             android:textSize="10sp"
             android:textStyle="bold" />
         <TextView
+            android:id="@+id/cal_weekday_tue"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -136,6 +139,7 @@
             android:textSize="10sp"
             android:textStyle="bold" />
         <TextView
+            android:id="@+id/cal_weekday_wed"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -145,6 +149,7 @@
             android:textSize="10sp"
             android:textStyle="bold" />
         <TextView
+            android:id="@+id/cal_weekday_thu"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -154,6 +159,7 @@
             android:textSize="10sp"
             android:textStyle="bold" />
         <TextView
+            android:id="@+id/cal_weekday_fri"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -163,6 +169,7 @@
             android:textSize="10sp"
             android:textStyle="bold" />
         <TextView
+            android:id="@+id/cal_weekday_sat"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"

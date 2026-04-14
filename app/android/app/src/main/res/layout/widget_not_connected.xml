@@ -9,12 +9,14 @@
     android:padding="16dp">
 
     <TextView
+        android:id="@+id/widget_not_connected_emoji"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="💕"
         android:textSize="36sp" />
 
     <TextView
+        android:id="@+id/widget_not_connected_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
@@ -24,6 +26,7 @@
         android:textStyle="bold" />
 
     <TextView
+        android:id="@+id/widget_not_connected_message"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"

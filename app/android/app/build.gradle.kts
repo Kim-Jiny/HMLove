@@ -58,3 +58,24 @@ android {
 flutter {
     source = "../.."
 }
+
+val generatedRegistrant = file("src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java")
+
+tasks.withType<JavaCompile>().configureEach {
+    // Flutter regenerates this file into src/main/java, but compiling it
+    // directly can fail for some plugin variants. We provide our own
+    // reflective registrant from src/main/kotlin instead.
+    doFirst {
+        if (generatedRegistrant.exists()) {
+            generatedRegistrant.delete()
+        }
+    }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    doFirst {
+        if (generatedRegistrant.exists()) {
+            generatedRegistrant.delete()
+        }
+    }
+}

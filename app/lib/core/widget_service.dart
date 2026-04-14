@@ -47,7 +47,9 @@ class WidgetService {
         HomeWidget.saveWidgetData('nextAnniversaryName', nextAnniversaryName),
       if (nextAnniversaryDaysLeft != null)
         HomeWidget.saveWidgetData(
-            'nextAnniversaryDaysLeft', nextAnniversaryDaysLeft),
+          'nextAnniversaryDaysLeft',
+          nextAnniversaryDaysLeft,
+        ),
     ]);
     await _refresh();
   }
@@ -55,7 +57,9 @@ class WidgetService {
   /// Clear widget data on logout
   static Future<void> clearData() async {
     final calendarMonths = await _loadTrackedMonths(_calendarEventMonthsKey);
-    final deviceMonths = await _loadTrackedMonths(_deviceCalendarEventMonthsKey);
+    final deviceMonths = await _loadTrackedMonths(
+      _deviceCalendarEventMonthsKey,
+    );
 
     final clears = <Future<bool?>>[
       HomeWidget.saveWidgetData('isConnected', false),
@@ -112,8 +116,7 @@ class WidgetService {
 
   /// Update today's schedule text for medium widget
   static Future<void> updateTodaySchedule(String? schedule) async {
-    await HomeWidget.saveWidgetData(
-        'todaySchedule', schedule ?? '');
+    await HomeWidget.saveWidgetData('todaySchedule', schedule ?? '');
     await _refresh();
   }
 
@@ -127,11 +130,12 @@ class WidgetService {
   /// we intentionally do NOT overwrite it here — doing so would snap the
   /// widget back to the current month whenever the app pushes data.
   static Future<void> updateCalendarEvents(
-      List<Map<String, dynamic>> events, String yearMonth) async {
+    List<Map<String, dynamic>> events,
+    String yearMonth,
+  ) async {
     final jsonStr = jsonEncode(events);
     final now = DateTime.now();
-    final currentYm =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final currentYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final futures = <Future<void>>[
       HomeWidget.saveWidgetData('calendarEvents_$yearMonth', jsonStr),
       _trackMonth(_calendarEventMonthsKey, yearMonth),
@@ -154,7 +158,9 @@ class WidgetService {
   /// Stored under `deviceCalendarEvents_{yearMonth}` so the widget can merge
   /// them with the server events at render time.
   static Future<void> updateDeviceCalendarEvents(
-      List<Map<String, dynamic>> events, String yearMonth) async {
+    List<Map<String, dynamic>> events,
+    String yearMonth,
+  ) async {
     await Future.wait([
       HomeWidget.saveWidgetData(
         'deviceCalendarEvents_$yearMonth',
@@ -216,23 +222,5 @@ class WidgetService {
       'stressed': '😩',
     };
     return map[key] ?? '😶';
-  }
-
-  static String _moodLabel(String? key) {
-    const map = {
-      'happy': '행복해',
-      'love': '사랑해',
-      'excited': '신나',
-      'grateful': '감사해',
-      'peaceful': '평온해',
-      'proud': '뿌듯해',
-      'missing': '보고싶어',
-      'bored': '심심해',
-      'sad': '슬퍼',
-      'angry': '화나',
-      'tired': '피곤해',
-      'stressed': '스트레스',
-    };
-    return map[key] ?? '설정 안 됨';
   }
 }

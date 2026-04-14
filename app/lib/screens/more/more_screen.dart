@@ -42,7 +42,11 @@ class MoreScreen extends ConsumerWidget {
           children: [
             const Text(
               '아래 코드를 상대방에게 공유하세요.\n상대방이 코드를 입력하면 자동으로 연결됩니다.',
-              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, height: 1.5),
+              style: TextStyle(
+                fontSize: 13,
+                color: AppTheme.textSecondary,
+                height: 1.5,
+              ),
             ),
             const SizedBox(height: 20),
             Container(
@@ -73,8 +77,11 @@ class MoreScreen extends ConsumerWidget {
                       Clipboard.setData(ClipboardData(text: code));
                       showTopSnackBar(ctx, '초대 코드가 복사되었습니다');
                     },
-                    icon: const Icon(Icons.copy,
-                        color: AppTheme.primaryColor, size: 20),
+                    icon: const Icon(
+                      Icons.copy,
+                      color: AppTheme.primaryColor,
+                      size: 20,
+                    ),
                     tooltip: '복사',
                   ),
                 ],
@@ -208,7 +215,9 @@ class MoreScreen extends ConsumerWidget {
         final controller = TextEditingController();
         return StatefulBuilder(
           builder: (ctx, setState) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: const Text(
               '최종 확인',
               style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
@@ -276,7 +285,8 @@ class MoreScreen extends ConsumerWidget {
     try {
       final dio = ref.read(dioProvider);
       final res = await dio.get('/couple/members');
-      memberCount = (res.data as Map<String, dynamic>)['memberCount'] as int? ?? 2;
+      memberCount =
+          (res.data as Map<String, dynamic>)['memberCount'] as int? ?? 2;
     } catch (_) {}
 
     final isLastMember = memberCount <= 1;
@@ -307,10 +317,7 @@ class MoreScreen extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              '다음',
-              style: TextStyle(color: Colors.red.shade400),
-            ),
+            child: Text('다음', style: TextStyle(color: Colors.red.shade400)),
           ),
         ],
       ),
@@ -323,10 +330,16 @@ class MoreScreen extends ConsumerWidget {
       final step2 = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 28),
+              Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.red.shade700,
+                size: 28,
+              ),
               const SizedBox(width: 8),
               Text('데이터 삭제 경고', style: TextStyle(color: Colors.red.shade700)),
             ],
@@ -383,10 +396,15 @@ class MoreScreen extends ConsumerWidget {
           final controller = TextEditingController();
           return StatefulBuilder(
             builder: (ctx, setState) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               title: const Text(
                 '최종 확인',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -418,9 +436,7 @@ class MoreScreen extends ConsumerWidget {
                   onPressed: controller.text.trim() == '해제'
                       ? () => Navigator.pop(ctx, true)
                       : null,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.red,
-                  ),
+                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
                   child: const Text('커플 해제'),
                 ),
               ],
@@ -455,9 +471,7 @@ class MoreScreen extends ConsumerWidget {
     ref.read(unreadInquiryCountProvider.notifier).fetch();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('더보기'),
-      ),
+      appBar: AppBar(title: const Text('더보기')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -480,8 +494,9 @@ class MoreScreen extends ConsumerWidget {
                     children: [
                       CircleAvatar(
                         radius: 30,
-                        backgroundColor:
-                            AppTheme.primaryLight.withValues(alpha: 0.3),
+                        backgroundColor: AppTheme.primaryLight.withValues(
+                          alpha: 0.3,
+                        ),
                         backgroundImage: user?.profileImage != null
                             ? NetworkImage(user!.profileImage!)
                             : null,
@@ -542,10 +557,7 @@ class MoreScreen extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      const Icon(
-                        Icons.chevron_right,
-                        color: AppTheme.textHint,
-                      ),
+                      const Icon(Icons.chevron_right, color: AppTheme.textHint),
                     ],
                   ),
                 ),
@@ -568,8 +580,10 @@ class MoreScreen extends ConsumerWidget {
                           color: AppTheme.primaryColor.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.person_add,
-                            color: AppTheme.primaryColor),
+                        child: const Icon(
+                          Icons.person_add,
+                          color: AppTheme.primaryColor,
+                        ),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -596,12 +610,19 @@ class MoreScreen extends ConsumerWidget {
                       ),
                       FilledButton(
                         onPressed: () => _showInviteCode(
-                            context, coupleState.couple!.inviteCode),
+                          context,
+                          coupleState.couple!.inviteCode,
+                        ),
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
                         ),
-                        child: const Text('코드 보기', style: TextStyle(fontSize: 13)),
+                        child: const Text(
+                          '코드 보기',
+                          style: TextStyle(fontSize: 13),
+                        ),
                       ),
                     ],
                   ),
@@ -828,18 +849,12 @@ class _InfoRow extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 13,
-            color: AppTheme.textSecondary,
-          ),
+          style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
         ),
         const SizedBox(width: 12),
         Text(
           value,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-          ),
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
         ),
       ],
     );
@@ -933,11 +948,7 @@ class _MenuTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(
-              Icons.chevron_right,
-              color: AppTheme.textHint,
-              size: 20,
-            ),
+            const Icon(Icons.chevron_right, color: AppTheme.textHint, size: 20),
           ],
         ),
       ),

@@ -161,6 +161,7 @@ class ChatNotifier extends Notifier<ChatState> {
   IO.Socket? _socket;
   bool _chatScreenActive = false;
   bool _hasConnectedOnce = false;
+  bool _recoverStateOnNextConnect = false;
 
   @override
   ChatState build() {
@@ -175,10 +176,11 @@ class ChatNotifier extends Notifier<ChatState> {
   }
 
   /// Connect to the Socket.io server.
-  void connect(String token) {
+  void connect(String token, {bool recoverState = false}) {
     _socket?.dispose();
 
     _hasConnectedOnce = false;
+    _recoverStateOnNextConnect = recoverState;
 
     _socket = IO.io(
       AppConstants.socketUrl,
@@ -195,11 +197,14 @@ class ChatNotifier extends Notifier<ChatState> {
 
     _socket!.onConnect((_) {
       final wasConnectedBefore = _hasConnectedOnce;
+      final shouldRecoverState = _recoverStateOnNextConnect;
       _hasConnectedOnce = true;
+      _recoverStateOnNextConnect = false;
       state = state.copyWith(isConnected: true);
-      // 재연결 시에만 누락된 메시지 동기화
-      if (wasConnectedBefore) {
+      // 재연결 또는 서버 재시작 후 복구 시 상태 동기화
+      if (wasConnectedBefore || shouldRecoverState) {
         _syncMissedMessages();
+        _refreshRealtimeState();
       }
     });
 
@@ -209,6 +214,11 @@ class ChatNotifier extends Notifier<ChatState> {
 
     _socket!.onConnectError((_) {
       state = state.copyWith(isConnected: false);
+    });
+
+    _socket!.on('server:restart', (_) {
+      state = state.copyWith(isConnected: false);
+      _recoverStateOnNextConnect = true;
     });
 
     _socket!.on('message:new', (data) {
@@ -228,9 +238,7 @@ class ChatNotifier extends Notifier<ChatState> {
           // 상대방 메시지 (또는 tempId 없는 경우) → 앞에 추가
           // 중복 방지
           if (!state.messages.any((m) => m.id == message.id)) {
-            state = state.copyWith(
-              messages: [message, ...state.messages],
-            );
+            state = state.copyWith(messages: [message, ...state.messages]);
           }
         }
         // 상대방 메시지면 뱃지 갱신 + 채팅 화면 활성 시에만 읽음 처리
@@ -263,7 +271,9 @@ class ChatNotifier extends Notifier<ChatState> {
     _socket!.on('message:deleted', (data) {
       if (data != null) {
         final messageId = (data as Map<String, dynamic>)['messageId'] as String;
-        final updated = state.messages.where((msg) => msg.id != messageId).toList();
+        final updated = state.messages
+            .where((msg) => msg.id != messageId)
+            .toList();
         state = state.copyWith(messages: updated);
       }
     });
@@ -372,10 +382,10 @@ class ChatNotifier extends Notifier<ChatState> {
           .firstOrNull;
       if (lastServerMsg == null) return;
 
-      final response = await _dio.get('/chat/messages', queryParameters: {
-        'after': lastServerMsg.id,
-        'limit': 100,
-      });
+      final response = await _dio.get(
+        '/chat/messages',
+        queryParameters: {'after': lastServerMsg.id, 'limit': 100},
+      );
       final data = response.data as Map<String, dynamic>;
       final latest = (data['messages'] as List)
           .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
@@ -385,12 +395,12 @@ class ChatNotifier extends Notifier<ChatState> {
 
       // 기존 메시지에 없는 새 메시지만 병합
       final existingIds = state.messages.map((m) => m.id).toSet();
-      final newMessages = latest.where((m) => !existingIds.contains(m.id)).toList();
+      final newMessages = latest
+          .where((m) => !existingIds.contains(m.id))
+          .toList();
 
       if (newMessages.isNotEmpty) {
-        state = state.copyWith(
-          messages: [...newMessages, ...state.messages],
-        );
+        state = state.copyWith(messages: [...newMessages, ...state.messages]);
       }
 
       // 채팅 화면 활성 시 읽음 처리
@@ -400,6 +410,24 @@ class ChatNotifier extends Notifier<ChatState> {
       ref.read(badgeProvider.notifier).fetchBadges();
     } catch (e) {
       debugPrint('[Chat] syncMissedMessages error: $e');
+    }
+  }
+
+  /// 재연결 후 실시간 의존 상태들을 전체 새로고침한다.
+  Future<void> _refreshRealtimeState() async {
+    final month =
+        '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}';
+
+    try {
+      await Future.wait([
+        ref.read(feedProvider.notifier).fetchFeeds(refresh: true),
+        ref.read(missionProvider.notifier).fetchTodayMissions(),
+        ref.read(missionProvider.notifier).fetchCalendarMissions(month),
+        ref.read(calendarProvider.notifier).refreshCurrentMonth(),
+        ref.read(badgeProvider.notifier).fetchBadges(),
+      ]);
+    } catch (e) {
+      debugPrint('[Chat] refreshRealtimeState error: $e');
     }
   }
 
@@ -414,7 +442,7 @@ class ChatNotifier extends Notifier<ChatState> {
       // 기존 소켓 정리 후 새 토큰으로 완전히 재연결
       _socket!.dispose();
       _socket = null;
-      connect(token);
+      connect(token, recoverState: true);
     }
   }
 
@@ -480,17 +508,12 @@ class ChatNotifier extends Notifier<ChatState> {
 
   /// Edit a message via socket.
   void editMessage({required String messageId, required String content}) {
-    _socket?.emit('message:edit', {
-      'messageId': messageId,
-      'content': content,
-    });
+    _socket?.emit('message:edit', {'messageId': messageId, 'content': content});
   }
 
   /// Delete a message via socket.
   void deleteMessage({required String messageId}) {
-    _socket?.emit('message:delete', {
-      'messageId': messageId,
-    });
+    _socket?.emit('message:delete', {'messageId': messageId});
   }
 
   /// Notify the server that the user is typing.
@@ -545,10 +568,10 @@ class ChatNotifier extends Notifier<ChatState> {
     state = state.copyWith(isSearching: true);
 
     try {
-      final response = await _dio.get('/chat/search', queryParameters: {
-        'q': query.trim(),
-        'limit': 50,
-      });
+      final response = await _dio.get(
+        '/chat/search',
+        queryParameters: {'q': query.trim(), 'limit': 50},
+      );
       final data = response.data as Map<String, dynamic>;
       final messages = (data['messages'] as List)
           .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
@@ -568,8 +591,7 @@ class ChatNotifier extends Notifier<ChatState> {
   /// Returns the target index in the loaded messages list.
   Future<int> jumpToMessage(String messageId) async {
     try {
-      final response =
-          await _dio.get('/chat/messages/around/$messageId');
+      final response = await _dio.get('/chat/messages/around/$messageId');
       final data = response.data as Map<String, dynamic>;
       final messages = (data['messages'] as List)
           .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
@@ -630,8 +652,10 @@ class ChatNotifier extends Notifier<ChatState> {
         if (cursor != null) 'cursor': cursor,
       };
 
-      final response =
-          await _dio.get('/chat/messages', queryParameters: queryParams);
+      final response = await _dio.get(
+        '/chat/messages',
+        queryParameters: queryParams,
+      );
       final data = response.data as Map<String, dynamic>;
       final messagesJson = data['messages'] as List<dynamic>;
       final messages = messagesJson
@@ -671,10 +695,7 @@ class ChatNotifier extends Notifier<ChatState> {
           e.response?.data?['message'] as String? ?? '메시지를 불러오지 못했습니다';
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: '알 수 없는 오류가 발생했습니다',
-      );
+      state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
     }
   }
 }

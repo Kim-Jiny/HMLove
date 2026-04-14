@@ -11,6 +11,8 @@ import SwiftUI
 @main
 struct HMLoveWidgetBundle: WidgetBundle {
     var body: some Widget {
-        HMLoveWidget()
+        if #available(iOS 17.0, *) {
+            HMLoveWidget()
+        }
     }
 }

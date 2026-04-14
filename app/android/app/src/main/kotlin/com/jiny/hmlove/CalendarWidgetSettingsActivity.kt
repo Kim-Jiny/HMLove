@@ -14,39 +14,86 @@ import android.widget.SeekBar
 import android.widget.TextView
 import es.antonborri.home_widget.HomeWidgetPlugin
 
+data class CalendarWidgetThemeOption(
+    val id: String,
+    val name: String,
+    val bgRgb: Int,
+    val primary: Int,
+    val textPrimary: Int,
+    val textSecondary: Int
+)
+
 /**
  * Dialog-style activity launched from the calendar widget's settings button.
- * Lets the user pick a preset background color and adjust the widget's
- * background alpha. The selection is stored in the `home_widget` SharedPreferences
- * under keys `widgetBgArgb` (Int, ARGB), and then an explicit widget update is
- * triggered so the change takes effect immediately.
+ * Lets the user pick a readable color theme and adjust only the widget
+ * background alpha. The selection is stored in the `home_widget`
+ * SharedPreferences and then an explicit widget update is triggered so the
+ * change takes effect immediately.
  */
 class CalendarWidgetSettingsActivity : Activity() {
 
     companion object {
         const val PREF_KEY_BG_ARGB = "widgetBgArgb"
-        private const val STATE_SELECTED_RGB = "selectedRgb"
+        const val PREF_KEY_THEME_ID = "widgetCalendarThemeId"
+        private const val STATE_SELECTED_THEME_ID = "selectedThemeId"
         private const val STATE_SELECTED_ALPHA = "selectedAlpha"
 
-        // Preset palette — order mirrors swatch_0..swatch_11 in the layout.
-        // Alpha channel here is ignored at selection time; the SeekBar controls alpha.
-        private val PRESET_COLORS = intArrayOf(
-            0xFFFFFFFF.toInt(), // white
-            0xFFFFE4EC.toInt(), // soft pink (default-ish)
-            0xFFE91E63.toInt(), // pink
-            0xFFF44336.toInt(), // red
-            0xFFFF9800.toInt(), // orange
-            0xFFFFEB3B.toInt(), // yellow
-            0xFF4CAF50.toInt(), // green
-            0xFF2196F3.toInt(), // blue
-            0xFF673AB7.toInt(), // purple
-            0xFF795548.toInt(), // brown
-            0xFF9E9E9E.toInt(), // gray
-            0xFF212121.toInt()  // near-black
+        val THEMES = arrayOf(
+            CalendarWidgetThemeOption(
+                id = "blush",
+                name = "러브",
+                bgRgb = 0xFFFFF5F8.toInt(),
+                primary = 0xFFE91E63.toInt(),
+                textPrimary = 0xFF424242.toInt(),
+                textSecondary = 0xFF8E6B75.toInt()
+            ),
+            CalendarWidgetThemeOption(
+                id = "clean",
+                name = "화이트",
+                bgRgb = 0xFFFFFFFF.toInt(),
+                primary = 0xFFE91E63.toInt(),
+                textPrimary = 0xFF303030.toInt(),
+                textSecondary = 0xFF757575.toInt()
+            ),
+            CalendarWidgetThemeOption(
+                id = "charcoal",
+                name = "차콜",
+                bgRgb = 0xFF242124.toInt(),
+                primary = 0xFFFF7AA8.toInt(),
+                textPrimary = 0xFFFFF7FA.toInt(),
+                textSecondary = 0xFFE9B8C8.toInt()
+            ),
+            CalendarWidgetThemeOption(
+                id = "mint",
+                name = "민트",
+                bgRgb = 0xFFF0FFF8.toInt(),
+                primary = 0xFF00856F.toInt(),
+                textPrimary = 0xFF20302B.toInt(),
+                textSecondary = 0xFF53766B.toInt()
+            ),
+            CalendarWidgetThemeOption(
+                id = "sky",
+                name = "스카이",
+                bgRgb = 0xFFF3FAFF.toInt(),
+                primary = 0xFF1D6FD6.toInt(),
+                textPrimary = 0xFF25313D.toInt(),
+                textSecondary = 0xFF5D728A.toInt()
+            ),
+            CalendarWidgetThemeOption(
+                id = "mono",
+                name = "모노",
+                bgRgb = 0xFFF6F6F6.toInt(),
+                primary = 0xFF555555.toInt(),
+                textPrimary = 0xFF252525.toInt(),
+                textSecondary = 0xFF6D6D6D.toInt()
+            )
         )
+
+        fun themeFor(id: String?): CalendarWidgetThemeOption =
+            THEMES.firstOrNull { it.id == id } ?: THEMES.first()
     }
 
-    private var selectedRgb: Int = 0xFFFFFFFF.toInt()
+    private var selectedThemeId: String = THEMES.first().id
     private var selectedAlpha: Int = 255 // 0..255
 
     private lateinit var swatchViews: Array<View>
@@ -63,34 +110,40 @@ class CalendarWidgetSettingsActivity : Activity() {
         // Restore in-progress selection if this is a recreated instance (e.g. rotation),
         // otherwise seed UI from the saved preference (or defaults).
         if (savedInstanceState != null) {
-            selectedRgb = savedInstanceState.getInt(STATE_SELECTED_RGB, 0xFFFFFFFF.toInt())
             selectedAlpha = savedInstanceState.getInt(STATE_SELECTED_ALPHA, 255)
+            selectedThemeId = savedInstanceState.getString(
+                STATE_SELECTED_THEME_ID,
+                THEMES.first().id
+            ) ?: THEMES.first().id
         } else if (prefs.contains(PREF_KEY_BG_ARGB)) {
             val argb = prefs.getInt(PREF_KEY_BG_ARGB, 0xFFFFFFFF.toInt())
             selectedAlpha = Color.alpha(argb)
-            selectedRgb = (argb and 0x00FFFFFF) or 0xFF000000.toInt()
+            selectedThemeId = prefs.getString(PREF_KEY_THEME_ID, null)
+                ?: themeIdForLegacyColor(argb)
+        } else {
+            selectedThemeId = prefs.getString(PREF_KEY_THEME_ID, THEMES.first().id)
+                ?: THEMES.first().id
         }
 
-        // Bind swatches
+        // Bind theme swatches
         swatchViews = arrayOf(
             findViewById(R.id.swatch_0),
             findViewById(R.id.swatch_1),
             findViewById(R.id.swatch_2),
             findViewById(R.id.swatch_3),
             findViewById(R.id.swatch_4),
-            findViewById(R.id.swatch_5),
-            findViewById(R.id.swatch_6),
-            findViewById(R.id.swatch_7),
-            findViewById(R.id.swatch_8),
-            findViewById(R.id.swatch_9),
-            findViewById(R.id.swatch_10),
-            findViewById(R.id.swatch_11)
+            findViewById(R.id.swatch_5)
         )
         for ((i, v) in swatchViews.withIndex()) {
-            val color = PRESET_COLORS[i]
-            v.background = makeSwatchDrawable(color, selected = false)
+            val theme = THEMES[i]
+            if (v is TextView) {
+                v.text = theme.name
+                v.setTextColor(theme.textPrimary)
+                v.contentDescription = "${theme.name} 테마"
+            }
+            v.background = makeSwatchDrawable(theme, selected = false)
             v.setOnClickListener {
-                selectedRgb = PRESET_COLORS[i]
+                selectedThemeId = theme.id
                 refreshSwatchSelection()
                 updatePreview()
             }
@@ -120,8 +173,12 @@ class CalendarWidgetSettingsActivity : Activity() {
 
         // Buttons
         findViewById<Button>(R.id.btn_apply).setOnClickListener {
-            val argb = (selectedAlpha shl 24) or (selectedRgb and 0x00FFFFFF)
-            prefs.edit().putInt(PREF_KEY_BG_ARGB, argb).apply()
+            val theme = themeFor(selectedThemeId)
+            val argb = (selectedAlpha shl 24) or (theme.bgRgb and 0x00FFFFFF)
+            prefs.edit()
+                .putString(PREF_KEY_THEME_ID, theme.id)
+                .putInt(PREF_KEY_BG_ARGB, argb)
+                .commit()
             triggerWidgetUpdate()
             finish()
         }
@@ -129,7 +186,10 @@ class CalendarWidgetSettingsActivity : Activity() {
             finish()
         }
         findViewById<Button>(R.id.btn_reset).setOnClickListener {
-            prefs.edit().remove(PREF_KEY_BG_ARGB).apply()
+            prefs.edit()
+                .remove(PREF_KEY_THEME_ID)
+                .remove(PREF_KEY_BG_ARGB)
+                .commit()
             triggerWidgetUpdate()
             finish()
         }
@@ -137,7 +197,7 @@ class CalendarWidgetSettingsActivity : Activity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        outState.putInt(STATE_SELECTED_RGB, selectedRgb)
+        outState.putString(STATE_SELECTED_THEME_ID, selectedThemeId)
         outState.putInt(STATE_SELECTED_ALPHA, selectedAlpha)
     }
 
@@ -146,38 +206,67 @@ class CalendarWidgetSettingsActivity : Activity() {
 
     private fun refreshSwatchSelection() {
         for ((i, v) in swatchViews.withIndex()) {
-            val color = PRESET_COLORS[i]
-            val selected = color == selectedRgb
-            v.background = makeSwatchDrawable(color, selected)
+            val theme = THEMES[i]
+            val selected = theme.id == selectedThemeId
+            v.background = makeSwatchDrawable(theme, selected)
         }
     }
 
-    private fun makeSwatchDrawable(color: Int, selected: Boolean): GradientDrawable {
+    private fun makeSwatchDrawable(theme: CalendarWidgetThemeOption, selected: Boolean): GradientDrawable {
         return GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(color)
+            shape = GradientDrawable.RECTANGLE
+            setColor(theme.bgRgb)
+            cornerRadius = dpToPx(8f).toFloat()
             val strokeWidth = dpToPx(if (selected) 3f else 1f)
-            val strokeColor = if (selected) 0xFFE91E63.toInt() else 0xFFBDBDBD.toInt()
+            val strokeColor = if (selected) theme.primary else 0xFFBDBDBD.toInt()
             setStroke(strokeWidth, strokeColor)
         }
     }
 
     private fun updatePreview() {
-        val argb = (selectedAlpha shl 24) or (selectedRgb and 0x00FFFFFF)
+        val theme = themeFor(selectedThemeId)
+        val argb = (selectedAlpha shl 24) or (theme.bgRgb and 0x00FFFFFF)
         val bg = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             setColor(argb)
             cornerRadius = dpToPx(10f).toFloat()
         }
         previewBox.background = bg
+
+        findViewById<TextView>(R.id.preview_title).setTextColor(theme.primary)
+        findViewById<TextView>(R.id.preview_month).setTextColor(theme.textPrimary)
+        findViewById<TextView>(R.id.preview_day).setTextColor(theme.textSecondary)
+    }
+
+    private fun themeIdForLegacyColor(argb: Int): String {
+        val rgb = (argb and 0x00FFFFFF) or 0xFF000000.toInt()
+        return THEMES.minByOrNull { colorDistance(rgb, it.bgRgb) }?.id ?: THEMES.first().id
+    }
+
+    private fun colorDistance(a: Int, b: Int): Int {
+        val dr = Color.red(a) - Color.red(b)
+        val dg = Color.green(a) - Color.green(b)
+        val db = Color.blue(a) - Color.blue(b)
+        return dr * dr + dg * dg + db * db
     }
 
     private fun triggerWidgetUpdate() {
         val appWidgetManager = AppWidgetManager.getInstance(this)
-        val component = ComponentName(this, HMLoveCalendarWidgetProvider::class.java)
-        val ids = appWidgetManager.getAppWidgetIds(component)
-        if (ids.isNotEmpty()) {
-            val intent = Intent(this, HMLoveCalendarWidgetProvider::class.java).apply {
+        val targets = listOf(
+            HMLoveWidgetProvider::class.java to HMLoveWidgetProvider(),
+            HMLoveSmallWidgetProvider::class.java to HMLoveSmallWidgetProvider(),
+            HMLoveCalendarWidgetProvider::class.java to HMLoveCalendarWidgetProvider()
+        )
+
+        for ((providerClass, provider) in targets) {
+            val ids = appWidgetManager.getAppWidgetIds(ComponentName(this, providerClass))
+            if (ids.isEmpty()) continue
+
+            // Update immediately so the saved alpha/theme is reflected without
+            // waiting for the launcher to dispatch the widget-update broadcast.
+            provider.onUpdate(this, appWidgetManager, ids)
+
+            val intent = Intent(this, providerClass).apply {
                 action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
             }

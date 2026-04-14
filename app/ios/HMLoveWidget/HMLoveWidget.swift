@@ -15,6 +15,58 @@ private let calendarAppGroupId = "group.com.jiny.hmlove"
 private let calendarMonthKey = "calendarYearMonth"
 private let calendarEventMonthsKey = "widgetCalendarEventMonths"
 
+struct CalendarWidgetTheme {
+    let id: String
+    let backgroundHex: String
+    let primaryHex: String
+    let textPrimaryHex: String
+    let textSecondaryHex: String
+
+    static let themes: [CalendarWidgetTheme] = [
+        CalendarWidgetTheme(id: "blush", backgroundHex: "FFF5F8", primaryHex: "E91E63", textPrimaryHex: "424242", textSecondaryHex: "8E6B75"),
+        CalendarWidgetTheme(id: "clean", backgroundHex: "FFFFFF", primaryHex: "E91E63", textPrimaryHex: "303030", textSecondaryHex: "757575"),
+        CalendarWidgetTheme(id: "charcoal", backgroundHex: "242124", primaryHex: "FF7AA8", textPrimaryHex: "FFF7FA", textSecondaryHex: "E9B8C8"),
+        CalendarWidgetTheme(id: "mint", backgroundHex: "F0FFF8", primaryHex: "00856F", textPrimaryHex: "20302B", textSecondaryHex: "53766B"),
+        CalendarWidgetTheme(id: "sky", backgroundHex: "F3FAFF", primaryHex: "1D6FD6", textPrimaryHex: "25313D", textSecondaryHex: "5D728A"),
+        CalendarWidgetTheme(id: "mono", backgroundHex: "F6F6F6", primaryHex: "555555", textPrimaryHex: "252525", textSecondaryHex: "6D6D6D")
+    ]
+
+    static let defaultTheme = themes[0]
+
+    static func theme(for id: String?) -> CalendarWidgetTheme {
+        themes.first { $0.id == id } ?? defaultTheme
+    }
+}
+
+@available(iOS 17.0, *)
+enum WidgetThemeOption: String, AppEnum {
+    case blush
+    case clean
+    case charcoal
+    case mint
+    case sky
+    case mono
+
+    static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "테마")
+    static var caseDisplayRepresentations: [WidgetThemeOption: DisplayRepresentation] = [
+        .blush: DisplayRepresentation(title: "러브"),
+        .clean: DisplayRepresentation(title: "화이트"),
+        .charcoal: DisplayRepresentation(title: "차콜"),
+        .mint: DisplayRepresentation(title: "민트"),
+        .sky: DisplayRepresentation(title: "스카이"),
+        .mono: DisplayRepresentation(title: "모노"),
+    ]
+}
+
+@available(iOS 17.0, *)
+struct HMLoveWidgetConfigurationIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource = "위젯 설정"
+    static var description = IntentDescription("우리연애 위젯 테마를 선택합니다.")
+
+    @Parameter(title: "테마")
+    var theme: WidgetThemeOption?
+}
+
 @available(iOS 16.0, *)
 private func calendarMonthFormatter() -> DateFormatter {
     let formatter = DateFormatter()
@@ -135,6 +187,7 @@ struct CoupleData {
     let todaySchedule: String
     let calendarEvents: [CalendarEventData]
     let calendarYearMonth: String
+    let calendarTheme: CalendarWidgetTheme
 
     static let placeholder = CoupleData(
         isConnected: true,
@@ -148,7 +201,8 @@ struct CoupleData {
         partnerMoodEmoji: "😊",
         todaySchedule: "데이트 약속",
         calendarEvents: [],
-        calendarYearMonth: ""
+        calendarYearMonth: "",
+        calendarTheme: .defaultTheme
     )
 
     static let notConnected = CoupleData(
@@ -159,7 +213,8 @@ struct CoupleData {
         myMoodEmoji: "", partnerMoodEmoji: "",
         todaySchedule: "",
         calendarEvents: [],
-        calendarYearMonth: ""
+        calendarYearMonth: "",
+        calendarTheme: .defaultTheme
     )
 }
 
@@ -170,21 +225,23 @@ struct CoupleEntry: TimelineEntry {
     let data: CoupleData
 }
 
-struct CoupleTimelineProvider: TimelineProvider {
+@available(iOS 17.0, *)
+struct CoupleTimelineProvider: AppIntentTimelineProvider {
+    typealias Intent = HMLoveWidgetConfigurationIntent
     let appGroupId = "group.com.jiny.hmlove"
 
     func placeholder(in context: Context) -> CoupleEntry {
         CoupleEntry(date: Date(), data: .placeholder)
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (CoupleEntry) -> Void) {
-        completion(CoupleEntry(date: Date(), data: loadData()))
+    func snapshot(for configuration: HMLoveWidgetConfigurationIntent, in context: Context) async -> CoupleEntry {
+        CoupleEntry(date: Date(), data: loadData(configuration: configuration))
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<CoupleEntry>) -> Void) {
-        // Try to fetch fresh data from server
-        fetchFromServer { serverData in
-            let data = serverData ?? self.loadData()
+    func timeline(for configuration: HMLoveWidgetConfigurationIntent, in context: Context) async -> Timeline<CoupleEntry> {
+        await withCheckedContinuation { continuation in
+            fetchFromServer(configuration: configuration) { serverData in
+            let data = serverData ?? self.loadData(configuration: configuration)
             let now = Date()
             let calendar = Calendar.current
 
@@ -200,18 +257,22 @@ struct CoupleTimelineProvider: TimelineProvider {
             // If midnight is within 30 min, create an entry for midnight with recalculated data
             var entries = [currentEntry]
             if nextMidnight.timeIntervalSince(now) < 30 * 60 {
-                let midnightData = self.loadData()
+                let midnightData = self.loadData(configuration: configuration)
                 entries.append(CoupleEntry(date: nextMidnight, data: midnightData))
                 // After midnight entry, schedule next refresh 30 min later
                 nextMidnight = calendar.date(byAdding: .minute, value: 30, to: nextMidnight)!
             }
 
             let timeline = Timeline(entries: entries, policy: .after(nextUpdate))
-            completion(timeline)
+                continuation.resume(returning: timeline)
+            }
         }
     }
 
-    private func fetchFromServer(completion: @escaping (CoupleData?) -> Void) {
+    private func fetchFromServer(
+        configuration: HMLoveWidgetConfigurationIntent,
+        completion: @escaping (CoupleData?) -> Void
+    ) {
         guard let defaults = UserDefaults(suiteName: appGroupId),
               let token = defaults.string(forKey: "authToken"),
               let baseUrl = defaults.string(forKey: "apiBaseUrl"),
@@ -307,7 +368,7 @@ struct CoupleTimelineProvider: TimelineProvider {
                 }
             }
 
-            completion(self.loadData())
+            completion(self.loadData(configuration: configuration))
         }.resume()
     }
 
@@ -321,7 +382,7 @@ struct CoupleTimelineProvider: TimelineProvider {
         return map[key] ?? "😶"
     }
 
-    private func loadData() -> CoupleData {
+    private func loadData(configuration: HMLoveWidgetConfigurationIntent) -> CoupleData {
         guard let defaults = UserDefaults(suiteName: appGroupId) else {
             return .notConnected
         }
@@ -394,8 +455,15 @@ struct CoupleTimelineProvider: TimelineProvider {
             partnerMoodEmoji: defaults.string(forKey: "partnerMoodEmoji") ?? "😶",
             todaySchedule: defaults.string(forKey: "todaySchedule") ?? "",
             calendarEvents: calendarEvents,
-            calendarYearMonth: calendarYearMonth
+            calendarYearMonth: calendarYearMonth,
+            calendarTheme: CalendarWidgetTheme.theme(
+                for: configuration.theme?.rawValue
+            )
         )
+    }
+
+    private func loadData() -> CoupleData {
+        loadData(configuration: HMLoveWidgetConfigurationIntent())
     }
 
     /// Decode the widget-serialized event JSON blob into [CalendarEventData].
@@ -485,43 +553,44 @@ struct CoupleTimelineProvider: TimelineProvider {
 
 struct SmallWidgetView: View {
     let data: CoupleData
+    private var theme: CalendarWidgetTheme { data.calendarTheme }
 
     var body: some View {
         VStack(spacing: 6) {
             HStack(spacing: 4) {
                 Text(data.myName)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Color(hex: "E91E63"))
+                    .foregroundColor(Color(hex: theme.primaryHex))
                 Text("♥")
                     .font(.system(size: 12))
-                    .foregroundColor(Color(hex: "E91E63"))
+                    .foregroundColor(Color(hex: theme.primaryHex))
                 Text(data.partnerName)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Color(hex: "E91E63"))
+                    .foregroundColor(Color(hex: theme.primaryHex))
             }
 
             HStack(alignment: .firstTextBaseline, spacing: 0) {
                 Text("\(data.daysTogether)")
                     .font(.system(size: 42, weight: .bold, design: .rounded))
-                    .foregroundColor(Color(hex: "C2185B"))
+                    .foregroundColor(Color(hex: theme.primaryHex))
                 Text("일")
                     .font(.system(size: 18, weight: .semibold, design: .rounded))
-                    .foregroundColor(Color(hex: "E91E63"))
+                    .foregroundColor(Color(hex: theme.primaryHex))
             }
 
             Text(data.startDate + " ~")
                 .font(.system(size: 12))
-                .foregroundColor(Color(hex: "E91E63").opacity(0.6))
+                .foregroundColor(Color(hex: theme.primaryHex).opacity(0.6))
 
             if let name = data.nextAnniversaryName,
                let daysLeft = data.nextAnniversaryDaysLeft {
                 HStack(spacing: 3) {
                     Text(name)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color(hex: "9E9E9E"))
+                        .foregroundColor(Color(hex: theme.textSecondaryHex))
                     Text("D-\(daysLeft)")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(Color(hex: "E91E63"))
+                        .foregroundColor(Color(hex: theme.primaryHex))
                 }
             }
         }
@@ -533,6 +602,7 @@ struct SmallWidgetView: View {
 
 struct MediumWidgetView: View {
     let data: CoupleData
+    private var theme: CalendarWidgetTheme { data.calendarTheme }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -546,30 +616,30 @@ struct MediumWidgetView: View {
                     Text(data.partnerName)
                         .font(.system(size: 13, weight: .semibold))
                 }
-                .foregroundColor(Color(hex: "E91E63"))
+                .foregroundColor(Color(hex: theme.primaryHex))
 
                 HStack(alignment: .firstTextBaseline, spacing: 0) {
                     Text("\(data.daysTogether)")
                         .font(.system(size: 42, weight: .bold, design: .rounded))
-                        .foregroundColor(Color(hex: "C2185B"))
+                        .foregroundColor(Color(hex: theme.primaryHex))
                     Text("일째")
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundColor(Color(hex: "E91E63"))
+                        .foregroundColor(Color(hex: theme.primaryHex))
                 }
 
                 Text(data.startDate + " ~")
                     .font(.system(size: 11))
-                    .foregroundColor(Color(hex: "E91E63").opacity(0.5))
+                    .foregroundColor(Color(hex: theme.primaryHex).opacity(0.5))
 
                 if let name = data.nextAnniversaryName,
                    let daysLeft = data.nextAnniversaryDaysLeft {
                     HStack(spacing: 3) {
                         Text("🎉 \(name)")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(Color(hex: "757575"))
+                            .foregroundColor(Color(hex: theme.textSecondaryHex))
                         Text("D-\(daysLeft)")
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(Color(hex: "E91E63"))
+                            .foregroundColor(Color(hex: theme.primaryHex))
                     }
                 }
             }
@@ -583,7 +653,7 @@ struct MediumWidgetView: View {
                         .font(.system(size: 24))
                     Text("♥")
                         .font(.system(size: 11))
-                        .foregroundColor(Color(hex: "F48FB1"))
+                        .foregroundColor(Color(hex: theme.primaryHex).opacity(0.6))
                     Text(data.partnerMoodEmoji)
                         .font(.system(size: 24))
                 }
@@ -592,13 +662,13 @@ struct MediumWidgetView: View {
                 if !data.todaySchedule.isEmpty {
                     Text(data.todaySchedule)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color(hex: "616161"))
+                        .foregroundColor(Color(hex: theme.textPrimaryHex))
                         .lineLimit(3)
                         .multilineTextAlignment(.center)
                 } else {
                     Text("오늘 일정 없음")
                         .font(.system(size: 12))
-                        .foregroundColor(Color(hex: "BDBDBD"))
+                        .foregroundColor(Color(hex: theme.textSecondaryHex).opacity(0.7))
                 }
             }
             .frame(maxWidth: .infinity)
@@ -615,6 +685,7 @@ struct LargeWidgetView: View {
 
     private let calendar = Calendar(identifier: .gregorian)
     private let weekdaySymbols = ["일", "월", "화", "수", "목", "금", "토"]
+    private var theme: CalendarWidgetTheme { data.calendarTheme }
 
     private var displayDate: Date {
         if !data.calendarYearMonth.isEmpty {
@@ -705,11 +776,11 @@ struct LargeWidgetView: View {
                 Button(intent: PrevMonthIntent()) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(Color(hex: "E91E63"))
+                        .foregroundColor(Color(hex: theme.primaryHex))
                         .frame(width: 26, height: 22)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(Color(hex: "E91E63").opacity(0.1))
+                                .fill(Color(hex: theme.primaryHex).opacity(0.1))
                         )
                 }
                 .buttonStyle(.plain)
@@ -718,19 +789,19 @@ struct LargeWidgetView: View {
 
                 Text(yearMonthText)
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(Color(hex: "424242"))
+                    .foregroundColor(Color(hex: theme.textPrimaryHex))
 
                 Spacer(minLength: 6)
 
                 Button(intent: TodayMonthIntent()) {
                     Text("오늘")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(Color(hex: "E91E63"))
+                        .foregroundColor(Color(hex: theme.primaryHex))
                         .padding(.horizontal, 8)
                         .frame(height: 22)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(Color(hex: "E91E63").opacity(0.1))
+                                .fill(Color(hex: theme.primaryHex).opacity(0.1))
                         )
                 }
                 .buttonStyle(.plain)
@@ -739,11 +810,11 @@ struct LargeWidgetView: View {
                 Button(intent: NextMonthIntent()) {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(Color(hex: "E91E63"))
+                        .foregroundColor(Color(hex: theme.primaryHex))
                         .frame(width: 26, height: 22)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(Color(hex: "E91E63").opacity(0.1))
+                                .fill(Color(hex: theme.primaryHex).opacity(0.1))
                         )
                 }
                 .buttonStyle(.plain)
@@ -751,7 +822,7 @@ struct LargeWidgetView: View {
         } else {
             Text(yearMonthText)
                 .font(.system(size: 14, weight: .bold))
-                .foregroundColor(Color(hex: "424242"))
+                .foregroundColor(Color(hex: theme.textPrimaryHex))
         }
     }
 
@@ -761,16 +832,16 @@ struct LargeWidgetView: View {
             HStack {
                 Text("\(data.myName) ♥ \(data.partnerName)")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color(hex: "E91E63"))
+                    .foregroundColor(Color(hex: theme.primaryHex))
                 Spacer()
                 Text("\(data.daysTogether)일")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundColor(Color(hex: "C2185B"))
+                    .foregroundColor(Color(hex: theme.primaryHex))
                 if let name = data.nextAnniversaryName,
                    let daysLeft = data.nextAnniversaryDaysLeft {
                     Text("· \(name) D-\(daysLeft)")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(Color(hex: "9E9E9E"))
+                        .foregroundColor(Color(hex: theme.textSecondaryHex))
                 }
             }
             .padding(.horizontal, 14)
@@ -787,7 +858,7 @@ struct LargeWidgetView: View {
                 ForEach(0..<7, id: \.self) { index in
                     Text(weekdaySymbols[index])
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(index == 0 ? Color(hex: "E91E63") : Color(hex: "9E9E9E"))
+                        .foregroundColor(index == 0 ? Color(hex: theme.primaryHex) : Color(hex: theme.textSecondaryHex))
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -810,16 +881,16 @@ struct LargeWidgetView: View {
                                     ZStack {
                                         if today {
                                             Circle()
-                                                .fill(Color(hex: "E91E63"))
+                                                .fill(Color(hex: theme.primaryHex))
                                                 .frame(width: 14, height: 14)
                                         }
                                         Text("\(dayItem.day)")
                                             .font(.system(size: 10, weight: today ? .bold : .regular))
                                             .foregroundColor(
                                                 today ? .white :
-                                                !dayItem.isCurrentMonth ? Color(hex: "BDBDBD") :
-                                                col == 0 ? Color(hex: "E91E63") :
-                                                Color(hex: "424242")
+                                                !dayItem.isCurrentMonth ? Color(hex: theme.textSecondaryHex).opacity(0.55) :
+                                                col == 0 ? Color(hex: theme.primaryHex) :
+                                                Color(hex: theme.textPrimaryHex)
                                             )
                                     }
                                     .frame(height: 14)
@@ -863,35 +934,38 @@ struct CalendarDay {
 
 // MARK: - Widget Configuration
 
+@available(iOS 17.0, *)
 struct HMLoveWidget: Widget {
     let kind: String = "HMLoveWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: CoupleTimelineProvider()) { entry in
-            if #available(iOS 17.0, *) {
-                WidgetView(entry: entry)
-                    .containerBackground(for: .widget) {
-                        LinearGradient(
-                            colors: [Color(hex: "FFE4EC"), Color(hex: "FFF0F5")],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    }
-            } else {
-                WidgetView(entry: entry)
-                    .background(
-                        LinearGradient(
-                            colors: [Color(hex: "FFE4EC"), Color(hex: "FFF0F5")],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            }
+        AppIntentConfiguration(
+            kind: kind,
+            intent: HMLoveWidgetConfigurationIntent.self,
+            provider: CoupleTimelineProvider()
+        ) { entry in
+            WidgetContentView(entry: entry)
         }
         .configurationDisplayName("우리연애")
         .description("D-Day와 오늘의 기분을 확인하세요")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
         .contentMarginsDisabled()
+    }
+}
+
+struct WidgetContentView: View {
+    let entry: CoupleEntry
+
+    var body: some View {
+            if #available(iOS 17.0, *) {
+                WidgetView(entry: entry)
+                    .containerBackground(for: .widget) {
+                        Color(hex: entry.data.calendarTheme.backgroundHex)
+                    }
+            } else {
+                WidgetView(entry: entry)
+                    .background(Color(hex: entry.data.calendarTheme.backgroundHex))
+            }
     }
 }
 

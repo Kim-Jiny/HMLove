@@ -97,8 +97,8 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
     private fun applyCustomBackground(
         views: RemoteViews,
         prefs: SharedPreferences
-    ) {
-        if (!prefs.contains(CalendarWidgetSettingsActivity.PREF_KEY_BG_ARGB)) return
+    ): Int? {
+        if (!prefs.contains(CalendarWidgetSettingsActivity.PREF_KEY_BG_ARGB)) return null
         val argb = prefs.getInt(
             CalendarWidgetSettingsActivity.PREF_KEY_BG_ARGB,
             0xFFFFFFFF.toInt()
@@ -117,6 +117,94 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
         } else {
             views.setInt(R.id.widget_root, "setBackgroundColor", argb)
         }
+        return argb
+    }
+
+    private fun selectedTheme(
+        prefs: SharedPreferences,
+        bgArgb: Int?
+    ): CalendarWidgetThemeOption {
+        val savedThemeId = prefs.getString(CalendarWidgetSettingsActivity.PREF_KEY_THEME_ID, null)
+        if (!savedThemeId.isNullOrEmpty()) {
+            return CalendarWidgetSettingsActivity.themeFor(savedThemeId)
+        }
+        if (bgArgb != null) {
+            val bgRgb = (bgArgb and 0x00FFFFFF) or 0xFF000000.toInt()
+            return CalendarWidgetSettingsActivity.THEMES.minByOrNull {
+                colorDistance(bgRgb, it.bgRgb)
+            } ?: CalendarWidgetSettingsActivity.THEMES.first()
+        }
+        return CalendarWidgetSettingsActivity.THEMES.first()
+    }
+
+    private fun colorDistance(a: Int, b: Int): Int {
+        val dr = Color.red(a) - Color.red(b)
+        val dg = Color.green(a) - Color.green(b)
+        val db = Color.blue(a) - Color.blue(b)
+        return dr * dr + dg * dg + db * db
+    }
+
+    private fun withAlpha(color: Int, alpha: Int): Int =
+        (alpha.coerceIn(0, 255) shl 24) or (color and 0x00FFFFFF)
+
+    private fun tintBackground(
+        views: RemoteViews,
+        viewId: Int,
+        drawableId: Int,
+        color: Int
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            views.setInt(viewId, "setBackgroundResource", drawableId)
+            views.setColorStateList(
+                viewId,
+                "setBackgroundTintList",
+                ColorStateList.valueOf(color)
+            )
+        }
+    }
+
+    private fun applyTheme(
+        views: RemoteViews,
+        theme: CalendarWidgetThemeOption
+    ) {
+        views.setTextColor(R.id.cal_couple_names, theme.primary)
+        views.setTextColor(R.id.cal_dday_info, theme.primary)
+        views.setTextColor(R.id.cal_settings_btn, theme.primary)
+        views.setTextColor(R.id.cal_prev_month, theme.primary)
+        views.setTextColor(R.id.cal_today_month, theme.primary)
+        views.setTextColor(R.id.cal_next_month, theme.primary)
+        views.setTextColor(R.id.cal_month_title, theme.textPrimary)
+
+        val weekdayIds = intArrayOf(
+            R.id.cal_weekday_sun,
+            R.id.cal_weekday_mon,
+            R.id.cal_weekday_tue,
+            R.id.cal_weekday_wed,
+            R.id.cal_weekday_thu,
+            R.id.cal_weekday_fri,
+            R.id.cal_weekday_sat
+        )
+        for ((index, id) in weekdayIds.withIndex()) {
+            views.setTextColor(id, if (index == 0) theme.primary else theme.textSecondary)
+        }
+
+        val navBg = withAlpha(theme.primary, 26)
+        tintBackground(views, R.id.cal_settings_btn, R.drawable.widget_calendar_nav_btn_bg, navBg)
+        tintBackground(views, R.id.cal_prev_month, R.drawable.widget_calendar_nav_btn_bg, navBg)
+        tintBackground(views, R.id.cal_today_month, R.drawable.widget_calendar_nav_btn_bg, navBg)
+        tintBackground(views, R.id.cal_next_month, R.drawable.widget_calendar_nav_btn_bg, navBg)
+    }
+
+    private fun hasWidgetSession(prefs: SharedPreferences): Boolean {
+        if (prefs.getBoolean("isConnected", false)) return true
+        val authToken = prefs.getString("authToken", "") ?: ""
+        val myName = prefs.getString("myName", "") ?: ""
+        val partnerName = prefs.getString("partnerName", "") ?: ""
+        val startDate = prefs.getString("startDate", "") ?: ""
+        return authToken.isNotEmpty() ||
+            myName.isNotEmpty() ||
+            partnerName.isNotEmpty() ||
+            startDate.isNotEmpty()
     }
 
     /**
@@ -320,11 +408,10 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
         for (appWidgetId in appWidgetIds) {
             try {
                 val prefs = HomeWidgetPlugin.getData(context)
-                val isConnected = prefs.getBoolean("isConnected", false)
+                val isConnected = hasWidgetSession(prefs)
 
                 if (!isConnected) {
-                    val views = RemoteViews(context.packageName, R.layout.widget_not_connected)
-                    views.setOnClickPendingIntent(R.id.widget_root, launchAppIntent(context))
+                    val views = buildNotConnectedWidgetViews(context, prefs, launchAppIntent(context))
                     appWidgetManager.updateAppWidget(appWidgetId, views)
                     continue
                 }
@@ -352,8 +439,15 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                     settingsPendingIntent(context)
                 )
 
-                // Apply custom background color / alpha if user has configured it.
-                applyCustomBackground(views, prefs)
+                // Apply custom background alpha only to the widget root, then
+                // apply the paired text/accent colors from the selected theme.
+                val theme = try {
+                    val bgArgb = applyCustomBackground(views, prefs)
+                    selectedTheme(prefs, bgArgb)
+                } catch (_: Exception) {
+                    CalendarWidgetSettingsActivity.THEMES.first()
+                }
+                applyTheme(views, theme)
 
                 val myName = prefs.getString("myName", "나") ?: "나"
                 val partnerName = prefs.getString("partnerName", "상대방") ?: "상대방"
@@ -498,14 +592,27 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                     cellView.setTextViewText(R.id.cell_day, day.toString())
 
                     if (isToday) {
-                        cellView.setInt(R.id.cell_day, "setBackgroundResource", R.drawable.widget_calendar_today_bg)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            cellView.setInt(
+                                R.id.cell_day,
+                                "setBackgroundResource",
+                                R.drawable.widget_calendar_today_bg
+                            )
+                            cellView.setColorStateList(
+                                R.id.cell_day,
+                                "setBackgroundTintList",
+                                ColorStateList.valueOf(theme.primary)
+                            )
+                        } else {
+                            cellView.setInt(R.id.cell_day, "setBackgroundResource", R.drawable.widget_calendar_today_bg)
+                        }
                         cellView.setTextColor(R.id.cell_day, Color.WHITE)
                     } else if (!isCurrentMonth) {
-                        cellView.setTextColor(R.id.cell_day, Color.parseColor("#BDBDBD"))
+                        cellView.setTextColor(R.id.cell_day, withAlpha(theme.textSecondary, 130))
                     } else if (col == 0) {
-                        cellView.setTextColor(R.id.cell_day, Color.parseColor("#E91E63"))
+                        cellView.setTextColor(R.id.cell_day, theme.primary)
                     } else {
-                        cellView.setTextColor(R.id.cell_day, Color.parseColor("#424242"))
+                        cellView.setTextColor(R.id.cell_day, theme.textPrimary)
                     }
 
                     // Add event bars dynamically
@@ -536,8 +643,8 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
 
                 appWidgetManager.updateAppWidget(appWidgetId, views)
             } catch (e: Exception) {
-                val views = RemoteViews(context.packageName, R.layout.widget_not_connected)
-                views.setOnClickPendingIntent(R.id.widget_root, launchAppIntent(context))
+                val prefs = HomeWidgetPlugin.getData(context)
+                val views = buildNotConnectedWidgetViews(context, prefs, launchAppIntent(context))
                 appWidgetManager.updateAppWidget(appWidgetId, views)
             }
         }
