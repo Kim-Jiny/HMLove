@@ -26,7 +26,7 @@ RUN chmod +x docker-entrypoint.sh
 # 파일 소유권 변경
 RUN chown -R appuser:appgroup /app
 
-USER appuser
+USER root
 
 EXPOSE 3000
 
