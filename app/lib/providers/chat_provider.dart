@@ -5,10 +5,13 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 import '../core/api_client.dart';
 import '../core/constants.dart';
+import '../models/wish_item.dart';
 import 'badge_provider.dart';
 import 'calendar_provider.dart';
 import 'feed_provider.dart';
 import 'mission_provider.dart';
+import 'question_provider.dart';
+import 'wishlist_provider.dart';
 
 // Message send status
 enum MessageStatus { sending, sent, failed }
@@ -91,6 +94,8 @@ class ChatMessage {
 
 // Chat state class
 class ChatState {
+  static const _sentinel = Object();
+
   final List<ChatMessage> messages;
   final bool isLoading;
   final bool isConnected;
@@ -129,12 +134,12 @@ class ChatState {
     bool? partnerTyping,
     bool? partnerOnline,
     bool? hasMore,
-    String? nextCursor,
+    Object? nextCursor = _sentinel,
     String? error,
     bool? isSearchMode,
     List<ChatMessage>? searchResults,
     int? currentSearchIndex,
-    String? highlightedMessageId,
+    Object? highlightedMessageId = _sentinel,
     bool? isSearching,
   }) {
     return ChatState(
@@ -144,12 +149,16 @@ class ChatState {
       partnerTyping: partnerTyping ?? this.partnerTyping,
       partnerOnline: partnerOnline ?? this.partnerOnline,
       hasMore: hasMore ?? this.hasMore,
-      nextCursor: nextCursor ?? this.nextCursor,
+      nextCursor: identical(nextCursor, _sentinel)
+          ? this.nextCursor
+          : nextCursor as String?,
       error: error,
       isSearchMode: isSearchMode ?? this.isSearchMode,
       searchResults: searchResults ?? this.searchResults,
       currentSearchIndex: currentSearchIndex ?? this.currentSearchIndex,
-      highlightedMessageId: highlightedMessageId ?? this.highlightedMessageId,
+      highlightedMessageId: identical(highlightedMessageId, _sentinel)
+          ? this.highlightedMessageId
+          : highlightedMessageId as String?,
       isSearching: isSearching ?? this.isSearching,
     );
   }
@@ -206,6 +215,8 @@ class ChatNotifier extends Notifier<ChatState> {
         _syncMissedMessages();
         _refreshRealtimeState();
       }
+      // 재연결 시 sending 상태 메시지 자동 재전송
+      _retrySendingMessages();
     });
 
     _socket!.onDisconnect((_) {
@@ -369,6 +380,63 @@ class ChatNotifier extends Notifier<ChatState> {
       }
     });
 
+    // 위시리스트 실시간 동기화
+    _socket!.on('wish:new', (data) {
+      try {
+        if (data != null) {
+          final item = WishItem.fromJson(data as Map<String, dynamic>);
+          ref.read(wishlistProvider.notifier).onSocketNew(item);
+        }
+      } catch (e) {
+        debugPrint('[Socket] wish:new parse error: $e');
+      }
+    });
+
+    _socket!.on('wish:updated', (data) {
+      try {
+        if (data != null) {
+          final item = WishItem.fromJson(data as Map<String, dynamic>);
+          ref.read(wishlistProvider.notifier).onSocketUpdated(item);
+        }
+      } catch (e) {
+        debugPrint('[Socket] wish:updated parse error: $e');
+      }
+    });
+
+    _socket!.on('wish:toggled', (data) {
+      try {
+        if (data != null) {
+          final item = WishItem.fromJson(data as Map<String, dynamic>);
+          ref.read(wishlistProvider.notifier).onSocketToggled(item);
+        }
+      } catch (e) {
+        debugPrint('[Socket] wish:toggled parse error: $e');
+      }
+    });
+
+    _socket!.on('wish:deleted', (data) {
+      try {
+        if (data != null) {
+          final map = data as Map<String, dynamic>;
+          final id = map['id'] as String;
+          ref.read(wishlistProvider.notifier).onSocketDeleted(id);
+        }
+      } catch (e) {
+        debugPrint('[Socket] wish:deleted parse error: $e');
+      }
+    });
+
+    // 질문 카드 실시간 동기화
+    _socket!.on('question:answered', (data) {
+      try {
+        if (data != null) {
+          ref.read(questionProvider.notifier).onPartnerAnswered();
+        }
+      } catch (e) {
+        debugPrint('[Socket] question:answered error: $e');
+      }
+    });
+
     _socket!.connect();
   }
 
@@ -425,6 +493,8 @@ class ChatNotifier extends Notifier<ChatState> {
         ref.read(missionProvider.notifier).fetchCalendarMissions(month),
         ref.read(calendarProvider.notifier).refreshCurrentMonth(),
         ref.read(badgeProvider.notifier).fetchBadges(),
+        ref.read(wishlistProvider.notifier).fetchItems(),
+        ref.read(questionProvider.notifier).fetchToday(),
       ]);
     } catch (e) {
       debugPrint('[Chat] refreshRealtimeState error: $e');
@@ -439,10 +509,18 @@ class ChatNotifier extends Notifier<ChatState> {
     if (_socket == null) {
       connect(token);
     } else if (!_socket!.connected) {
-      // 기존 소켓 정리 후 새 토큰으로 완전히 재연결
-      _socket!.dispose();
-      _socket = null;
-      connect(token, recoverState: true);
+      // 토큰이 변경되었으면 소켓 재생성, 아니면 재연결만 시도
+      final socketAuth = _socket!.auth as Map?;
+      final socketToken = socketAuth?['token'] as String?;
+      if (socketToken != token) {
+        // 토큰 갱신됨 → 소켓 재생성
+        _socket!.dispose();
+        _socket = null;
+        connect(token, recoverState: true);
+      } else {
+        _recoverStateOnNextConnect = true;
+        _socket!.connect();
+      }
     }
   }
 
@@ -473,15 +551,39 @@ class ChatNotifier extends Notifier<ChatState> {
     );
     state = state.copyWith(messages: [optimistic, ...state.messages]);
 
-    // 소켓 전송
+    // 소켓 연결 보장
+    ensureConnected();
+
+    // 연결된 경우에만 즉시 전송, 미연결 시 onConnect에서 자동 재전송
+    if (_socket?.connected == true) {
+      _emitMessage(tempId: tempId, content: content, imageUrls: imageUrls);
+    } else {
+      // 미연결: 10초 내 재연결 안 되면 실패 처리 (재연결 시 자동 재전송됨)
+      Future.delayed(const Duration(seconds: 10), () {
+        final idx = state.messages.indexWhere((m) => m.id == tempId);
+        if (idx != -1 && state.messages[idx].status == MessageStatus.sending) {
+          final updated = [...state.messages];
+          updated[idx] = updated[idx].copyWith(status: MessageStatus.failed);
+          state = state.copyWith(messages: updated);
+        }
+      });
+    }
+  }
+
+  /// 소켓으로 메시지 emit (내부 공용)
+  void _emitMessage({
+    required String tempId,
+    required String content,
+    List<String> imageUrls = const [],
+  }) {
     _socket?.emit('message:send', {
       'content': content,
       if (imageUrls.isNotEmpty) 'imageUrls': imageUrls,
       '_tempId': tempId,
     });
 
-    // 5초 내 서버 응답 없으면 실패 처리
-    Future.delayed(const Duration(seconds: 5), () {
+    // 10초 내 서버 응답 없으면 실패 처리
+    Future.delayed(const Duration(seconds: 10), () {
       final idx = state.messages.indexWhere((m) => m.id == tempId);
       if (idx != -1 && state.messages[idx].status == MessageStatus.sending) {
         final updated = [...state.messages];
@@ -489,6 +591,35 @@ class ChatNotifier extends Notifier<ChatState> {
         state = state.copyWith(messages: updated);
       }
     });
+  }
+
+  /// 재연결 시 미전송 메시지 자동 재전송 (sending + failed 모두)
+  void _retrySendingMessages() {
+    final pendingMessages = state.messages
+        .where((m) =>
+            (m.status == MessageStatus.sending ||
+                m.status == MessageStatus.failed) &&
+            m.id.startsWith('temp-'))
+        .toList();
+
+    if (pendingMessages.isEmpty) return;
+
+    // failed → sending 상태로 변경
+    final updated = state.messages.map((m) {
+      if (m.status == MessageStatus.failed && m.id.startsWith('temp-')) {
+        return m.copyWith(status: MessageStatus.sending);
+      }
+      return m;
+    }).toList();
+    state = state.copyWith(messages: updated);
+
+    for (final msg in pendingMessages) {
+      _emitMessage(
+        tempId: msg.id,
+        content: msg.content,
+        imageUrls: msg.imageUrls,
+      );
+    }
   }
 
   /// Retry sending a failed message.

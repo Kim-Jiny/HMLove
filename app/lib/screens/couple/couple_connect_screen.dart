@@ -123,7 +123,7 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
     final code = _inviteCodeController.text.trim();
     if (code.isEmpty) return;
 
-    final success = await ref.read(coupleProvider.notifier).joinCouple(
+    await ref.read(coupleProvider.notifier).joinCouple(
           inviteCode: code,
         );
 

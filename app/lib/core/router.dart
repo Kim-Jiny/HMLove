@@ -24,6 +24,8 @@ import '../screens/letter/letter_read_screen.dart';
 import '../screens/fortune/fortune_screen.dart';
 import '../screens/home/anniversary_screen.dart';
 import '../screens/notification/notification_screen.dart';
+import '../screens/wishlist/wishlist_screen.dart';
+import '../screens/question/question_screen.dart';
 
 /// 푸시 알림 등에서 네비게이션 접근용 글로벌 키
 final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -168,6 +170,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/notifications',
         builder: (context, state) => const NotificationScreen(),
+      ),
+
+      // Wishlist
+      GoRoute(
+        path: '/wishlist',
+        builder: (context, state) => const WishlistScreen(),
+      ),
+
+      // Question
+      GoRoute(
+        path: '/question',
+        builder: (context, state) => const QuestionScreen(),
       ),
 
       // Main Shell with bottom navigation

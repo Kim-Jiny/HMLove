@@ -186,6 +186,7 @@ class MoreScreen extends ConsumerWidget {
             _DeleteItem('사진'),
             _DeleteItem('편지'),
             _DeleteItem('기분 · 다툼 · 운세 기록'),
+            _DeleteItem('위시리스트 · 질문 기록'),
             SizedBox(height: 12),
             Text(
               '이 작업은 되돌릴 수 없습니다.',
@@ -361,6 +362,8 @@ class MoreScreen extends ConsumerWidget {
               _DeleteItem('기분 기록'),
               _DeleteItem('다툼 기록'),
               _DeleteItem('운세 기록'),
+              _DeleteItem('위시리스트'),
+              _DeleteItem('질문 기록'),
               SizedBox(height: 12),
               Text(
                 '이 작업은 되돌릴 수 없습니다.',
@@ -659,6 +662,22 @@ class MoreScreen extends ConsumerWidget {
                     color: const Color(0xFFFF9800),
                     badge: unreadLetters,
                     onTap: () => context.push('/letter'),
+                  ),
+                  const Divider(height: 1, indent: 72),
+                  _MenuTile(
+                    icon: Icons.favorite_outline,
+                    title: '위시리스트',
+                    subtitle: '함께 하고 싶은 것들을 모아보세요',
+                    color: const Color(0xFF00BCD4),
+                    onTap: () => context.push('/wishlist'),
+                  ),
+                  const Divider(height: 1, indent: 72),
+                  _MenuTile(
+                    icon: Icons.quiz_outlined,
+                    title: '오늘의 질문',
+                    subtitle: '매일 새로운 질문으로 대화해요',
+                    color: const Color(0xFF3F51B5),
+                    onTap: () => context.push('/question'),
                   ),
                   const Divider(height: 1, indent: 72),
                   _MenuTile(

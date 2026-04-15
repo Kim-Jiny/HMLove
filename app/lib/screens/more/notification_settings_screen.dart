@@ -55,6 +55,40 @@ class _NotificationSettingsScreenState
     _scheduleSyncToServer();
   }
 
+  List<int> _getDayMilestones() {
+    final raw = _box.get('noti_anniversary_milestones_day');
+    if (raw is List) return raw.cast<int>();
+    return [50, 100, 200, 300, 500, 1000]; // 기본값: 전체
+  }
+
+  void _setDayMilestones(List<int> days) {
+    _box.put('noti_anniversary_milestones_day', days);
+    setState(() {});
+    _scheduleSyncToServer();
+  }
+
+  List<int> _getYearMilestones() {
+    final raw = _box.get('noti_anniversary_milestones_year');
+    if (raw is List) return raw.cast<int>();
+    return List.generate(20, (i) => i + 1); // 기본값: 1~20
+  }
+
+  void _setYearMilestones(List<int> years) {
+    _box.put('noti_anniversary_milestones_year', years);
+    setState(() {});
+    _scheduleSyncToServer();
+  }
+
+  bool _getBirthdayMilestone() {
+    return _box.get('noti_anniversary_milestones_birthday', defaultValue: true) as bool;
+  }
+
+  void _setBirthdayMilestone(bool value) {
+    _box.put('noti_anniversary_milestones_birthday', value);
+    setState(() {});
+    _scheduleSyncToServer();
+  }
+
   /// 설정 변경 후 500ms 디바운스로 서버에 동기화
   void _scheduleSyncToServer() {
     _syncTimer?.cancel();
@@ -72,6 +106,8 @@ class _NotificationSettingsScreenState
         'noti_calendar', 'noti_calendar_sound', 'noti_calendar_vibrate',
         'noti_anniversary', 'noti_anniversary_sound', 'noti_anniversary_vibrate',
         'noti_anniversary_remind_days',
+        'noti_anniversary_milestones_day', 'noti_anniversary_milestones_year',
+        'noti_anniversary_milestones_birthday',
         'noti_letter', 'noti_letter_sound', 'noti_letter_vibrate',
         'noti_mood', 'noti_mood_sound', 'noti_mood_vibrate',
         'noti_fight', 'noti_fight_sound', 'noti_fight_vibrate',
@@ -164,6 +200,52 @@ class _NotificationSettingsScreenState
             _AnniversaryRemindDaysSelector(
               selectedDays: _getRemindDays(),
               onChanged: _setRemindDays,
+            ),
+          // 기념일 마일스톤 선택 (일 단위)
+          if (_allOn && _get('noti_anniversary'))
+            _AnniversaryMilestoneSelector(
+              label: '일 단위 마일스톤',
+              options: const [
+                (value: 50, label: '50일'),
+                (value: 100, label: '100일'),
+                (value: 200, label: '200일'),
+                (value: 300, label: '300일'),
+                (value: 500, label: '500일'),
+                (value: 1000, label: '1000일'),
+              ],
+              selectedValues: _getDayMilestones(),
+              onChanged: _setDayMilestones,
+            ),
+          // 기념일 마일스톤 선택 (주년)
+          if (_allOn && _get('noti_anniversary'))
+            _AnniversaryMilestoneSelector(
+              label: '주년 마일스톤',
+              options: List.generate(20, (i) => (value: i + 1, label: '${i + 1}주년')),
+              selectedValues: _getYearMilestones(),
+              onChanged: _setYearMilestones,
+            ),
+          // 생일 알림 토글
+          if (_allOn && _get('noti_anniversary'))
+            Padding(
+              padding: const EdgeInsets.only(left: 56, right: 16, bottom: 12),
+              child: Row(
+                children: [
+                  const Text(
+                    '생일 알림',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  const Spacer(),
+                  Switch(
+                    value: _getBirthdayMilestone(),
+                    activeTrackColor: AppTheme.primaryColor,
+                    onChanged: (v) => _setBirthdayMilestone(v),
+                  ),
+                ],
+              ),
             ),
           _NotificationCategory(
             icon: Icons.mail_outline,
@@ -370,6 +452,82 @@ class _NotificationCategory extends StatelessWidget {
           ),
         const Divider(height: 1, indent: 16, endIndent: 16),
       ],
+    );
+  }
+}
+
+// ── 기념일 마일스톤 선택 (범용) ──
+class _AnniversaryMilestoneSelector extends StatelessWidget {
+  final String label;
+  final List<({int value, String label})> options;
+  final List<int> selectedValues;
+  final ValueChanged<List<int>> onChanged;
+
+  const _AnniversaryMilestoneSelector({
+    required this.label,
+    required this.options,
+    required this.selectedValues,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 56, right: 16, bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: options.map((opt) {
+              final isSelected = selectedValues.contains(opt.value);
+              return FilterChip(
+                label: Text(
+                  opt.label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: isSelected ? Colors.white : AppTheme.textSecondary,
+                  ),
+                ),
+                selected: isSelected,
+                onSelected: (selected) {
+                  final newValues = List<int>.from(selectedValues);
+                  if (selected) {
+                    newValues.add(opt.value);
+                  } else {
+                    newValues.remove(opt.value);
+                  }
+                  if (newValues.isEmpty) return;
+                  newValues.sort();
+                  onChanged(newValues);
+                },
+                selectedColor: AppTheme.primaryColor,
+                backgroundColor: Colors.grey.shade100,
+                checkmarkColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: isSelected ? AppTheme.primaryColor : Colors.grey.shade300,
+                  ),
+                ),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              );
+            }).toList(),
+          ),
+        ],
+      ),
     );
   }
 }

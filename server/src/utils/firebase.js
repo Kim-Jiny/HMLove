@@ -195,6 +195,8 @@ const _typeToPrefKey = {
   mission: 'noti_mission',
   mood: 'noti_mood',
   fight: 'noti_fight',
+  wishlist: 'noti_wishlist',
+  question: 'noti_question',
 };
 
 export async function notifyPartner({ userId, coupleId, title, body, data, silentData }) {
