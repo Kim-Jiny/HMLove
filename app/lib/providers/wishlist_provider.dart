@@ -93,7 +93,10 @@ class WishlistNotifier extends Notifier<WishlistState> {
       });
       final data = response.data as Map<String, dynamic>;
       final item = WishItem.fromJson(data['item'] as Map<String, dynamic>);
-      state = state.copyWith(items: [item, ...state.items]);
+      // 소켓 이벤트로 이미 추가되었을 수 있으므로 중복 체크
+      if (!state.items.any((i) => i.id == item.id)) {
+        state = state.copyWith(items: [item, ...state.items]);
+      }
       return true;
     } catch (e) {
       debugPrint('[Wishlist] addItem error: $e');

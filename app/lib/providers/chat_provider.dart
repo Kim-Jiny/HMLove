@@ -380,11 +380,15 @@ class ChatNotifier extends Notifier<ChatState> {
       }
     });
 
-    // 위시리스트 실시간 동기화
+    // 위시리스트 실시간 동기화 (상대방 액션만 반영, 내 액션은 API 응답에서 처리)
     _socket!.on('wish:new', (data) {
       try {
         if (data != null) {
-          final item = WishItem.fromJson(data as Map<String, dynamic>);
+          final map = data as Map<String, dynamic>;
+          final authorId = map['authorId'] as String?;
+          final myId = ApiClient.getUserId();
+          if (authorId == myId) return; // 내가 추가한 건 API 응답에서 처리
+          final item = WishItem.fromJson(map);
           ref.read(wishlistProvider.notifier).onSocketNew(item);
         }
       } catch (e) {
