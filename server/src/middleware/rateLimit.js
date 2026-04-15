@@ -1,9 +1,9 @@
 import rateLimit from 'express-rate-limit';
 
-// 글로벌: 15분에 100회
+// 글로벌: 15분에 200회
 export const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 200,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },

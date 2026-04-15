@@ -380,11 +380,15 @@ class ChatNotifier extends Notifier<ChatState> {
       }
     });
 
-    // 위시리스트 실시간 동기화
+    // 위시리스트 실시간 동기화 (상대방 액션만 반영, 내 액션은 API 응답에서 처리)
     _socket!.on('wish:new', (data) {
       try {
         if (data != null) {
-          final item = WishItem.fromJson(data as Map<String, dynamic>);
+          final map = data as Map<String, dynamic>;
+          final authorId = map['authorId'] as String?;
+          final myId = ApiClient.getUserId();
+          if (authorId == myId) return; // 내가 추가한 건 API 응답에서 처리
+          final item = WishItem.fromJson(map);
           ref.read(wishlistProvider.notifier).onSocketNew(item);
         }
       } catch (e) {
@@ -481,7 +485,8 @@ class ChatNotifier extends Notifier<ChatState> {
     }
   }
 
-  /// 재연결 후 실시간 의존 상태들을 전체 새로고침한다.
+  /// 재연결 후 소켓 의존 상태들만 새로고침한다.
+  /// (fetchToday, fetchTodayMissions, fetchBadges 등은 home_screen.resumed에서 이미 호출됨)
   Future<void> _refreshRealtimeState() async {
     final month =
         '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}';
@@ -489,12 +494,9 @@ class ChatNotifier extends Notifier<ChatState> {
     try {
       await Future.wait([
         ref.read(feedProvider.notifier).fetchFeeds(refresh: true),
-        ref.read(missionProvider.notifier).fetchTodayMissions(),
         ref.read(missionProvider.notifier).fetchCalendarMissions(month),
         ref.read(calendarProvider.notifier).refreshCurrentMonth(),
-        ref.read(badgeProvider.notifier).fetchBadges(),
         ref.read(wishlistProvider.notifier).fetchItems(),
-        ref.read(questionProvider.notifier).fetchToday(),
       ]);
     } catch (e) {
       debugPrint('[Chat] refreshRealtimeState error: $e');

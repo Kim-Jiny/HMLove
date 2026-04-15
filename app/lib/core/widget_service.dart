@@ -201,8 +201,14 @@ class WidgetService {
       androidName: _androidWidgetName,
     );
     await Future.wait([
-      HomeWidget.updateWidget(androidName: _androidSmallWidgetName),
-      HomeWidget.updateWidget(androidName: _androidCalendarWidgetName),
+      HomeWidget.updateWidget(
+        iOSName: _iosWidgetName,
+        androidName: _androidSmallWidgetName,
+      ),
+      HomeWidget.updateWidget(
+        iOSName: _iosWidgetName,
+        androidName: _androidCalendarWidgetName,
+      ),
     ]);
   }
 
