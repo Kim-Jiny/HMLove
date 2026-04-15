@@ -50,7 +50,7 @@ app.set('io', io);
 
 // 채팅 푸시 debounce: 3초 내 같은 유저 → 같은 상대 메시지를 묶어서 1개 알림
 const _chatPushTimers = new Map(); // key: `${senderId}:${partnerId}`
-function debouncedChatPush({ senderId, partnerId, token, senderNickname, body }) {
+function debouncedChatPush({ senderId, partnerId, coupleId, token, senderNickname, body }) {
   const key = `${senderId}:${partnerId}`;
   const existing = _chatPushTimers.get(key);
 
@@ -71,7 +71,7 @@ function debouncedChatPush({ senderId, partnerId, token, senderNickname, body })
       token,
       title: senderNickname || '상대방',
       body: pushBody,
-      data: { type: 'chat', coupleId: '' },
+      data: { type: 'chat', coupleId: coupleId || '' },
     });
     _chatPushTimers.delete(key);
   }, 3000);
@@ -216,6 +216,7 @@ io.on('connection', async (socket) => {
         debouncedChatPush({
           senderId: socket.userId,
           partnerId: partner.id,
+          coupleId: socket.coupleId,
           token: partner.fcmToken,
           senderNickname: socket.nickname,
           body: pushBody,
@@ -412,11 +413,13 @@ async function sendAnniversaryReminders() {
 
           // 중복 방지: 오늘 같은 알림을 이미 보냈는지 확인
           const dedupKey = `anniversary_remind:${ann.title}:d-${ann.daysLeft}`;
+          // KST 자정 기준으로 중복 방지 (UTC 기준이 아닌 KST 00:00부터)
+          const kstMidnightUtc = new Date(todayStr + 'T00:00:00+09:00');
           const existing = await prisma.notification.findFirst({
             where: {
               userId: user.id,
               type: 'anniversary_remind',
-              createdAt: { gte: new Date(todayStr + 'T00:00:00.000Z') },
+              createdAt: { gte: kstMidnightUtc },
               data: { path: ['dedupKey'], equals: dedupKey },
             },
           });

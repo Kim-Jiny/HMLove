@@ -26,7 +26,7 @@ class QuestionState {
   });
 
   QuestionState copyWith({
-    DailyQuestion? today,
+    Object? today = _sentinel,
     List<QuestionHistoryItem>? history,
     bool? isLoading,
     bool? isHistoryLoading,
@@ -35,7 +35,9 @@ class QuestionState {
     bool? hasMore,
   }) {
     return QuestionState(
-      today: today ?? this.today,
+      today: identical(today, _sentinel)
+          ? this.today
+          : today as DailyQuestion?,
       history: history ?? this.history,
       isLoading: isLoading ?? this.isLoading,
       isHistoryLoading: isHistoryLoading ?? this.isHistoryLoading,

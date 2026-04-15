@@ -94,6 +94,8 @@ class ChatMessage {
 
 // Chat state class
 class ChatState {
+  static const _sentinel = Object();
+
   final List<ChatMessage> messages;
   final bool isLoading;
   final bool isConnected;
@@ -132,12 +134,12 @@ class ChatState {
     bool? partnerTyping,
     bool? partnerOnline,
     bool? hasMore,
-    String? nextCursor,
+    Object? nextCursor = _sentinel,
     String? error,
     bool? isSearchMode,
     List<ChatMessage>? searchResults,
     int? currentSearchIndex,
-    String? highlightedMessageId,
+    Object? highlightedMessageId = _sentinel,
     bool? isSearching,
   }) {
     return ChatState(
@@ -147,12 +149,16 @@ class ChatState {
       partnerTyping: partnerTyping ?? this.partnerTyping,
       partnerOnline: partnerOnline ?? this.partnerOnline,
       hasMore: hasMore ?? this.hasMore,
-      nextCursor: nextCursor ?? this.nextCursor,
+      nextCursor: identical(nextCursor, _sentinel)
+          ? this.nextCursor
+          : nextCursor as String?,
       error: error,
       isSearchMode: isSearchMode ?? this.isSearchMode,
       searchResults: searchResults ?? this.searchResults,
       currentSearchIndex: currentSearchIndex ?? this.currentSearchIndex,
-      highlightedMessageId: highlightedMessageId ?? this.highlightedMessageId,
+      highlightedMessageId: identical(highlightedMessageId, _sentinel)
+          ? this.highlightedMessageId
+          : highlightedMessageId as String?,
       isSearching: isSearching ?? this.isSearching,
     );
   }

@@ -160,12 +160,17 @@ class WishlistNotifier extends Notifier<WishlistState> {
   }
 
   void onSocketUpdated(WishItem item) {
-    state = state.copyWith(
-      items: state.items.map((i) => i.id == item.id ? item : i).toList(),
-    );
+    final exists = state.items.any((i) => i.id == item.id);
+    if (exists) {
+      state = state.copyWith(
+        items: state.items.map((i) => i.id == item.id ? item : i).toList(),
+      );
+    }
   }
 
   void onSocketToggled(WishItem item) {
+    final exists = state.items.any((i) => i.id == item.id);
+    if (!exists) return;
     final newItems = state.items.map((i) => i.id == item.id ? item : i).toList();
     newItems.sort((a, b) {
       if (a.isCompleted != b.isCompleted) return a.isCompleted ? 1 : -1;
