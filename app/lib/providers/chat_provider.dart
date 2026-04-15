@@ -5,10 +5,13 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 import '../core/api_client.dart';
 import '../core/constants.dart';
+import '../models/wish_item.dart';
 import 'badge_provider.dart';
 import 'calendar_provider.dart';
 import 'feed_provider.dart';
 import 'mission_provider.dart';
+import 'question_provider.dart';
+import 'wishlist_provider.dart';
 
 // Message send status
 enum MessageStatus { sending, sent, failed }
@@ -369,6 +372,63 @@ class ChatNotifier extends Notifier<ChatState> {
       }
     });
 
+    // 위시리스트 실시간 동기화
+    _socket!.on('wish:new', (data) {
+      try {
+        if (data != null) {
+          final item = WishItem.fromJson(data as Map<String, dynamic>);
+          ref.read(wishlistProvider.notifier).onSocketNew(item);
+        }
+      } catch (e) {
+        debugPrint('[Socket] wish:new parse error: $e');
+      }
+    });
+
+    _socket!.on('wish:updated', (data) {
+      try {
+        if (data != null) {
+          final item = WishItem.fromJson(data as Map<String, dynamic>);
+          ref.read(wishlistProvider.notifier).onSocketUpdated(item);
+        }
+      } catch (e) {
+        debugPrint('[Socket] wish:updated parse error: $e');
+      }
+    });
+
+    _socket!.on('wish:toggled', (data) {
+      try {
+        if (data != null) {
+          final item = WishItem.fromJson(data as Map<String, dynamic>);
+          ref.read(wishlistProvider.notifier).onSocketToggled(item);
+        }
+      } catch (e) {
+        debugPrint('[Socket] wish:toggled parse error: $e');
+      }
+    });
+
+    _socket!.on('wish:deleted', (data) {
+      try {
+        if (data != null) {
+          final map = data as Map<String, dynamic>;
+          final id = map['id'] as String;
+          ref.read(wishlistProvider.notifier).onSocketDeleted(id);
+        }
+      } catch (e) {
+        debugPrint('[Socket] wish:deleted parse error: $e');
+      }
+    });
+
+    // 질문 카드 실시간 동기화
+    _socket!.on('question:answered', (data) {
+      try {
+        if (data != null) {
+          ref.read(questionProvider.notifier).onPartnerAnswered();
+        }
+      } catch (e) {
+        debugPrint('[Socket] question:answered error: $e');
+      }
+    });
+
     _socket!.connect();
   }
 
@@ -425,6 +485,8 @@ class ChatNotifier extends Notifier<ChatState> {
         ref.read(missionProvider.notifier).fetchCalendarMissions(month),
         ref.read(calendarProvider.notifier).refreshCurrentMonth(),
         ref.read(badgeProvider.notifier).fetchBadges(),
+        ref.read(wishlistProvider.notifier).fetchItems(),
+        ref.read(questionProvider.notifier).fetchToday(),
       ]);
     } catch (e) {
       debugPrint('[Chat] refreshRealtimeState error: $e');

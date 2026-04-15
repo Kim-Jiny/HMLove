@@ -52,7 +52,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   final Set<String> _selectedForDelete = {};
   int? _captureStartIndex;
   int? _captureEndIndex;
-  final GlobalKey _captureKey = GlobalKey();
+
 
   @override
   void initState() {
@@ -1720,42 +1720,6 @@ class _LocationBubble extends StatelessWidget {
       await launchUrl(googleUrl, mode: LaunchMode.externalApplication);
     }
   }
-}
-
-class _MapGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFB9D9B0)
-      ..strokeWidth = 0.5;
-
-    // 가로선
-    for (double y = 0; y < size.height; y += 20) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-    // 세로선
-    for (double x = 0; x < size.width; x += 20) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-
-    // 중심 십자선
-    final centerPaint = Paint()
-      ..color = const Color(0xFF81C784)
-      ..strokeWidth = 1;
-    canvas.drawLine(
-      Offset(size.width / 2, 0),
-      Offset(size.width / 2, size.height),
-      centerPaint,
-    );
-    canvas.drawLine(
-      Offset(0, size.height / 2),
-      Offset(size.width, size.height / 2),
-      centerPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _AttachButtonExpanded extends StatelessWidget {

@@ -29,6 +29,8 @@ import settingsRoutes from './routes/settings.js';
 import notificationRoutes from './routes/notification.js';
 import missionRoutes from './routes/mission.js';
 import mapRoutes from './routes/map.js';
+import wishlistRoutes from './routes/wishlist.js';
+import questionRoutes from './routes/question.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -114,6 +116,8 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/notification', notificationRoutes);
 app.use('/api/mission', missionRoutes);
 app.use('/api/map', mapRoutes);
+app.use('/api/wishlist', wishlistRoutes);
+app.use('/api/question', questionRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -165,7 +169,10 @@ io.on('connection', async (socket) => {
       if (!socket.coupleId) return;
 
       const { content, imageUrls } = data;
-      const urls = Array.isArray(imageUrls) ? imageUrls.slice(0, 5) : [];
+      const urls = Array.isArray(imageUrls)
+        ? imageUrls.slice(0, 5).filter(u => typeof u === 'string' && u.length < 2048)
+        : [];
+      if (content !== undefined && content !== null && typeof content !== 'string') return;
       if (!content && urls.length === 0) return;
       if (typeof content === 'string' && content.length > 5000) return;
 
@@ -247,9 +254,10 @@ io.on('connection', async (socket) => {
       if (!socket.coupleId) return;
       const { messageId, content } = data;
       if (!messageId || !content) return;
+      if (typeof content !== 'string' || content.length > 5000) return;
 
       const message = await prisma.message.findUnique({ where: { id: messageId } });
-      if (!message || message.senderId !== socket.userId) return;
+      if (!message || message.senderId !== socket.userId || message.coupleId !== socket.coupleId) return;
 
       const updated = await prisma.message.update({
         where: { id: messageId },
@@ -274,7 +282,7 @@ io.on('connection', async (socket) => {
       if (!messageId) return;
 
       const message = await prisma.message.findUnique({ where: { id: messageId } });
-      if (!message || message.senderId !== socket.userId) return;
+      if (!message || message.senderId !== socket.userId || message.coupleId !== socket.coupleId) return;
 
       await prisma.message.delete({ where: { id: messageId } });
 
@@ -366,21 +374,34 @@ async function sendAnniversaryReminders() {
     });
 
     const now = new Date();
-    const todayStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
+    // KST = UTC+9
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    const todayStr = `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}-${String(kst.getUTCDate()).padStart(2, '0')}`;
 
     let sentCount = 0;
 
     for (const couple of couples) {
       if (couple.users.length < 2) continue;
 
-      const upcoming = getUpcomingAnniversaries(couple, 30);
-      if (upcoming.length === 0) continue;
-
       for (const user of couple.users) {
         const prefs = user.notiPrefs || {};
 
         // 전체 알림 OFF이거나 기념일 알림 OFF이면 스킵
         if (prefs.noti_all === false || prefs.noti_anniversary === false) continue;
+
+        // 유저별 마일스톤 설정 읽기
+        const milestoneConfig = {
+          dayMilestones: Array.isArray(prefs.noti_anniversary_milestones_day)
+            ? prefs.noti_anniversary_milestones_day
+            : undefined,
+          yearMilestones: Array.isArray(prefs.noti_anniversary_milestones_year)
+            ? prefs.noti_anniversary_milestones_year
+            : undefined,
+          birthday: prefs.noti_anniversary_milestones_birthday !== false,
+        };
+
+        const upcoming = getUpcomingAnniversaries(couple, 30, milestoneConfig);
+        if (upcoming.length === 0) continue;
 
         const remindDays = Array.isArray(prefs.noti_anniversary_remind_days)
           ? prefs.noti_anniversary_remind_days

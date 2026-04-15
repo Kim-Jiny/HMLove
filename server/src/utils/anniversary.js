@@ -1,9 +1,12 @@
 /**
  * 기념일 계산 유틸리티
- * - 100일 단위 (100~1000)
+ * - 50일 단위 (50, 100, 200, 300, 500, 1000)
  * - N주년 (1~20)
  * - 생일
  */
+
+/** 기본 일 단위 마일스톤 */
+export const DEFAULT_DAY_MILESTONES = [50, 100, 200, 300, 500, 1000];
 
 /**
  * 특정 월에 해당하는 자동 기념일 목록 반환 (캘린더용)
@@ -16,8 +19,8 @@ export function getAutoAnniversariesForMonth(couple, year, month) {
   const autoEvents = [];
   const start = new Date(couple.startDate);
 
-  // 100일 단위
-  for (let d = 100; d <= 1000; d += 100) {
+  // 일 단위 마일스톤
+  for (const d of DEFAULT_DAY_MILESTONES) {
     const ms = start.getTime() + (d - 1) * 86400000;
     const date = new Date(ms);
     if (date.getUTCFullYear() === year && date.getUTCMonth() === month - 1) {
@@ -80,16 +83,21 @@ export function getAutoAnniversariesForMonth(couple, year, month) {
  * 향후 maxDays 이내의 다가오는 기념일 배열 반환 (리마인드 스케줄러용)
  * @param {Object} couple - couple 객체 (startDate, users[{nickname, birthDate}])
  * @param {number} maxDays - 최대 며칠 이내까지 확인할지
+ * @param {Object} [milestoneConfig] - 유저별 마일스톤 설정 (없으면 전체 포함)
+ * @param {number[]} [milestoneConfig.dayMilestones] - 일 단위 마일스톤 (예: [50, 100, 200])
+ * @param {number[]} [milestoneConfig.yearMilestones] - 주년 마일스톤 (예: [1, 2, 3])
+ * @param {boolean} [milestoneConfig.birthday] - 생일 알림 여부
  * @returns {Array<{title: string, date: Date, daysLeft: number}>}
  */
-export function getUpcomingAnniversaries(couple, maxDays = 30) {
+export function getUpcomingAnniversaries(couple, maxDays = 30, milestoneConfig = null) {
   const now = new Date();
   const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const results = [];
   const start = new Date(couple.startDate);
 
-  // 100일 단위
-  for (let d = 100; d <= 1000; d += 100) {
+  // 일 단위 마일스톤
+  const dayMilestones = milestoneConfig?.dayMilestones ?? DEFAULT_DAY_MILESTONES;
+  for (const d of dayMilestones) {
     const ms = start.getTime() + (d - 1) * 86400000;
     const date = new Date(ms);
     const dateUTC = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
@@ -100,7 +108,8 @@ export function getUpcomingAnniversaries(couple, maxDays = 30) {
   }
 
   // N주년
-  for (let y = 1; y <= 20; y++) {
+  const yearMilestones = milestoneConfig?.yearMilestones ?? Array.from({ length: 20 }, (_, i) => i + 1);
+  for (const y of yearMilestones) {
     const date = new Date(Date.UTC(start.getUTCFullYear() + y, start.getUTCMonth(), start.getUTCDate()));
     const dateUTC = date.getTime();
     const daysLeft = Math.round((dateUTC - todayUTC) / 86400000);
@@ -110,16 +119,19 @@ export function getUpcomingAnniversaries(couple, maxDays = 30) {
   }
 
   // 생일 (올해 또는 내년)
-  const thisYear = now.getUTCFullYear();
-  for (const user of couple.users) {
-    if (user.birthDate) {
-      const birth = new Date(user.birthDate);
-      for (const yr of [thisYear, thisYear + 1]) {
-        const date = new Date(Date.UTC(yr, birth.getUTCMonth(), birth.getUTCDate()));
-        const dateUTC = date.getTime();
-        const daysLeft = Math.round((dateUTC - todayUTC) / 86400000);
-        if (daysLeft >= 0 && daysLeft <= maxDays) {
-          results.push({ title: `${user.nickname} 생일`, date: new Date(dateUTC), daysLeft });
+  const includeBirthday = milestoneConfig?.birthday !== false;
+  if (includeBirthday) {
+    const thisYear = now.getUTCFullYear();
+    for (const user of couple.users) {
+      if (user.birthDate) {
+        const birth = new Date(user.birthDate);
+        for (const yr of [thisYear, thisYear + 1]) {
+          const date = new Date(Date.UTC(yr, birth.getUTCMonth(), birth.getUTCDate()));
+          const dateUTC = date.getTime();
+          const daysLeft = Math.round((dateUTC - todayUTC) / 86400000);
+          if (daysLeft >= 0 && daysLeft <= maxDays) {
+            results.push({ title: `${user.nickname} 생일`, date: new Date(dateUTC), daysLeft });
+          }
         }
       }
     }

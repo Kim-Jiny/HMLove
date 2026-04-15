@@ -35,6 +35,8 @@ model User {
   feedComments     FeedComment[]   @relation("commentAuthor")
   inquiries        Inquiry[]
   notifications    Notification[]
+  wishItems        WishItem[]      @relation("wishAuthor")
+  questionAnswers  QuestionAnswer[]
 
   @@index([coupleId])
 }
@@ -56,6 +58,8 @@ model Couple {
   photos          Photo[]
   letters         Letter[]
   missions        CoupleMission[]
+  wishItems       WishItem[]
+  dailyQuestions  DailyQuestion[]
 }
 
 enum MissionType {
@@ -317,4 +321,54 @@ model AppSettings {
   key       String   @unique
   value     String
   updatedAt DateTime @updatedAt
+}
+
+enum WishCategory {
+  PLACE
+  FOOD
+  ACTIVITY
+  OTHER
+}
+
+model WishItem {
+  id          String       @id @default(uuid())
+  coupleId    String
+  couple      Couple       @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User         @relation("wishAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  category    WishCategory @default(OTHER)
+  title       String
+  memo        String?
+  isCompleted Boolean      @default(false)
+  completedBy String?
+  completedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([coupleId, category])
+}
+
+model DailyQuestion {
+  id          String           @id @default(uuid())
+  coupleId    String
+  couple      Couple           @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  questionIdx Int
+  date        DateTime         @db.Date
+  answers     QuestionAnswer[]
+  createdAt   DateTime         @default(now())
+
+  @@unique([coupleId, date])
+  @@index([coupleId])
+}
+
+model QuestionAnswer {
+  id         String        @id @default(uuid())
+  questionId String
+  question   DailyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answer     String
+  createdAt  DateTime      @default(now())
+
+  @@unique([questionId, userId])
 }
