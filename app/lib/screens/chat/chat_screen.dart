@@ -114,7 +114,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     _debounceTimer?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
-    ref.read(chatProvider.notifier).disconnect();
     super.dispose();
   }
 
