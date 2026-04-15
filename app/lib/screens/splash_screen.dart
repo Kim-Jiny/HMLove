@@ -41,9 +41,18 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
     if (!mounted) return;
 
-    // This will update authProvider state, which triggers
-    // GoRouter's refreshListenable → redirect handles navigation
-    await ref.read(authProvider.notifier).checkAuthStatus();
+    try {
+      // This will update authProvider state, which triggers
+      // GoRouter's refreshListenable → redirect handles navigation
+      await ref.read(authProvider.notifier).checkAuthStatus().timeout(
+            const Duration(seconds: 10),
+          );
+    } catch (_) {
+      // Safety net: if checkAuthStatus throws or times out,
+      // force unauthenticated so the splash never gets stuck.
+      if (!mounted) return;
+      ref.read(authProvider.notifier).forceUnauthenticated();
+    }
   }
 
   @override

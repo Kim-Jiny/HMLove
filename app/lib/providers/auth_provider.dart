@@ -56,6 +56,23 @@ class AuthNotifier extends Notifier<AuthState> {
     return const AuthState();
   }
 
+  /// Safely clear tokens, ignoring errors (e.g. Hive not initialized).
+  Future<void> _safeClearTokens() async {
+    try {
+      await ApiClient.clearTokens();
+      await WidgetService.clearData();
+    } catch (_) {
+      // Hive may not be open — ignore so the caller can still set state.
+    }
+  }
+
+  /// Force the auth state to unauthenticated. Used as a safety net when
+  /// checkAuthStatus fails with an unrecoverable error.
+  void forceUnauthenticated() {
+    if (state.status != AuthStatus.initial) return;
+    state = state.copyWith(status: AuthStatus.unauthenticated);
+  }
+
   /// Check if user is already authenticated. Called on app startup (from the
   /// splash screen) and on app resume (from the root widget observer).
   ///
@@ -110,8 +127,7 @@ class AuthNotifier extends Notifier<AuthState> {
       final isAuthDenied = code == 401 || code == 403;
 
       if (isAuthDenied) {
-        await ApiClient.clearTokens();
-        await WidgetService.clearData();
+        await _safeClearTokens();
         state = AuthState(
           status: AuthStatus.unauthenticated,
           forceLogoutReason: wasAuthenticated
@@ -131,8 +147,7 @@ class AuthNotifier extends Notifier<AuthState> {
 
       // Startup check with a network error — keep the original conservative
       // behavior so the user sees /login instead of a stuck splash.
-      await ApiClient.clearTokens();
-      await WidgetService.clearData();
+      await _safeClearTokens();
       state = state.copyWith(status: AuthStatus.unauthenticated);
     } catch (_) {
       // Same race guard as above.
@@ -141,11 +156,10 @@ class AuthNotifier extends Notifier<AuthState> {
         return;
       }
 
-      // Non-Dio error (parse error, etc.). Treat as auth-dead only on startup;
-      // leave mid-session users alone.
+      // Non-Dio error (parse error, Hive error, etc.). Treat as auth-dead
+      // only on startup; leave mid-session users alone.
       if (wasAuthenticated) return;
-      await ApiClient.clearTokens();
-      await WidgetService.clearData();
+      await _safeClearTokens();
       state = state.copyWith(status: AuthStatus.unauthenticated);
     }
   }

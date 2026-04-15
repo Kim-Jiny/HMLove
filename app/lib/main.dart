@@ -119,12 +119,15 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 필수: Hive + 로케일은 스플래시/라우터가 바로 의존하므로 runApp 이전에 완료.
-  await _guardedInit('Hive', () async {
+  // Hive는 타임아웃 없이 반드시 완료해야 함 (auth 체크에 필수).
+  try {
     await Hive.initFlutter();
     await Hive.openBox(AppConstants.authBox);
     await Hive.openBox(AppConstants.settingsBox);
     await Hive.openBox(AppConstants.cacheBox);
-  });
+  } catch (e) {
+    debugPrint('[init] Hive failed: $e');
+  }
   await _guardedInit(
     'dateFormatting',
     () => initializeDateFormatting('ko_KR', null),

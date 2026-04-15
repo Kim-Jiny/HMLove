@@ -135,9 +135,13 @@ class _AuthInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    final token = ApiClient.getAccessToken();
-    if (token != null) {
-      options.headers['Authorization'] = 'Bearer $token';
+    try {
+      final token = ApiClient.getAccessToken();
+      if (token != null) {
+        options.headers['Authorization'] = 'Bearer $token';
+      }
+    } catch (_) {
+      // Hive may not be ready — proceed without auth header.
     }
     handler.next(options);
   }
@@ -167,8 +171,17 @@ class _AuthInterceptor extends Interceptor {
     // This is the first 401 — take ownership of the refresh.
     _refreshCompleter = Completer<String?>();
 
-    final bool userIsLoggedIn = ApiClient.getAccessToken() != null;
-    final refreshToken = ApiClient.getRefreshToken();
+    bool userIsLoggedIn;
+    String? refreshToken;
+    try {
+      userIsLoggedIn = ApiClient.getAccessToken() != null;
+      refreshToken = ApiClient.getRefreshToken();
+    } catch (_) {
+      // Hive not available — can't refresh, just propagate the error.
+      _refreshCompleter!.complete(null);
+      _refreshCompleter = null;
+      return handler.next(err);
+    }
     if (refreshToken == null) {
       _refreshCompleter!.complete(null);
       _refreshCompleter = null;
