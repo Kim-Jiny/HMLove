@@ -186,8 +186,11 @@ router.get('/history', async (req, res) => {
     const { cursor, limit: limitStr } = req.query;
     const limit = Math.max(1, Math.min(parseInt(limitStr) || 20, 50));
 
+    const todayStr = getTodayStr();
+    const todayDate = new Date(todayStr + 'T00:00:00.000Z');
+
     const questions = await prisma.dailyQuestion.findMany({
-      where: { coupleId },
+      where: { coupleId, date: { lt: todayDate } },
       orderBy: { date: 'desc' },
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
