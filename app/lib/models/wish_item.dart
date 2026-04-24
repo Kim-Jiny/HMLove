@@ -38,6 +38,7 @@ class WishItem {
   final WishCategory category;
   final String title;
   final String? memo;
+  final bool isFavorite;
   final bool isCompleted;
   final String? completedBy;
   final DateTime? completedAt;
@@ -51,6 +52,7 @@ class WishItem {
     required this.category,
     required this.title,
     this.memo,
+    required this.isFavorite,
     required this.isCompleted,
     this.completedBy,
     this.completedAt,
@@ -69,6 +71,7 @@ class WishItem {
       ),
       title: json['title'] as String,
       memo: json['memo'] as String?,
+      isFavorite: json['isFavorite'] as bool? ?? false,
       isCompleted: json['isCompleted'] as bool? ?? false,
       completedBy: json['completedBy'] as String?,
       completedAt: json['completedAt'] != null
@@ -80,20 +83,22 @@ class WishItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'coupleId': coupleId,
-        'authorId': authorId,
-        'category': category.name,
-        'title': title,
-        'memo': memo,
-        'isCompleted': isCompleted,
-        'completedBy': completedBy,
-        'completedAt': completedAt?.toIso8601String(),
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt.toIso8601String(),
-      };
+    'id': id,
+    'coupleId': coupleId,
+    'authorId': authorId,
+    'category': category.name,
+    'title': title,
+    'memo': memo,
+    'isFavorite': isFavorite,
+    'isCompleted': isCompleted,
+    'completedBy': completedBy,
+    'completedAt': completedAt?.toIso8601String(),
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+  };
 
   WishItem copyWith({
+    bool? isFavorite,
     bool? isCompleted,
     String? completedBy,
     DateTime? completedAt,
@@ -108,6 +113,7 @@ class WishItem {
       category: category ?? this.category,
       title: title ?? this.title,
       memo: memo ?? this.memo,
+      isFavorite: isFavorite ?? this.isFavorite,
       isCompleted: isCompleted ?? this.isCompleted,
       completedBy: completedBy ?? this.completedBy,
       completedAt: completedAt ?? this.completedAt,

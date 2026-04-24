@@ -171,6 +171,7 @@ class ChatNotifier extends Notifier<ChatState> {
   bool _chatScreenActive = false;
   bool _hasConnectedOnce = false;
   bool _recoverStateOnNextConnect = false;
+  DateTime? _lastForcedReconnectAt;
 
   @override
   ChatState build() {
@@ -526,6 +527,24 @@ class ChatNotifier extends Notifier<ChatState> {
     }
   }
 
+  /// 앱 복귀 후 기존 소켓 상태를 신뢰하지 않고 새 연결을 강제로 만든다.
+  /// iOS/Android 백그라운드 복귀 시 transport가 죽었는데 connected로 남는 경우를 방지한다.
+  void refreshConnectionOnResume() {
+    final token = ApiClient.getAccessToken();
+    if (token == null) return;
+
+    final now = DateTime.now();
+    if (_lastForcedReconnectAt != null &&
+        now.difference(_lastForcedReconnectAt!) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastForcedReconnectAt = now;
+
+    _socket?.dispose();
+    _socket = null;
+    connect(token, recoverState: true);
+  }
+
   /// Disconnect from the Socket.io server.
   void disconnect() {
     _socket?.dispose();
@@ -553,6 +572,9 @@ class ChatNotifier extends Notifier<ChatState> {
     );
     state = state.copyWith(messages: [optimistic, ...state.messages]);
 
+    // 전체 전송 시도가 오래 걸리면 최종 실패 처리
+    _scheduleSendTimeout(tempId);
+
     // 소켓 연결 보장
     ensureConnected();
 
@@ -577,31 +599,67 @@ class ChatNotifier extends Notifier<ChatState> {
     required String tempId,
     required String content,
     List<String> imageUrls = const [],
+    bool allowReconnectRetry = true,
   }) {
-    _socket?.emit('message:send', {
-      'content': content,
-      if (imageUrls.isNotEmpty) 'imageUrls': imageUrls,
-      '_tempId': tempId,
-    });
+    final socket = _socket;
+    if (socket == null) return;
 
-    // 10초 내 서버 응답 없으면 실패 처리
-    Future.delayed(const Duration(seconds: 10), () {
+    socket
+        .timeout(8000)
+        .emitWithAckAsync('message:send', {
+          'content': content,
+          if (imageUrls.isNotEmpty) 'imageUrls': imageUrls,
+          '_tempId': tempId,
+        })
+        .then((_) {
+          Future.delayed(const Duration(milliseconds: 500), () {
+            final idx = state.messages.indexWhere((m) => m.id == tempId);
+            if (idx != -1 &&
+                state.messages[idx].status == MessageStatus.sending) {
+              _syncMissedMessages();
+            }
+          });
+        })
+        .catchError((error) {
+          debugPrint('[Chat] message:send ack error: $error');
+
+          if (allowReconnectRetry) {
+            refreshConnectionOnResume();
+            return;
+          }
+
+          _markMessageFailed(tempId);
+        });
+  }
+
+  void _scheduleSendTimeout(String tempId) {
+    Future.delayed(const Duration(seconds: 20), () {
       final idx = state.messages.indexWhere((m) => m.id == tempId);
-      if (idx != -1 && state.messages[idx].status == MessageStatus.sending) {
-        final updated = [...state.messages];
-        updated[idx] = updated[idx].copyWith(status: MessageStatus.failed);
-        state = state.copyWith(messages: updated);
-      }
+      if (idx == -1) return;
+      if (state.messages[idx].status != MessageStatus.sending) return;
+      _markMessageFailed(tempId);
     });
+  }
+
+  void _markMessageFailed(String tempId) {
+    final idx = state.messages.indexWhere((m) => m.id == tempId);
+    if (idx == -1) return;
+    if (state.messages[idx].status != MessageStatus.sending) return;
+
+    final updated = [...state.messages];
+    updated[idx] = updated[idx].copyWith(status: MessageStatus.failed);
+    state = state.copyWith(messages: updated);
   }
 
   /// 재연결 시 미전송 메시지 자동 재전송 (sending + failed 모두)
   void _retrySendingMessages() {
     final pendingMessages = state.messages
-        .where((m) =>
-            (m.status == MessageStatus.sending ||
-                m.status == MessageStatus.failed) &&
-            m.id.startsWith('temp-'))
+        .where(
+          (m) =>
+              (m.status == MessageStatus.sending ||
+                  m.status == MessageStatus.failed) &&
+              m.id.startsWith('temp-'),
+        )
         .toList();
 
     if (pendingMessages.isEmpty) return;

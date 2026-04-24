@@ -35,6 +35,7 @@ import questionRoutes from './routes/question.js';
 const app = express();
 app.set('trust proxy', 1);
 const server = createServer(app);
+const connectedUserSockets = new Map();
 
 // Socket.io 설정
 const io = new Server(server, {
@@ -75,6 +76,29 @@ function debouncedChatPush({ senderId, partnerId, coupleId, token, senderNicknam
     });
     _chatPushTimers.delete(key);
   }, 3000);
+}
+
+function addUserSocket(userId, socketId) {
+  if (!userId || !socketId) return 0;
+  const sockets = connectedUserSockets.get(userId) ?? new Set();
+  sockets.add(socketId);
+  connectedUserSockets.set(userId, sockets);
+  return sockets.size;
+}
+
+function removeUserSocket(userId, socketId) {
+  if (!userId || !socketId) return 0;
+  const sockets = connectedUserSockets.get(userId);
+  if (!sockets) return 0;
+
+  sockets.delete(socketId);
+  if (sockets.size === 0) {
+    connectedUserSockets.delete(userId);
+    return 0;
+  }
+
+  connectedUserSockets.set(userId, sockets);
+  return sockets.size;
 }
 
 // Middleware
@@ -141,6 +165,7 @@ io.use((socket, next) => {
 io.on('connection', async (socket) => {
   try {
     console.log(`Socket connected: ${socket.userId}`);
+    const activeSocketCount = addUserSocket(socket.userId, socket.id);
 
     // 사용자의 커플 룸에 참여
     const user = await prisma.user.findUnique({
@@ -154,27 +179,53 @@ io.on('connection', async (socket) => {
       socket.coupleId = user.coupleId;
       socket.nickname = user.nickname;
 
-      // 상대방에게 온라인 알림
-      socket.to(room).emit('partner:online', { userId: socket.userId });
+      const partner = await prisma.user.findFirst({
+        where: {
+          coupleId: user.coupleId,
+          id: { not: socket.userId },
+        },
+        select: { id: true },
+      });
+      if (partner && connectedUserSockets.has(partner.id)) {
+        socket.emit('partner:online', { userId: partner.id });
+      }
+
+      // 같은 사용자의 첫 활성 소켓일 때만 상대방에게 온라인 알림
+      if (activeSocketCount == 1) {
+        socket.to(room).emit('partner:online', { userId: socket.userId });
+      }
     }
   } catch (err) {
+    removeUserSocket(socket.userId, socket.id);
     console.error('Socket connection setup error:', err);
     socket.disconnect(true);
     return;
   }
 
   // 메시지 전송
-  socket.on('message:send', async (data) => {
+  socket.on('message:send', async (data, ack) => {
     try {
-      if (!socket.coupleId) return;
+      if (!socket.coupleId) {
+        ack?.('채팅 연결이 준비되지 않았습니다.');
+        return;
+      }
 
       const { content, imageUrls } = data;
       const urls = Array.isArray(imageUrls)
         ? imageUrls.slice(0, 5).filter(u => typeof u === 'string' && u.length < 2048)
         : [];
-      if (content !== undefined && content !== null && typeof content !== 'string') return;
-      if (!content && urls.length === 0) return;
-      if (typeof content === 'string' && content.length > 5000) return;
+      if (content !== undefined && content !== null && typeof content !== 'string') {
+        ack?.('메시지 형식이 올바르지 않습니다.');
+        return;
+      }
+      if (!content && urls.length === 0) {
+        ack?.('보낼 메시지가 없습니다.');
+        return;
+      }
+      if (typeof content === 'string' && content.length > 5000) {
+        ack?.('메시지가 너무 깁니다.');
+        return;
+      }
 
       const message = await prisma.message.create({
         data: {
@@ -191,6 +242,7 @@ io.on('connection', async (socket) => {
       const room = `couple:${socket.coupleId}`;
       const payload = { ...message, _tempId: data._tempId || null };
       io.to(room).emit('message:new', payload);
+      ack?.(null, { ok: true, messageId: message.id });
 
       // 상대방에게 푸시 알림 (debounce 적용)
       const partner = await prisma.user.findFirst({
@@ -224,6 +276,7 @@ io.on('connection', async (socket) => {
       }
     } catch (err) {
       console.error('Socket message:send error:', err);
+      ack?.('메시지 전송에 실패했습니다.');
       socket.emit('error', { message: '메시지 전송에 실패했습니다.' });
     }
   });
@@ -318,8 +371,9 @@ io.on('connection', async (socket) => {
   // 연결 해제
   socket.on('disconnect', () => {
     if (socket._typingTimer) clearTimeout(socket._typingTimer);
+    const remainingSocketCount = removeUserSocket(socket.userId, socket.id);
     console.log(`Socket disconnected: ${socket.userId}`);
-    if (socket.coupleId) {
+    if (socket.coupleId && remainingSocketCount === 0) {
       socket.to(`couple:${socket.coupleId}`).emit('partner:offline', { userId: socket.userId });
     }
   });

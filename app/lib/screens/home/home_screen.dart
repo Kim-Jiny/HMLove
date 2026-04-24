@@ -18,7 +18,9 @@ import '../../providers/notification_provider.dart';
 import '../../providers/mission_provider.dart';
 import '../../providers/calendar_provider.dart';
 import '../../providers/question_provider.dart';
+import '../../providers/wishlist_provider.dart';
 import '../../models/daily_question.dart';
+import '../../models/wish_item.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -35,13 +37,21 @@ Map<String, dynamic>? _getNextAnniversary(DateTime? startDate) {
   for (final days in milestones) {
     final date = start.add(Duration(days: days - 1));
     if (date.isAfter(today)) {
-      return {'name': '$days일', 'date': date, 'daysLeft': date.difference(today).inDays};
+      return {
+        'name': '$days일',
+        'date': date,
+        'daysLeft': date.difference(today).inDays,
+      };
     }
   }
   int year = today.year - start.year;
   if (DateTime(today.year, start.month, start.day).isBefore(today)) year++;
   final nextAnniv = DateTime(start.year + year, start.month, start.day);
-  return {'name': '$year주년', 'date': nextAnniv, 'daysLeft': nextAnniv.difference(today).inDays};
+  return {
+    'name': '$year주년',
+    'date': nextAnniv,
+    'daysLeft': nextAnniv.difference(today).inDays,
+  };
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
@@ -67,6 +77,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ref.read(notificationProvider.notifier).fetchUnreadCount();
       ref.read(missionProvider.notifier).fetchTodayMissions();
       ref.read(questionProvider.notifier).fetchToday();
+      ref.read(wishlistProvider.notifier).fetchItems();
     });
   }
 
@@ -92,6 +103,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ref.read(notificationProvider.notifier).fetchUnreadCount();
       ref.read(missionProvider.notifier).fetchTodayMissions();
       ref.read(questionProvider.notifier).fetchToday();
+      ref.read(wishlistProvider.notifier).fetchItems();
     }
   }
 
@@ -108,7 +120,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       myName: u?.nickname ?? '나',
       partnerName: partner?.nickname ?? '상대방',
       daysTogether: couple.daysTogether,
-      startDate: '${couple.startDate.year}.${couple.startDate.month.toString().padLeft(2, '0')}.${couple.startDate.day.toString().padLeft(2, '0')}',
+      startDate:
+          '${couple.startDate.year}.${couple.startDate.month.toString().padLeft(2, '0')}.${couple.startDate.day.toString().padLeft(2, '0')}',
       nextAnniversaryName: anniversary?['name'] as String?,
       nextAnniversaryDaysLeft: anniversary?['daysLeft'] as int?,
     );
@@ -123,8 +136,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Future<void> _syncWidgetSchedule() async {
     final now = DateTime.now();
-    final yearMonth =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final yearMonth = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     await ref.read(calendarProvider.notifier).fetchEvents(yearMonth);
     if (!mounted) return;
     final calState = ref.read(calendarProvider);
@@ -149,9 +161,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-                  primary: AppTheme.primaryColor,
-                ),
+            colorScheme: Theme.of(
+              context,
+            ).colorScheme.copyWith(primary: AppTheme.primaryColor),
           ),
           child: child!,
         );
@@ -183,8 +195,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       );
 
       if (confirm == true && mounted) {
-        final success =
-            await ref.read(coupleProvider.notifier).updateStartDate(picked);
+        final success = await ref
+            .read(coupleProvider.notifier)
+            .updateStartDate(picked);
         if (mounted) {
           showTopSnackBar(
             context,
@@ -228,9 +241,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             return InkWell(
               onTap: () async {
                 Navigator.pop(context);
-                await ref.read(moodProvider.notifier).setMood(
-                      emoji: mood['key'] as String,
-                    );
+                await ref
+                    .read(moodProvider.notifier)
+                    .setMood(emoji: mood['key'] as String);
               },
               borderRadius: BorderRadius.circular(12),
               child: Container(
@@ -273,6 +286,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final unreadNotifications = ref.watch(unreadNotificationCountProvider);
     final missionState = ref.watch(missionProvider);
     final questionState = ref.watch(questionProvider);
+    final wishlistState = ref.watch(wishlistProvider);
 
     // Sync widget data when couple/mood changes
     ref.listen(coupleProvider, (_, next) => _syncWidgetCouple(next));
@@ -362,6 +376,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ref.read(notificationProvider.notifier).fetchUnreadCount(),
             ref.read(missionProvider.notifier).fetchTodayMissions(),
             ref.read(questionProvider.notifier).fetchToday(),
+            ref.read(wishlistProvider.notifier).fetchItems(),
           ]);
         },
         child: SingleChildScrollView(
@@ -374,8 +389,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 daysTogether: daysTogether,
                 startDate: coupleState.couple?.startDate,
                 user1Name: user?.nickname ?? '나',
-                user2Name: coupleState.couple?.getPartner(user?.id ?? '')?.nickname ?? '상대방',
-                onEditDate: () => _showEditStartDate(coupleState.couple?.startDate),
+                user2Name:
+                    coupleState.couple?.getPartner(user?.id ?? '')?.nickname ??
+                    '상대방',
+                onEditDate: () =>
+                    _showEditStartDate(coupleState.couple?.startDate),
               ),
               const SizedBox(height: 12),
 
@@ -393,6 +411,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
               const SizedBox(height: 12),
 
+              _WishlistPreviewCard(
+                state: wishlistState,
+                onTap: () => context.push('/wishlist'),
+              ),
+              const SizedBox(height: 12),
+
               // Banner Ad
               BannerAdWidget(adUnitId: AppConstants.adMobHomeBanner),
               const SizedBox(height: 12),
@@ -406,13 +430,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   final success = await ref
                       .read(missionProvider.notifier)
                       .completeMission(id);
-                  if (mounted) {
-                    showTopSnackBar(
-                      context,
-                      success ? '미션 완료!' : '미션 완료에 실패했습니다.',
-                      isError: !success,
-                    );
-                  }
+                  if (!context.mounted) return;
+                  showTopSnackBar(
+                    context,
+                    success ? '미션 완료!' : '미션 완료에 실패했습니다.',
+                    isError: !success,
+                  );
                 },
                 onCancel: (id) async {
                   final confirm = await showDialog<bool>(
@@ -436,13 +459,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     final success = await ref
                         .read(missionProvider.notifier)
                         .cancelMission(id);
-                    if (mounted) {
-                      showTopSnackBar(
-                        context,
-                        success ? '미션 완료가 취소되었습니다.' : '취소에 실패했습니다.',
-                        isError: !success,
-                      );
-                    }
+                    if (!context.mounted) return;
+                    showTopSnackBar(
+                      context,
+                      success ? '미션 완료가 취소되었습니다.' : '취소에 실패했습니다.',
+                      isError: !success,
+                    );
                   }
                 },
               ),
@@ -453,9 +475,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 myMoodEmoji: moodState.myMood?.emoji,
                 partnerMoodEmoji: moodState.partnerMood?.emoji,
                 myName: user?.nickname ?? '나',
-                partnerName: coupleState.couple
-                        ?.getPartner(user?.id ?? '')
-                        ?.nickname ??
+                partnerName:
+                    coupleState.couple?.getPartner(user?.id ?? '')?.nickname ??
                     '상대방',
                 onTap: _showMoodPicker,
               ),
@@ -480,6 +501,344 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 }
 
+class _WishlistPreviewCard extends StatelessWidget {
+  final WishlistState state;
+  final VoidCallback onTap;
+
+  const _WishlistPreviewCard({required this.state, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final favoriteItems = state.items.where((item) => item.isFavorite).toList();
+    final activeFavoriteItems = favoriteItems
+        .where((item) => !item.isCompleted)
+        .toList();
+    final completedItems = state.items
+        .where((item) => item.isCompleted && item.isFavorite)
+        .toList();
+    final previewItems = favoriteItems.take(4).toList();
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFFF1E6DF)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF1EA),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.favorite_rounded,
+                      color: Color(0xFFE07A5F),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          '즐겨찾는 위시',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          '홈에서는 콕 찜해둔 위시만 빠르게 볼 수 있어요',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppTheme.textHint,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: _WishlistMetricChip(
+                      label: '남은 즐겨찾기',
+                      value: '${activeFavoriteItems.length}',
+                      accentColor: const Color(0xFFE07A5F),
+                      backgroundColor: const Color(0xFFFFF5F0),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _WishlistMetricChip(
+                      label: '완료한 항목',
+                      value: '${completedItems.length}',
+                      accentColor: const Color(0xFF4D8C74),
+                      backgroundColor: const Color(0xFFEAF7F0),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (state.isLoading && state.items.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (state.error != null && state.items.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFCFA),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Text(
+                    state.error!,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                )
+              else if (favoriteItems.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFCFA),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFF2E4DB)),
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '아직 즐겨찾기가 없어요',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        '위시리스트에서 하트를 눌러두면 홈에서 따로 모아볼 수 있어요.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFCFA),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFF2E4DB)),
+                  ),
+                  child: Column(
+                    children: [
+                      for (final item in previewItems) ...[
+                        _WishlistPreviewRow(item: item),
+                        if (item != previewItems.last)
+                          const SizedBox(height: 10),
+                      ],
+                      if (favoriteItems.length > previewItems.length) ...[
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            '+ ${favoriteItems.length - previewItems.length}개의 즐겨찾기 위시 더 있어요',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFE07A5F),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WishlistMetricChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color accentColor;
+  final Color backgroundColor;
+
+  const _WishlistMetricChip({
+    required this.label,
+    required this.value,
+    required this.accentColor,
+    required this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: accentColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WishlistPreviewRow extends StatelessWidget {
+  final WishItem item;
+
+  const _WishlistPreviewRow({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF1E9),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            item.category.emoji,
+            style: const TextStyle(fontSize: 16),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (item.isCompleted) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEAF7F0),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text(
+                        '완료',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF4D8C74),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF1E9),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      item.category.label,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFE07A5F),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if ((item.memo ?? '').trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  item.memo!.trim(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // D-Day Counter Card
 class _DdayCard extends StatelessWidget {
   final int? daysTogether;
@@ -500,68 +859,64 @@ class _DdayCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: InkWell(
-      onTap: onEditDate,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: AppTheme.primaryGradient,
-        ),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  user1Name,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+        onTap: onEditDate,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: AppTheme.primaryGradient,
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    user1Name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Icon(
-                    Icons.favorite,
-                    color: Colors.white,
-                    size: 20,
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Icon(Icons.favorite, color: Colors.white, size: 20),
                   ),
-                ),
-                Text(
-                  user2Name,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                  Text(
+                    user2Name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              daysTogether != null ? '$daysTogether일' : '- 일',
-              style: const TextStyle(
-                fontSize: 48,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+                ],
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              startDate != null
-                  ? '${DateFormat('yyyy.MM.dd').format(startDate!)} ~'
-                  : '',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.white.withValues(alpha: 0.8),
+              const SizedBox(height: 16),
+              Text(
+                daysTogether != null ? '$daysTogether일' : '- 일',
+                style: const TextStyle(
+                  fontSize: 48,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                startDate != null
+                    ? '${DateFormat('yyyy.MM.dd').format(startDate!)} ~'
+                    : '',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.white.withValues(alpha: 0.8),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -579,17 +934,25 @@ class _AnniversaryCard extends StatelessWidget {
 
     final today = DateUtils.dateOnly(DateTime.now());
     final start = DateUtils.dateOnly(startDate!);
-    final milestones = [50, 100, 200, 300, 365, 500, 700, 730, 1000, 1095, 1461];
+    final milestones = [
+      50,
+      100,
+      200,
+      300,
+      365,
+      500,
+      700,
+      730,
+      1000,
+      1095,
+      1461,
+    ];
 
     for (final days in milestones) {
       final date = start.add(Duration(days: days - 1));
       if (date.isAfter(today)) {
         final daysLeft = date.difference(today).inDays;
-        return {
-          'name': '$days일',
-          'date': date,
-          'daysLeft': daysLeft,
-        };
+        return {'name': '$days일', 'date': date, 'daysLeft': daysLeft};
       }
     }
 
@@ -598,11 +961,7 @@ class _AnniversaryCard extends StatelessWidget {
     if (DateTime(today.year, start.month, start.day).isBefore(today)) {
       year++;
     }
-    final nextAnniv = DateTime(
-      start.year + year,
-      start.month,
-      start.day,
-    );
+    final nextAnniv = DateTime(start.year + year, start.month, start.day);
     return {
       'name': '$year주년',
       'date': nextAnniv,
@@ -672,8 +1031,9 @@ class _AnniversaryCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      DateFormat('M월 d일')
-                          .format(anniversary['date'] as DateTime),
+                      DateFormat(
+                        'M월 d일',
+                      ).format(anniversary['date'] as DateTime),
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppTheme.textSecondary,
@@ -683,7 +1043,11 @@ class _AnniversaryCard extends StatelessWidget {
                 ),
               ],
               const SizedBox(width: 4),
-              const Icon(Icons.chevron_right, color: AppTheme.textHint, size: 20),
+              const Icon(
+                Icons.chevron_right,
+                color: AppTheme.textHint,
+                size: 20,
+              ),
             ],
           ),
         ),
@@ -755,10 +1119,7 @@ class _MoodCard extends StatelessWidget {
                   ),
                   Text(
                     '탭하여 변경',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppTheme.textHint,
-                    ),
+                    style: TextStyle(fontSize: 11, color: AppTheme.textHint),
                   ),
                 ],
               ),
@@ -872,10 +1233,7 @@ class _MissionCard extends StatelessWidget {
                 const SizedBox(width: 10),
                 const Text(
                   '커플 미션',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
@@ -957,10 +1315,7 @@ class _MissionRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Text(
-            mission!.emoji,
-            style: const TextStyle(fontSize: 28),
-          ),
+          Text(mission!.emoji, style: const TextStyle(fontSize: 28)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -970,7 +1325,9 @@ class _MissionRow extends StatelessWidget {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: mission!.type == 'DAILY'
                             ? AppTheme.primaryColor.withValues(alpha: 0.1)
@@ -1050,7 +1407,10 @@ class _MissionRow extends StatelessWidget {
             GestureDetector(
               onTap: () => onCancel(mission!.id),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF4CAF50).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
@@ -1159,10 +1519,7 @@ class _QuestionMiniCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right,
-                color: AppTheme.textHint,
-              ),
+              const Icon(Icons.chevron_right, color: AppTheme.textHint),
             ],
           ),
         ),
@@ -1204,10 +1561,7 @@ class _FortuneCard extends StatelessWidget {
                   color: const Color(0xFFFFF3E0),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
-                  Icons.auto_awesome,
-                  color: Color(0xFFFF9800),
-                ),
+                child: const Icon(Icons.auto_awesome, color: Color(0xFFFF9800)),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -1259,10 +1613,7 @@ class _FortuneCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right,
-                color: AppTheme.textHint,
-              ),
+              const Icon(Icons.chevron_right, color: AppTheme.textHint),
             ],
           ),
         ),
