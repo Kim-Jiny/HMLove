@@ -83,39 +83,48 @@ class CalendarMood {
 class CalendarState {
   final List<CalendarEvent> events;
   final List<CalendarEvent> deviceEvents;
+  final List<CalendarEvent> holidayEvents;
   final Map<String, List<CalendarMood>> moodMap;
   final DateTime? selectedDay;
   final bool isLoading;
   final String? error;
   final bool deviceCalendarEnabled;
+  final bool holidayOverlayEnabled;
 
   const CalendarState({
     this.events = const [],
     this.deviceEvents = const [],
+    this.holidayEvents = const [],
     this.moodMap = const {},
     this.selectedDay,
     this.isLoading = false,
     this.error,
     this.deviceCalendarEnabled = false,
+    this.holidayOverlayEnabled = false,
   });
 
   CalendarState copyWith({
     List<CalendarEvent>? events,
     List<CalendarEvent>? deviceEvents,
+    List<CalendarEvent>? holidayEvents,
     Map<String, List<CalendarMood>>? moodMap,
     DateTime? selectedDay,
     bool? isLoading,
     String? error,
     bool? deviceCalendarEnabled,
+    bool? holidayOverlayEnabled,
   }) {
     return CalendarState(
       events: events ?? this.events,
       deviceEvents: deviceEvents ?? this.deviceEvents,
+      holidayEvents: holidayEvents ?? this.holidayEvents,
       moodMap: moodMap ?? this.moodMap,
       selectedDay: selectedDay ?? this.selectedDay,
       isLoading: isLoading ?? this.isLoading,
       error: error,
       deviceCalendarEnabled: deviceCalendarEnabled ?? this.deviceCalendarEnabled,
+      holidayOverlayEnabled:
+          holidayOverlayEnabled ?? this.holidayOverlayEnabled,
     );
   }
 
@@ -126,14 +135,26 @@ class CalendarState {
     return moodMap[key] ?? [];
   }
 
-  /// Get events for a specific day (app + device).
+  /// Get events for a specific day (app + device + holiday).
   List<CalendarEvent> getEventsForDay(DateTime day) {
-    final allEvents = [...events, ...deviceEvents];
+    final allEvents = [...events, ...deviceEvents, ...holidayEvents];
     return allEvents.where((event) {
       return event.date.year == day.year &&
           event.date.month == day.month &&
           event.date.day == day.day;
     }).toList();
+  }
+
+  /// True if [day] has any auto-detected holiday event.
+  bool isHoliday(DateTime day) {
+    for (final e in holidayEvents) {
+      if (e.date.year == day.year &&
+          e.date.month == day.month &&
+          e.date.day == day.day) {
+        return true;
+      }
+    }
+    return false;
   }
 }
 
@@ -146,7 +167,11 @@ class CalendarNotifier extends Notifier<CalendarState> {
   CalendarState build() {
     _dio = ref.read(dioProvider);
     final enabled = DeviceCalendarService.isSyncEnabled();
-    return CalendarState(deviceCalendarEnabled: enabled);
+    final holidayEnabled = DeviceCalendarService.isHolidayOverlayEnabled();
+    return CalendarState(
+      deviceCalendarEnabled: enabled,
+      holidayOverlayEnabled: holidayEnabled,
+    );
   }
 
   /// 현재 보고 있는 월의 데이터를 재조회 (소켓 실시간 동기화용).
@@ -186,6 +211,11 @@ class CalendarNotifier extends Notifier<CalendarState> {
       if (state.deviceCalendarEnabled) {
         _fetchDeviceEvents(yearMonth);
         _syncServerEventsToDevice(events);
+      }
+
+      // 공휴일 오버레이 (기기 캘린더 연동과 독립)
+      if (state.holidayOverlayEnabled) {
+        _fetchHolidayEvents(yearMonth);
       }
     } on DioException catch (e) {
       final message =
@@ -231,6 +261,106 @@ class CalendarNotifier extends Notifier<CalendarState> {
         await WidgetService.updateDeviceCalendarEvents(
             const [], _currentYearMonth);
       }
+    }
+  }
+
+  /// 캘린더 화면 최초 진입 시 1회 호출. 아직 한 번도 평가된 적 없고
+  /// OS 권한이 (자동 요청으로) 허용되면 공휴일 오버레이를 기본 ON으로 켠다.
+  /// 사용자가 이미 명시적으로 끈 적이 있거나 권한을 거부한 경우엔 아무 것도 안 함.
+  Future<void> bootstrapHolidayOverlay() async {
+    if (DeviceCalendarService.isHolidayOverlayInitialized()) {
+      if (state.holidayOverlayEnabled && _currentYearMonth.isNotEmpty) {
+        await _fetchHolidayEvents(_currentYearMonth);
+        await WidgetService.setHolidayOverlayEnabled(true);
+      }
+      return;
+    }
+
+    // 최초 평가: 권한을 (필요 시) 요청. 이미 허용돼 있으면 프롬프트 없이 true.
+    final hasPerm = await DeviceCalendarService.hasPermission();
+    final granted =
+        hasPerm || await DeviceCalendarService.requestPermission();
+
+    await DeviceCalendarService.setHolidayOverlayInitialized(true);
+    if (granted) {
+      await DeviceCalendarService.setHolidayOverlayEnabled(true);
+      await WidgetService.setHolidayOverlayEnabled(true);
+      state = state.copyWith(holidayOverlayEnabled: true);
+      if (_currentYearMonth.isNotEmpty) {
+        await _fetchHolidayEvents(_currentYearMonth);
+      }
+    }
+  }
+
+  /// 공휴일 오버레이 on/off. 권한은 UI에서 사전 처리(거부 시 설정 이동).
+  Future<void> toggleHolidayOverlay(bool enabled) async {
+    await DeviceCalendarService.setHolidayOverlayInitialized(true);
+    await DeviceCalendarService.setHolidayOverlayEnabled(enabled);
+    state = state.copyWith(
+      holidayOverlayEnabled: enabled,
+      holidayEvents: enabled ? state.holidayEvents : const [],
+    );
+    await WidgetService.setHolidayOverlayEnabled(enabled);
+    if (enabled) {
+      if (_currentYearMonth.isNotEmpty) {
+        await _fetchHolidayEvents(_currentYearMonth);
+      }
+    } else if (_currentYearMonth.isNotEmpty) {
+      await WidgetService.updateHolidayEvents(const [], _currentYearMonth);
+    }
+  }
+
+  Future<void> _fetchHolidayEvents(String yearMonth) async {
+    try {
+      final holidayCalendars =
+          await DeviceCalendarService.getHolidayCalendars();
+      if (holidayCalendars.isEmpty) {
+        state = state.copyWith(holidayEvents: const []);
+        await WidgetService.updateHolidayEvents(const [], yearMonth);
+        return;
+      }
+
+      final calendarIds =
+          holidayCalendars.map((c) => c.id!).whereType<String>().toList();
+      final parts = yearMonth.split('-');
+      final year = int.parse(parts[0]);
+      final month = int.parse(parts[1]);
+      final start = DateTime(year, month, 1);
+      final end = DateTime(year, month + 1, 0, 23, 59, 59);
+
+      final rawEvents = await DeviceCalendarService.getEvents(
+        calendarIds: calendarIds,
+        start: start,
+        end: end,
+      );
+
+      final holidayEvents = rawEvents.map((e) {
+        final eventDate = e.start ?? DateTime.now();
+        return CalendarEvent(
+          id: 'holiday_${e.calendarId ?? ''}_${e.eventId ?? ''}',
+          title: e.title ?? '',
+          date: DateTime(eventDate.year, eventDate.month, eventDate.day),
+          eventType: 'holiday',
+          color: '#D32F2F',
+        );
+      }).toList();
+
+      state = state.copyWith(holidayEvents: holidayEvents);
+
+      await WidgetService.updateHolidayEvents(
+        holidayEvents
+            .map((e) => {
+                  'date': DateFormat('yyyy-MM-dd').format(e.date),
+                  'title': e.title,
+                  'color': e.color ?? '#D32F2F',
+                  'isAnniversary': false,
+                  'eventType': 'holiday',
+                })
+            .toList(),
+        yearMonth,
+      );
+    } catch (e) {
+      debugPrint('[Holidays] fetch error: $e');
     }
   }
 

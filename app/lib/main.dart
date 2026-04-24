@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show HttpClient, Platform;
 
@@ -192,6 +193,9 @@ class HMLoveApp extends ConsumerStatefulWidget {
 
 class _HMLoveAppState extends ConsumerState<HMLoveApp>
     with WidgetsBindingObserver {
+  StreamSubscription<Uri?>? _widgetClickSub;
+  String? _pendingWidgetRoute;
+
   @override
   void initState() {
     super.initState();
@@ -202,13 +206,59 @@ class _HMLoveAppState extends ConsumerState<HMLoveApp>
     ApiClient.onForceLogout = (reason) async {
       await ref.read(authProvider.notifier).forceLogout(reason);
     };
+
+    // Route home-widget taps (e.g. calendar widget → /calendar).
+    _widgetClickSub = HomeWidget.widgetClicked.listen(_handleWidgetClick);
+    HomeWidget.initiallyLaunchedFromHomeWidget().then((uri) {
+      if (!mounted) return;
+      _handleWidgetClick(uri);
+    });
+
+    // Consume pending widget route once auth resolves (cold-launch case).
+    ref.listenManual<AuthState>(authProvider, (prev, next) {
+      if (_pendingWidgetRoute == null) return;
+      if (next.status == AuthStatus.authenticated) {
+        final target = _pendingWidgetRoute!;
+        _pendingWidgetRoute = null;
+        ref.read(routerProvider).go(target);
+      } else if (next.status == AuthStatus.unauthenticated) {
+        _pendingWidgetRoute = null;
+      }
+    });
   }
 
   @override
   void dispose() {
+    _widgetClickSub?.cancel();
+    _widgetClickSub = null;
     ApiClient.onForceLogout = null;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _handleWidgetClick(Uri? uri) {
+    if (uri == null) return;
+    final route = _widgetUriToRoute(uri);
+    if (route == null) return;
+    final status = ref.read(authProvider).status;
+    if (status == AuthStatus.authenticated) {
+      ref.read(routerProvider).go(route);
+    } else if (status == AuthStatus.initial) {
+      _pendingWidgetRoute = route;
+    }
+  }
+
+  String? _widgetUriToRoute(Uri uri) {
+    // Widget URIs use the form hmlove://<section> (e.g. hmlove://calendar).
+    final target = uri.host.isNotEmpty
+        ? uri.host
+        : (uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '');
+    switch (target) {
+      case 'calendar':
+        return '/calendar';
+      default:
+        return null;
+    }
   }
 
   @override

@@ -188,6 +188,9 @@ struct CoupleData {
     let calendarEvents: [CalendarEventData]
     let calendarYearMonth: String
     let calendarTheme: CalendarWidgetTheme
+    /// yyyy-MM-dd strings for dates the OS flagged as holidays.
+    /// Empty when the user has disabled the holiday overlay.
+    let holidayDates: Set<String>
 
     static let placeholder = CoupleData(
         isConnected: true,
@@ -202,7 +205,8 @@ struct CoupleData {
         todaySchedule: "데이트 약속",
         calendarEvents: [],
         calendarYearMonth: "",
-        calendarTheme: .defaultTheme
+        calendarTheme: .defaultTheme,
+        holidayDates: []
     )
 
     static let notConnected = CoupleData(
@@ -214,7 +218,8 @@ struct CoupleData {
         todaySchedule: "",
         calendarEvents: [],
         calendarYearMonth: "",
-        calendarTheme: .defaultTheme
+        calendarTheme: .defaultTheme,
+        holidayDates: []
     )
 }
 
@@ -443,6 +448,18 @@ struct CoupleTimelineProvider: AppIntentTimelineProvider {
             calendarEvents.append(contentsOf: Self.parseWidgetEvents(deviceJson))
         }
 
+        // Auto-detected OS holiday overlay (separate toggle). Loaded as a
+        // date Set so we can recolor matching day numbers without cluttering
+        // the event chip list.
+        var holidayDates: Set<String> = []
+        let holidayEnabled = defaults.bool(forKey: "holidayOverlayEnabled")
+        if holidayEnabled && !calendarYearMonth.isEmpty {
+            let holidayJson = defaults.string(
+                forKey: "holidayEvents_\(calendarYearMonth)"
+            )
+            holidayDates = Self.parseHolidayDates(holidayJson)
+        }
+
         return CoupleData(
             isConnected: true,
             myName: defaults.string(forKey: "myName") ?? "나",
@@ -458,8 +475,25 @@ struct CoupleTimelineProvider: AppIntentTimelineProvider {
             calendarYearMonth: calendarYearMonth,
             calendarTheme: CalendarWidgetTheme.theme(
                 for: configuration.theme?.rawValue
-            )
+            ),
+            holidayDates: holidayDates
         )
+    }
+
+    private static func parseHolidayDates(_ json: String?) -> Set<String> {
+        guard let json = json,
+              let data = json.data(using: .utf8),
+              let array = try? JSONSerialization.jsonObject(with: data)
+                as? [[String: Any]] else {
+            return []
+        }
+        var dates: Set<String> = []
+        for dict in array {
+            guard let raw = dict["date"] as? String else { continue }
+            let prefix = String(raw.prefix(10))
+            if !prefix.isEmpty { dates.insert(prefix) }
+        }
+        return dates
     }
 
     private func loadData() -> CoupleData {
@@ -769,6 +803,19 @@ struct LargeWidgetView: View {
         calendar.isDateInToday(date)
     }
 
+    private static let holidayKeyFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        return f
+    }()
+
+    private func isHoliday(_ date: Date) -> Bool {
+        guard !data.holidayDates.isEmpty else { return false }
+        return data.holidayDates.contains(Self.holidayKeyFormatter.string(from: date))
+    }
+
     @ViewBuilder
     private var monthHeader: some View {
         if #available(iOS 17.0, *) {
@@ -876,6 +923,7 @@ struct LargeWidgetView: View {
                                 let dayItem = days[index]
                                 let dayEvents = dayItem.isCurrentMonth ? Array(eventsForDate(dayItem.date).prefix(5)) : []
                                 let today = dayItem.isCurrentMonth && isToday(dayItem.date)
+                                let holiday = dayItem.isCurrentMonth && isHoliday(dayItem.date)
 
                                 VStack(spacing: 0) {
                                     ZStack {
@@ -885,10 +933,11 @@ struct LargeWidgetView: View {
                                                 .frame(width: 14, height: 14)
                                         }
                                         Text("\(dayItem.day)")
-                                            .font(.system(size: 10, weight: today ? .bold : .regular))
+                                            .font(.system(size: 10, weight: (today || holiday) ? .bold : .regular))
                                             .foregroundColor(
                                                 today ? .white :
                                                 !dayItem.isCurrentMonth ? Color(hex: theme.textSecondaryHex).opacity(0.55) :
+                                                holiday ? Color(hex: "D32F2F") :
                                                 col == 0 ? Color(hex: theme.primaryHex) :
                                                 Color(hex: theme.textPrimaryHex)
                                             )
@@ -1002,6 +1051,7 @@ struct WidgetView: View {
                 MediumWidgetView(data: entry.data)
             case .systemLarge:
                 LargeWidgetView(data: entry.data)
+                    .widgetURL(URL(string: "hmlove://calendar?homeWidget=true"))
             default:
                 MediumWidgetView(data: entry.data)
             }

@@ -9,10 +9,12 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.widget.RemoteViews
+import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetPlugin
 import org.json.JSONArray
 import org.json.JSONObject
@@ -55,6 +57,9 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
         // (e.g. expired auth token) on every tick.
         private const val FETCH_FAIL_COOLDOWN_MS = 15 * 60 * 1000L  // 15 minutes
         private const val PREF_KEY_FETCH_FAIL_PREFIX = "widgetFetchFail_"
+
+        // Standalone holiday text color (theme-independent, 0xFFD32F2F).
+        private val HOLIDAY_RED: Int = 0xFFD32F2F.toInt()
     }
 
     private fun launchAppIntent(context: Context): PendingIntent {
@@ -62,6 +67,14 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
         return PendingIntent.getActivity(
             context, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun launchCalendarIntent(context: Context): PendingIntent {
+        return HomeWidgetLaunchIntent.getActivity(
+            context,
+            MainActivity::class.java,
+            Uri.parse("hmlove://calendar")
         )
     }
 
@@ -232,6 +245,27 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
             }
         } catch (_: Exception) {
             // Malformed JSON is non-fatal — skip the blob.
+        }
+    }
+
+    /**
+     * Extract just the yyyy-MM-dd dates from a holiday events JSON blob.
+     * We only need the dates (to recolor the day number), not the titles.
+     */
+    private fun parseHolidayDates(json: String?): Set<String> {
+        if (json.isNullOrEmpty()) return emptySet()
+        return try {
+            val arr = JSONArray(json)
+            val out = HashSet<String>(arr.length())
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val raw = obj.optString("date", "")
+                val prefix = raw.take(10)
+                if (prefix.isNotEmpty()) out.add(prefix)
+            }
+            out
+        } catch (_: Exception) {
+            emptySet()
         }
     }
 
@@ -417,7 +451,7 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                 }
 
                 val views = RemoteViews(context.packageName, R.layout.widget_calendar)
-                views.setOnClickPendingIntent(R.id.widget_root, launchAppIntent(context))
+                views.setOnClickPendingIntent(R.id.widget_root, launchCalendarIntent(context))
 
                 // Month navigation buttons
                 views.setOnClickPendingIntent(
@@ -529,6 +563,15 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                     list.sortBy { it.sortPriority }
                 }
 
+                // Auto-detected OS holidays (separate toggle). We only need the
+                // dates — they recolor the day number red without adding chips.
+                val holidayEnabled = prefs.getBoolean("holidayOverlayEnabled", false)
+                val holidayDates: Set<String> = if (holidayEnabled) {
+                    parseHolidayDates(prefs.getString("holidayEvents_$displayMonthKey", null))
+                } else {
+                    emptySet()
+                }
+
                 // Build calendar grid
                 val firstOfMonth = displayMonth.atDay(1)
                 val firstWeekday = firstOfMonth.dayOfWeek.value % 7 // 0=Sun
@@ -591,6 +634,8 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
 
                     cellView.setTextViewText(R.id.cell_day, day.toString())
 
+                    val isHoliday = isCurrentMonth && holidayDates.contains(dateStr)
+
                     if (isToday) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                             cellView.setInt(
@@ -609,6 +654,8 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                         cellView.setTextColor(R.id.cell_day, Color.WHITE)
                     } else if (!isCurrentMonth) {
                         cellView.setTextColor(R.id.cell_day, withAlpha(theme.textSecondary, 130))
+                    } else if (isHoliday) {
+                        cellView.setTextColor(R.id.cell_day, HOLIDAY_RED)
                     } else if (col == 0) {
                         cellView.setTextColor(R.id.cell_day, theme.primary)
                     } else {
