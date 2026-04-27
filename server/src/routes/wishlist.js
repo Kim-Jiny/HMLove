@@ -19,7 +19,11 @@ router.get('/', async (req, res) => {
 
     const items = await prisma.wishItem.findMany({
       where,
-      orderBy: [{ isCompleted: 'asc' }, { createdAt: 'desc' }],
+      orderBy: [
+        { isFavorite: 'desc' },
+        { isCompleted: 'asc' },
+        { createdAt: 'desc' },
+      ],
     });
 
     res.json({ items });
@@ -113,6 +117,39 @@ router.patch('/:id', async (req, res) => {
     }
     console.error('PATCH /wishlist/:id error:', err);
     res.status(500).json({ error: '위시 수정에 실패했습니다.' });
+  }
+});
+
+// 즐겨찾기 토글
+router.patch('/:id/favorite', async (req, res) => {
+  try {
+    const { coupleId } = req.user;
+    const { id } = req.params;
+
+    const existing = await prisma.wishItem.findFirst({ where: { id, coupleId } });
+    if (!existing) {
+      return res.status(404).json({ error: '위시를 찾을 수 없습니다.' });
+    }
+
+    const item = await prisma.wishItem.update({
+      where: { id },
+      data: {
+        isFavorite: !existing.isFavorite,
+      },
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`couple:${coupleId}`).emit('wish:updated', item);
+    }
+
+    res.json({ item });
+  } catch (err) {
+    if (err.code === 'P2025') {
+      return res.status(404).json({ error: '위시를 찾을 수 없습니다.' });
+    }
+    console.error('PATCH /wishlist/:id/favorite error:', err);
+    res.status(500).json({ error: '즐겨찾기 변경에 실패했습니다.' });
   }
 });
 

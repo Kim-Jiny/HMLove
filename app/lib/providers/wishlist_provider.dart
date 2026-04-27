@@ -30,7 +30,9 @@ class WishlistState {
       items: items ?? this.items,
       isLoading: isLoading ?? this.isLoading,
       error: identical(error, _sentinel) ? this.error : error as String?,
-      filterCategory: clearFilter ? null : (filterCategory ?? this.filterCategory),
+      filterCategory: clearFilter
+          ? null
+          : (filterCategory ?? this.filterCategory),
     );
   }
 
@@ -42,6 +44,16 @@ class WishlistState {
 
 class WishlistNotifier extends Notifier<WishlistState> {
   late final Dio _dio;
+
+  List<WishItem> _sortItems(List<WishItem> items) {
+    final sorted = [...items];
+    sorted.sort((a, b) {
+      if (a.isFavorite != b.isFavorite) return a.isFavorite ? -1 : 1;
+      if (a.isCompleted != b.isCompleted) return a.isCompleted ? 1 : -1;
+      return b.createdAt.compareTo(a.createdAt);
+    });
+    return sorted;
+  }
 
   @override
   WishlistState build() {
@@ -67,11 +79,17 @@ class WishlistNotifier extends Notifier<WishlistState> {
       final items = (data['items'] as List)
           .map((e) => WishItem.fromJson(e as Map<String, dynamic>))
           .toList();
-      state = state.copyWith(items: items, isLoading: false, error: null);
+      state = state.copyWith(
+        items: _sortItems(items),
+        isLoading: false,
+        error: null,
+      );
     } on DioException catch (e) {
-      final message = ((e.response?.data is Map)
-              ? (e.response?.data['error'] ?? e.response?.data['message'])
-              : null) as String? ??
+      final message =
+          ((e.response?.data is Map)
+                  ? (e.response?.data['error'] ?? e.response?.data['message'])
+                  : null)
+              as String? ??
           '위시리스트를 불러오는데 실패했습니다.';
       state = state.copyWith(error: message, isLoading: false);
     } catch (e) {
@@ -86,16 +104,15 @@ class WishlistNotifier extends Notifier<WishlistState> {
     WishCategory category = WishCategory.OTHER,
   }) async {
     try {
-      final response = await _dio.post('/wishlist', data: {
-        'title': title,
-        'memo': memo,
-        'category': category.name,
-      });
+      final response = await _dio.post(
+        '/wishlist',
+        data: {'title': title, 'memo': memo, 'category': category.name},
+      );
       final data = response.data as Map<String, dynamic>;
       final item = WishItem.fromJson(data['item'] as Map<String, dynamic>);
       // 소켓 이벤트로 이미 추가되었을 수 있으므로 중복 체크
       if (!state.items.any((i) => i.id == item.id)) {
-        state = state.copyWith(items: [item, ...state.items]);
+        state = state.copyWith(items: _sortItems([item, ...state.items]));
       }
       return true;
     } catch (e) {
@@ -104,7 +121,12 @@ class WishlistNotifier extends Notifier<WishlistState> {
     }
   }
 
-  Future<bool> updateItem(String id, {String? title, String? memo, WishCategory? category}) async {
+  Future<bool> updateItem(
+    String id, {
+    String? title,
+    String? memo,
+    WishCategory? category,
+  }) async {
     try {
       final data = <String, dynamic>{};
       if (title != null) data['title'] = title;
@@ -112,9 +134,12 @@ class WishlistNotifier extends Notifier<WishlistState> {
       if (category != null) data['category'] = category.name;
       final response = await _dio.patch('/wishlist/$id', data: data);
       final updated = WishItem.fromJson(
-          (response.data as Map<String, dynamic>)['item'] as Map<String, dynamic>);
+        (response.data as Map<String, dynamic>)['item'] as Map<String, dynamic>,
+      );
       state = state.copyWith(
-        items: state.items.map((i) => i.id == id ? updated : i).toList(),
+        items: _sortItems(
+          state.items.map((i) => i.id == id ? updated : i).toList(),
+        ),
       );
       return true;
     } catch (e) {
@@ -123,18 +148,35 @@ class WishlistNotifier extends Notifier<WishlistState> {
     }
   }
 
+  Future<bool> toggleFavorite(String id) async {
+    try {
+      final response = await _dio.patch('/wishlist/$id/favorite');
+      final updated = WishItem.fromJson(
+        (response.data as Map<String, dynamic>)['item'] as Map<String, dynamic>,
+      );
+      state = state.copyWith(
+        items: _sortItems(
+          state.items.map((i) => i.id == id ? updated : i).toList(),
+        ),
+      );
+      return true;
+    } catch (e) {
+      debugPrint('[Wishlist] toggleFavorite error: $e');
+      return false;
+    }
+  }
+
   Future<bool> toggleItem(String id) async {
     try {
       final response = await _dio.patch('/wishlist/$id/toggle');
       final updated = WishItem.fromJson(
-          (response.data as Map<String, dynamic>)['item'] as Map<String, dynamic>);
-      final newItems = state.items.map((i) => i.id == id ? updated : i).toList();
-      // 미완료 먼저, 완료 나중 정렬
-      newItems.sort((a, b) {
-        if (a.isCompleted != b.isCompleted) return a.isCompleted ? 1 : -1;
-        return b.createdAt.compareTo(a.createdAt);
-      });
-      state = state.copyWith(items: newItems);
+        (response.data as Map<String, dynamic>)['item'] as Map<String, dynamic>,
+      );
+      state = state.copyWith(
+        items: _sortItems(
+          state.items.map((i) => i.id == id ? updated : i).toList(),
+        ),
+      );
       return true;
     } catch (e) {
       debugPrint('[Wishlist] toggleItem error: $e');
@@ -158,7 +200,7 @@ class WishlistNotifier extends Notifier<WishlistState> {
   /// 소켓 이벤트로 아이템 업데이트
   void onSocketNew(WishItem item) {
     if (!state.items.any((i) => i.id == item.id)) {
-      state = state.copyWith(items: [item, ...state.items]);
+      state = state.copyWith(items: _sortItems([item, ...state.items]));
     }
   }
 
@@ -166,7 +208,9 @@ class WishlistNotifier extends Notifier<WishlistState> {
     final exists = state.items.any((i) => i.id == item.id);
     if (exists) {
       state = state.copyWith(
-        items: state.items.map((i) => i.id == item.id ? item : i).toList(),
+        items: _sortItems(
+          state.items.map((i) => i.id == item.id ? item : i).toList(),
+        ),
       );
     }
   }
@@ -174,12 +218,11 @@ class WishlistNotifier extends Notifier<WishlistState> {
   void onSocketToggled(WishItem item) {
     final exists = state.items.any((i) => i.id == item.id);
     if (!exists) return;
-    final newItems = state.items.map((i) => i.id == item.id ? item : i).toList();
-    newItems.sort((a, b) {
-      if (a.isCompleted != b.isCompleted) return a.isCompleted ? 1 : -1;
-      return b.createdAt.compareTo(a.createdAt);
-    });
-    state = state.copyWith(items: newItems);
+    state = state.copyWith(
+      items: _sortItems(
+        state.items.map((i) => i.id == item.id ? item : i).toList(),
+      ),
+    );
   }
 
   void onSocketDeleted(String id) {

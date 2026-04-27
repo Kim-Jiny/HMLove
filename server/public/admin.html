@@ -57,6 +57,16 @@
     .stat-mini { text-align: center; background: #f8fafc; border-radius: 8px; padding: 8px 4px; }
     .stat-mini .num { font-size: 16px; font-weight: 700; color: #1f2937; }
     .stat-mini .lbl { font-size: 10px; color: #9ca3af; }
+    .ops-card { border-radius: 14px; padding: 16px; color: #fff; }
+    .ops-card .kpi { font-size: 28px; font-weight: 800; line-height: 1; margin-top: 8px; }
+    .ops-card .caption { font-size: 12px; opacity: .9; margin-top: 6px; }
+    .list-card { padding: 18px; }
+    .list-item { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f3f4f6; }
+    .list-item:first-child { padding-top: 0; }
+    .list-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .list-title { font-size: 13px; font-weight: 600; color: #1f2937; }
+    .list-sub { font-size: 11px; color: #9ca3af; margin-top: 3px; line-height: 1.4; }
+    .pill-soft { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
 
     /* ===== MOBILE RESPONSIVE ===== */
     @media (max-width: 768px) {
@@ -218,6 +228,29 @@
         </div>
       </div>
 
+      <div class="charts-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:20px;">
+        <div class="ops-card" style="background:linear-gradient(135deg,#f97316,#fb7185);">
+          <div style="font-size:12px;font-weight:600;">답변 대기 문의</div>
+          <div id="ops-pending-inquiries" class="kpi">-</div>
+          <div class="caption">접수됨과 처리 중 문의 합계</div>
+        </div>
+        <div class="ops-card" style="background:linear-gradient(135deg,#ef4444,#f87171);">
+          <div style="font-size:12px;font-weight:600;">미해결 다툼</div>
+          <div id="ops-unresolved-fights" class="kpi">-</div>
+          <div class="caption">감정 케어가 필요한 기록</div>
+        </div>
+        <div class="ops-card" style="background:linear-gradient(135deg,#0ea5e9,#22c55e);">
+          <div style="font-size:12px;font-weight:600;">푸시 등록률</div>
+          <div id="ops-push-rate" class="kpi">-</div>
+          <div id="ops-push-caption" class="caption">-</div>
+        </div>
+        <div class="ops-card" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);">
+          <div style="font-size:12px;font-weight:600;">미연결 유저</div>
+          <div id="ops-uncoupled-users" class="kpi">-</div>
+          <div class="caption">가입 후 커플 연결 전 상태</div>
+        </div>
+      </div>
+
       <!-- Charts -->
       <div class="charts-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
         <div class="card" style="padding:20px;">
@@ -247,6 +280,30 @@
               <tbody id="recentBody"></tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <div class="bottom-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:20px;">
+        <div class="card list-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <h3 style="font-size:14px;font-weight:700;color:#1f2937;">대기 문의</h3>
+            <span class="pill-soft" style="background:#fff7ed;color:#ea580c;">운영 우선</span>
+          </div>
+          <div id="pendingInquiryList"></div>
+        </div>
+        <div class="card list-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <h3 style="font-size:14px;font-weight:700;color:#1f2937;">미해결 다툼</h3>
+            <span class="pill-soft" style="background:#fef2f2;color:#dc2626;">감정 케어</span>
+          </div>
+          <div id="unresolvedFightList"></div>
+        </div>
+        <div class="card list-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <h3 style="font-size:14px;font-weight:700;color:#1f2937;">활동 상위 유저</h3>
+            <span class="pill-soft" style="background:#eef2ff;color:#4f46e5;">최근 30일</span>
+          </div>
+          <div id="topUsersList"></div>
         </div>
       </div>
     </div>
@@ -540,10 +597,72 @@ async function loadOverview() {
   document.getElementById('s-newu').textContent = d.today.newUsers;
   document.getElementById('s-newm').textContent = d.today.newMessages.toLocaleString();
   document.getElementById('s-avgm').textContent = d.activity.avgMessagesPerCouple.toLocaleString();
+  renderOpsOverview(d);
 
   renderCharts(d.charts);
   renderFight(d.fights);
   renderRecent(d.recentUsers);
+}
+
+function renderOpsOverview(d) {
+  document.getElementById('ops-pending-inquiries').textContent = d.attention.pendingInquiries;
+  document.getElementById('ops-unresolved-fights').textContent = d.attention.unresolvedFights;
+  document.getElementById('ops-push-rate').textContent = d.activity.pushCoverageRate + '%';
+  document.getElementById('ops-push-caption').textContent =
+    '등록 ' + d.activity.usersWithPush + '명 / 미등록 ' + d.activity.usersWithoutPush + '명';
+  document.getElementById('ops-uncoupled-users').textContent = d.activity.uncoupledUsers;
+
+  renderOverviewList('pendingInquiryList', d.spotlight.pendingInquiries, function(inq) {
+    return {
+      title: esc(inq.title),
+      subtitle: esc(inq.user?.nickname || '알 수 없음') + ' · ' + fmtDT(inq.createdAt),
+      meta: inq.status === 'PENDING' ? '접수됨' : '처리 중',
+      metaStyle: inq.status === 'PENDING'
+        ? 'background:#fff7ed;color:#ea580c;'
+        : 'background:#eff6ff;color:#2563eb;',
+    };
+  }, '대기 문의가 없습니다.');
+
+  renderOverviewList('unresolvedFightList', d.spotlight.unresolvedFights, function(fight) {
+    var names = (fight.couple?.users || []).map(function(u) { return esc(u.nickname); }).join(' & ');
+    var reason = esc(fight.reason || '');
+    return {
+      title: names || '커플 정보 없음',
+      subtitle: (reason.length > 42 ? reason.slice(0, 42) + '...' : reason) + ' · ' + fmtD(fight.date),
+      meta: '미해결',
+      metaStyle: 'background:#fef2f2;color:#dc2626;',
+    };
+  }, '미해결 다툼이 없습니다.');
+
+  renderOverviewList('topUsersList', d.spotlight.topMessageUsers, function(user) {
+    return {
+      title: esc(user.nickname),
+      subtitle: '최근 30일 메시지 ' + (user.recentMessageCount || 0) + ' · 피드 ' + (user._count?.feeds || 0) + ' · 사진 ' + (user._count?.photos || 0),
+      meta: user.coupleId ? '커플 연결' : '미연결',
+      metaStyle: user.coupleId
+        ? 'background:#ecfdf5;color:#059669;'
+        : 'background:#f3f4f6;color:#6b7280;',
+    };
+  }, '활동 데이터가 없습니다.');
+}
+
+function renderOverviewList(elId, items, mapper, emptyText) {
+  var el = document.getElementById(elId);
+  if (!items || items.length === 0) {
+    el.innerHTML = '<div style="padding:24px 0;text-align:center;font-size:12px;color:#9ca3af;">' + emptyText + '</div>';
+    return;
+  }
+
+  el.innerHTML = items.map(function(item) {
+    var row = mapper(item);
+    return '<div class="list-item">' +
+      '<div style="min-width:0;">' +
+        '<div class="list-title">' + row.title + '</div>' +
+        '<div class="list-sub">' + row.subtitle + '</div>' +
+      '</div>' +
+      '<div><span class="pill-soft" style="' + row.metaStyle + '">' + row.meta + '</span></div>' +
+    '</div>';
+  }).join('');
 }
 
 function fill14(data) {

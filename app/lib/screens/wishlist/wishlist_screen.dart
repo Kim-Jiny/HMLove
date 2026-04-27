@@ -31,11 +31,9 @@ class _WishlistScreenState extends ConsumerState<WishlistScreen> {
       ),
       builder: (_) => _AddWishSheet(
         onAdd: (title, memo, category) async {
-          final success = await ref.read(wishlistProvider.notifier).addItem(
-                title: title,
-                memo: memo,
-                category: category,
-              );
+          final success = await ref
+              .read(wishlistProvider.notifier)
+              .addItem(title: title, memo: memo, category: category);
           if (mounted) {
             showTopSnackBar(
               context,
@@ -71,17 +69,21 @@ class _WishlistScreenState extends ConsumerState<WishlistScreen> {
                 _FilterChip(
                   label: '전체',
                   isSelected: state.filterCategory == null,
-                  onTap: () => ref.read(wishlistProvider.notifier).setFilter(null),
+                  onTap: () =>
+                      ref.read(wishlistProvider.notifier).setFilter(null),
                 ),
                 const SizedBox(width: 8),
-                ...WishCategory.values.map((cat) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: _FilterChip(
-                        label: '${cat.emoji} ${cat.label}',
-                        isSelected: state.filterCategory == cat,
-                        onTap: () => ref.read(wishlistProvider.notifier).setFilter(cat),
-                      ),
-                    )),
+                ...WishCategory.values.map(
+                  (cat) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _FilterChip(
+                      label: '${cat.emoji} ${cat.label}',
+                      isSelected: state.filterCategory == cat,
+                      onTap: () =>
+                          ref.read(wishlistProvider.notifier).setFilter(cat),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -92,8 +94,11 @@ class _WishlistScreenState extends ConsumerState<WishlistScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.error_outline,
-                            size: 48, color: Colors.grey.shade300),
+                        Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: Colors.grey.shade300,
+                        ),
                         const SizedBox(height: 12),
                         Text(
                           state.error!,
@@ -115,86 +120,103 @@ class _WishlistScreenState extends ConsumerState<WishlistScreen> {
                 : state.isLoading && items.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : items.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.favorite_border,
-                                size: 48, color: Colors.grey.shade300),
-                            const SizedBox(height: 12),
-                            Text(
-                              '아직 위시가 없어요\n함께 하고 싶은 것들을 추가해보세요!',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: AppTheme.textSecondary,
-                              ),
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.favorite_border,
+                          size: 48,
+                          color: Colors.grey.shade300,
                         ),
-                      )
-                    : RefreshIndicator(
-                        color: AppTheme.primaryColor,
-                        onRefresh: () =>
-                            ref.read(wishlistProvider.notifier).fetchItems(),
-                        child: ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
-                          itemCount: items.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 8),
-                          itemBuilder: (context, index) {
-                            final item = items[index];
-                            return _WishCard(
-                              item: item,
-                              onToggle: () async {
-                                final success = await ref
-                                    .read(wishlistProvider.notifier)
-                                    .toggleItem(item.id);
-                                if (mounted && !success) {
-                                  showTopSnackBar(context, '상태 변경에 실패했습니다.',
-                                      isError: true);
-                                }
-                              },
-                              onDelete: () async {
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    title: const Text('위시 삭제'),
-                                    content: const Text('이 위시를 삭제하시겠어요?'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(ctx, false),
-                                        child: const Text('취소'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(ctx, true),
-                                        child: const Text('삭제',
-                                            style:
-                                                TextStyle(color: Colors.red)),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                if (confirm == true) {
-                                  final success = await ref
-                                      .read(wishlistProvider.notifier)
-                                      .deleteItem(item.id);
-                                  if (mounted) {
-                                    showTopSnackBar(
-                                      context,
-                                      success
-                                          ? '위시가 삭제되었습니다.'
-                                          : '삭제에 실패했습니다.',
-                                      isError: !success,
-                                    );
-                                  }
-                                }
-                              },
-                            );
+                        const SizedBox(height: 12),
+                        Text(
+                          '아직 위시가 없어요\n함께 하고 싶은 것들을 추가해보세요!',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    color: AppTheme.primaryColor,
+                    onRefresh: () =>
+                        ref.read(wishlistProvider.notifier).fetchItems(),
+                    child: ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
+                      itemCount: items.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        return _WishCard(
+                          item: item,
+                          onFavoriteToggle: () async {
+                            final success = await ref
+                                .read(wishlistProvider.notifier)
+                                .toggleFavorite(item.id);
+                            if (!context.mounted) return;
+                            if (!success) {
+                              showTopSnackBar(
+                                context,
+                                '즐겨찾기 변경에 실패했습니다.',
+                                isError: true,
+                              );
+                            }
                           },
-                        ),
-                      ),
+                          onToggle: () async {
+                            final success = await ref
+                                .read(wishlistProvider.notifier)
+                                .toggleItem(item.id);
+                            if (!context.mounted) return;
+                            if (!success) {
+                              showTopSnackBar(
+                                context,
+                                '상태 변경에 실패했습니다.',
+                                isError: true,
+                              );
+                            }
+                          },
+                          onDelete: () async {
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('위시 삭제'),
+                                content: const Text('이 위시를 삭제하시겠어요?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('취소'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    child: const Text(
+                                      '삭제',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirm == true) {
+                              final success = await ref
+                                  .read(wishlistProvider.notifier)
+                                  .deleteItem(item.id);
+                              if (!context.mounted) return;
+                              showTopSnackBar(
+                                context,
+                                success ? '위시가 삭제되었습니다.' : '삭제에 실패했습니다.',
+                                isError: !success,
+                              );
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
@@ -220,9 +242,7 @@ class _FilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected
-              ? AppTheme.primaryColor
-              : Colors.grey.shade100,
+          color: isSelected ? AppTheme.primaryColor : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected ? AppTheme.primaryColor : Colors.grey.shade300,
@@ -243,11 +263,13 @@ class _FilterChip extends StatelessWidget {
 
 class _WishCard extends StatelessWidget {
   final WishItem item;
+  final VoidCallback onFavoriteToggle;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
 
   const _WishCard({
     required this.item,
+    required this.onFavoriteToggle,
     required this.onToggle,
     required this.onDelete,
   });
@@ -264,24 +286,24 @@ class _WishCard extends StatelessWidget {
             children: [
               // 완료 체크박스
               Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: item.isCompleted
+                      ? AppTheme.primaryColor
+                      : Colors.transparent,
+                  border: Border.all(
                     color: item.isCompleted
                         ? AppTheme.primaryColor
-                        : Colors.transparent,
-                    border: Border.all(
-                      color: item.isCompleted
-                          ? AppTheme.primaryColor
-                          : Colors.grey.shade400,
-                      width: 2,
-                    ),
+                        : Colors.grey.shade400,
+                    width: 2,
                   ),
-                  child: item.isCompleted
-                      ? const Icon(Icons.check, color: Colors.white, size: 16)
-                      : null,
                 ),
+                child: item.isCompleted
+                    ? const Icon(Icons.check, color: Colors.white, size: 16)
+                    : null,
+              ),
               const SizedBox(width: 14),
               // 카테고리 아이콘 + 제목
               Expanded(
@@ -297,7 +319,9 @@ class _WishCard extends StatelessWidget {
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: AppTheme.primaryColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
@@ -319,8 +343,9 @@ class _WishCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
-                        decoration:
-                            item.isCompleted ? TextDecoration.lineThrough : null,
+                        decoration: item.isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
                         color: item.isCompleted
                             ? AppTheme.textSecondary
                             : AppTheme.textPrimary,
@@ -341,11 +366,30 @@ class _WishCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // 삭제 버튼
-              IconButton(
-                icon: Icon(Icons.delete_outline,
-                    size: 20, color: Colors.grey.shade400),
-                onPressed: onDelete,
+              Column(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      item.isFavorite
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      size: 22,
+                      color: item.isFavorite
+                          ? const Color(0xFFE07A5F)
+                          : Colors.grey.shade400,
+                    ),
+                    tooltip: item.isFavorite ? '즐겨찾기 해제' : '즐겨찾기',
+                    onPressed: onFavoriteToggle,
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.delete_outline,
+                      size: 20,
+                      color: Colors.grey.shade400,
+                    ),
+                    onPressed: onDelete,
+                  ),
+                ],
               ),
             ],
           ),
@@ -357,7 +401,7 @@ class _WishCard extends StatelessWidget {
 
 class _AddWishSheet extends StatefulWidget {
   final Future<void> Function(String title, String? memo, WishCategory category)
-      onAdd;
+  onAdd;
 
   const _AddWishSheet({required this.onAdd});
 
@@ -470,7 +514,8 @@ class _AddWishSheetState extends State<_AddWishSheet> {
                             : _memoController.text.trim(),
                         _category,
                       );
-                      if (mounted) Navigator.pop(context);
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
                     },
               style: FilledButton.styleFrom(
                 backgroundColor: AppTheme.primaryColor,

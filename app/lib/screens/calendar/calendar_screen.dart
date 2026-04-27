@@ -29,11 +29,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   void initState() {
     super.initState();
     _selectedDay = DateTime.now();
-    Future.microtask(() {
+    Future.microtask(() async {
       final yearMonth = DateFormat('yyyy-MM').format(_focusedDay);
       ref.read(calendarProvider.notifier).fetchEvents(yearMonth);
       ref.read(calendarProvider.notifier).selectDay(_selectedDay!);
       ref.read(missionProvider.notifier).fetchCalendarMissions(yearMonth);
+      // 공휴일 오버레이 최초 부트스트랩 (1회만 권한 자동 요청).
+      await ref.read(calendarProvider.notifier).bootstrapHolidayOverlay();
     });
   }
 
@@ -192,7 +194,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   }
 
   void _showEventDetail(CalendarEvent event) {
-    final isUserEvent = !event.isAuto && event.eventType != 'feed' && event.eventType != 'device';
+    final isUserEvent = !event.isAuto &&
+        event.eventType != 'feed' &&
+        event.eventType != 'device' &&
+        event.eventType != 'holiday';
 
     showModalBottomSheet(
       context: context,
@@ -768,6 +773,39 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 outsideDaysVisible: false,
               ),
               calendarBuilders: CalendarBuilders(
+                defaultBuilder: (context, day, focusedDay) {
+                  if (!calendarState.isHoliday(day)) return null;
+                  return Center(
+                    child: Text(
+                      '${day.day}',
+                      style: const TextStyle(
+                        color: Color(0xFFD32F2F),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  );
+                },
+                todayBuilder: (context, day, focusedDay) {
+                  if (!calendarState.isHoliday(day)) return null;
+                  return Center(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryLight.withValues(alpha: 0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      width: 32,
+                      height: 32,
+                      alignment: Alignment.center,
+                      child: Text(
+                        '${day.day}',
+                        style: const TextStyle(
+                          color: Color(0xFFD32F2F),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  );
+                },
                 markerBuilder: (context, day, events) {
                   final dayKey =
                       '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
@@ -797,6 +835,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   }
                   if (types.contains('device')) {
                     dots.add(_buildDot(const Color(0xFF4CAF50)));
+                  }
+                  if (types.contains('holiday')) {
+                    dots.add(_buildDot(const Color(0xFFD32F2F)));
                   }
 
                   return Positioned(
@@ -846,6 +887,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 ),
                 if (calendarState.deviceCalendarEnabled)
                   _buildLegend(const Color(0xFF4CAF50), '기기'),
+                if (calendarState.holidayOverlayEnabled)
+                  _buildLegend(const Color(0xFFD32F2F), '공휴일'),
               ],
             ),
           ),
@@ -955,7 +998,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         Color iconColor;
         IconData icon;
 
-        if (event.eventType == 'device') {
+        if (event.eventType == 'holiday') {
+          iconBgColor = const Color(0xFFFFEBEE);
+          iconColor = const Color(0xFFD32F2F);
+          icon = Icons.flag;
+        } else if (event.eventType == 'device') {
           iconBgColor = const Color(0xFFE8F5E9);
           iconColor = const Color(0xFF4CAF50);
           icon = Icons.event_note;
@@ -980,8 +1027,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         }
 
         // 사용자가 만든 일정만 탭/삭제 가능
-        final isUserEvent =
-            !event.isAuto && event.eventType != 'feed' && event.eventType != 'device';
+        final isUserEvent = !event.isAuto &&
+            event.eventType != 'feed' &&
+            event.eventType != 'device' &&
+            event.eventType != 'holiday';
 
         return Card(
           child: ListTile(
@@ -1156,6 +1205,7 @@ class _DeviceCalendarSettingsSheet extends StatefulWidget {
 class _DeviceCalendarSettingsSheetState
     extends State<_DeviceCalendarSettingsSheet> {
   late bool _isEnabled;
+  late bool _holidayEnabled;
   List<dc.Calendar> _calendars = [];
   List<dc.Calendar> _writableCalendars = [];
   List<String> _selectedIds = [];
@@ -1167,6 +1217,7 @@ class _DeviceCalendarSettingsSheetState
   void initState() {
     super.initState();
     _isEnabled = widget.isEnabled;
+    _holidayEnabled = DeviceCalendarService.isHolidayOverlayEnabled();
     _defaultWriteCalendarId = widget.notifier.getDefaultWriteCalendarId();
     _syncPartner = widget.notifier.isSyncPartnerEnabled();
     if (_isEnabled) {
@@ -1262,6 +1313,37 @@ class _DeviceCalendarSettingsSheetState
             style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 20),
+
+          // 공휴일 표시 토글 (기기 캘린더 동기화와 독립)
+          SwitchListTile(
+            value: _holidayEnabled,
+            onChanged: (enabled) async {
+              if (enabled) {
+                final hasPermission = await _ensurePermission();
+                if (!hasPermission) return;
+              }
+              await widget.notifier.toggleHolidayOverlay(enabled);
+              setState(() => _holidayEnabled = enabled);
+              widget.onChanged();
+            },
+            title: const Text(
+              '공휴일 표시',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: const Text(
+              '기기 설정의 공휴일 캘린더를 자동 감지해 표시',
+              style: TextStyle(fontSize: 12),
+            ),
+            secondary: Icon(
+              Icons.flag_outlined,
+              color: _holidayEnabled
+                  ? const Color(0xFFD32F2F)
+                  : AppTheme.textHint,
+            ),
+            activeColor: const Color(0xFFD32F2F),
+            contentPadding: EdgeInsets.zero,
+          ),
+          const Divider(height: 8),
 
           // 동기화 토글
           SwitchListTile(

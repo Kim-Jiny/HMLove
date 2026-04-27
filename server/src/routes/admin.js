@@ -70,7 +70,27 @@ router.get('/stats', async (req, res) => {
     fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
     fourteenDaysAgo.setHours(0, 0, 0, 0);
 
-    const [totalUsers, totalCouples, totalMessages, totalFeeds, totalPhotos, totalLetters, totalFortunes, totalCalendarEvents, totalMoods] = await Promise.all([
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    const [
+      totalUsers,
+      totalCouples,
+      totalMessages,
+      totalFeeds,
+      totalPhotos,
+      totalLetters,
+      totalFortunes,
+      totalCalendarEvents,
+      totalMoods,
+      connectedUsers,
+      usersWithPush,
+      pendingInquiries,
+      unresolvedFights,
+      scheduledLetters,
+      newCouplesToday,
+    ] = await Promise.all([
       prisma.user.count(),
       prisma.couple.count(),
       prisma.message.count(),
@@ -80,6 +100,12 @@ router.get('/stats', async (req, res) => {
       prisma.fortune.count(),
       prisma.calendarEvent.count(),
       prisma.mood.count(),
+      prisma.user.count({ where: { coupleId: { not: null } } }),
+      prisma.user.count({ where: { fcmToken: { not: null } } }),
+      prisma.inquiry.count({ where: { status: { in: ['PENDING', 'IN_PROGRESS'] } } }),
+      prisma.fight.count({ where: { isResolved: false } }),
+      prisma.letter.count({ where: { status: 'SCHEDULED' } }),
+      prisma.couple.count({ where: { createdAt: { gte: todayStart } } }),
     ]);
 
     const [newUsersToday, newMessagesToday, newFeedsToday, moodsToday] = await Promise.all([
@@ -149,6 +175,77 @@ router.get('/stats', async (req, res) => {
       prisma.fight.count({ where: { isResolved: true } }),
     ]);
 
+    const [recentPendingInquiries, recentUnresolvedFights, recentDormantCouples, topMessageUsersRaw] =
+      await Promise.all([
+        prisma.inquiry.findMany({
+          where: { status: { in: ['PENDING', 'IN_PROGRESS'] } },
+          take: 5,
+          orderBy: { createdAt: 'asc' },
+          include: {
+            user: {
+              select: { id: true, nickname: true, email: true },
+            },
+          },
+        }),
+        prisma.fight.findMany({
+          where: { isResolved: false },
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            author: { select: { id: true, nickname: true } },
+            couple: {
+              select: {
+                id: true,
+                users: { select: { id: true, nickname: true } },
+              },
+            },
+          },
+        }),
+        prisma.couple.findMany({
+          take: 5,
+          orderBy: { updatedAt: 'asc' },
+          where: { updatedAt: { lte: fourteenDaysAgo } },
+          include: {
+            users: { select: { id: true, nickname: true } },
+            _count: {
+              select: { messages: true, feeds: true, photos: true, letters: true },
+            },
+          },
+        }),
+        prisma.$queryRaw`
+          SELECT "senderId", COUNT(*)::int AS "messageCount"
+          FROM "Message"
+          WHERE "createdAt" >= ${thirtyDaysAgo}
+          GROUP BY "senderId"
+          ORDER BY "messageCount" DESC
+          LIMIT 5
+        `,
+      ]);
+
+    const topMessageUserIds = topMessageUsersRaw.map(row => row.senderId);
+    const topMessageUsersMeta = topMessageUserIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: topMessageUserIds } },
+          select: {
+            id: true,
+            nickname: true,
+            email: true,
+            coupleId: true,
+            _count: { select: { feeds: true, photos: true } },
+          },
+        })
+      : [];
+    const topMessageUsers = topMessageUsersRaw
+      .map((row) => {
+        const user = topMessageUsersMeta.find(item => item.id === row.senderId);
+        if (!user) return null;
+        return {
+          ...user,
+          recentMessageCount: Number(row.messageCount),
+        };
+      })
+      .filter(Boolean);
+
     // 최근 유저 10명
     const recentUsers = await prisma.user.findMany({
       take: 10,
@@ -158,11 +255,38 @@ router.get('/stats', async (req, res) => {
 
     res.json({
       overview: { totalUsers, totalCouples, totalMessages, totalFeeds, totalPhotos, totalLetters, totalFortunes, totalCalendarEvents, totalMoods },
-      today: { newUsers: newUsersToday, newMessages: newMessagesToday, newFeeds: newFeedsToday, moods: moodsToday, activeUsers: dauIds.size },
-      activity: { weeklyActiveUsers: wauIds.size, avgMessagesPerCouple: totalCouples > 0 ? Math.round(totalMessages / totalCouples) : 0 },
+      today: {
+        newUsers: newUsersToday,
+        newCouples: newCouplesToday,
+        newMessages: newMessagesToday,
+        newFeeds: newFeedsToday,
+        moods: moodsToday,
+        activeUsers: dauIds.size,
+      },
+      activity: {
+        weeklyActiveUsers: wauIds.size,
+        avgMessagesPerCouple: totalCouples > 0 ? Math.round(totalMessages / totalCouples) : 0,
+        connectedUsers,
+        uncoupledUsers: totalUsers - connectedUsers,
+        usersWithPush,
+        usersWithoutPush: totalUsers - usersWithPush,
+        pushCoverageRate: totalUsers > 0 ? Math.round((usersWithPush / totalUsers) * 100) : 0,
+      },
       charts: { dailyMessages: dailyMessagesRaw.map(fmt), dailyUsers: dailyUsersRaw.map(fmt), dailyFeeds: dailyFeedsRaw.map(fmt) },
       fights: { total: totalFights, resolved: resolvedFights, unresolved: totalFights - resolvedFights },
       recentUsers,
+      attention: {
+        pendingInquiries,
+        unresolvedFights,
+        scheduledLetters,
+        dormantCouples: recentDormantCouples.length,
+      },
+      spotlight: {
+        pendingInquiries: recentPendingInquiries,
+        unresolvedFights: recentUnresolvedFights,
+        dormantCouples: recentDormantCouples,
+        topMessageUsers,
+      },
     });
   } catch (err) {
     console.error('Admin stats error:', err);

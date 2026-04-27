@@ -79,6 +79,61 @@ class DeviceCalendarService {
     return all.where((c) => c.isReadOnly == false).toList();
   }
 
+  /// OS가 제공하는 공휴일 캘린더 자동 감지. 읽기전용 구독 캘린더 중
+  /// 이름에 언어별 "공휴일" 키워드를 포함하는 항목만 반환하므로
+  /// 한국/일본/영어권/유럽권 등 지역 무관하게 자동 동작한다.
+  static const _holidayKeywords = [
+    'holiday', 'holidays',
+    '공휴일',
+    '祝日', '祝祭日', '節日', '节日',
+    'feriado', 'feriados',
+    'férié', 'fériés', 'jours fériés',
+    'feiertag', 'feiertage',
+    'festivo', 'festivi', 'festività',
+    'helgdag', 'helgdagar', 'helligdag', 'helligdage',
+    'święto', 'święta',
+    'feestdag', 'feestdagen',
+    'праздник', 'праздники',
+    'חג', 'חגים',
+    'hari libur', 'hari raya',
+    'วันหยุด',
+    'ngày lễ',
+  ];
+
+  static Future<List<Calendar>> getHolidayCalendars() async {
+    final all = await getCalendars();
+    return all.where((c) {
+      if (c.isReadOnly != true) return false;
+      final name = (c.name ?? '').toLowerCase();
+      if (name.isEmpty) return false;
+      return _holidayKeywords.any((kw) => name.contains(kw.toLowerCase()));
+    }).toList();
+  }
+
+  // --- 공휴일 오버레이 설정 ---
+
+  /// 유저가 최초로 공휴일 토글을 평가받은 적이 있는지.
+  /// false면 캘린더 화면 진입 시 1회 자동 권한 요청 + 기본 ON 시도.
+  static bool isHolidayOverlayInitialized() {
+    final box = Hive.box(AppConstants.authBox);
+    return box.get('holidayOverlayInitialized', defaultValue: false) as bool;
+  }
+
+  static Future<void> setHolidayOverlayInitialized(bool value) async {
+    final box = Hive.box(AppConstants.authBox);
+    await box.put('holidayOverlayInitialized', value);
+  }
+
+  static bool isHolidayOverlayEnabled() {
+    final box = Hive.box(AppConstants.authBox);
+    return box.get('holidayOverlayEnabled', defaultValue: false) as bool;
+  }
+
+  static Future<void> setHolidayOverlayEnabled(bool enabled) async {
+    final box = Hive.box(AppConstants.authBox);
+    await box.put('holidayOverlayEnabled', enabled);
+  }
+
   static Future<List<Event>> getEvents({
     required List<String> calendarIds,
     required DateTime start,

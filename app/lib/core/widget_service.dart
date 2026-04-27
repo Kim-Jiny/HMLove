@@ -12,6 +12,7 @@ const _androidSmallWidgetName = 'HMLoveSmallWidgetProvider';
 const _androidCalendarWidgetName = 'HMLoveCalendarWidgetProvider';
 const _calendarEventMonthsKey = 'widgetCalendarEventMonths';
 const _deviceCalendarEventMonthsKey = 'widgetDeviceCalendarEventMonths';
+const _holidayEventMonthsKey = 'widgetHolidayEventMonths';
 
 class WidgetService {
   WidgetService._();
@@ -60,6 +61,7 @@ class WidgetService {
     final deviceMonths = await _loadTrackedMonths(
       _deviceCalendarEventMonthsKey,
     );
+    final holidayMonths = await _loadTrackedMonths(_holidayEventMonthsKey);
 
     final clears = <Future<bool?>>[
       HomeWidget.saveWidgetData('isConnected', false),
@@ -77,8 +79,10 @@ class WidgetService {
       HomeWidget.saveWidgetData<String?>('calendarYearMonth', null),
       HomeWidget.saveWidgetData<String?>('calendarEvents', null),
       HomeWidget.saveWidgetData<bool?>('deviceCalendarEnabled', null),
+      HomeWidget.saveWidgetData<bool?>('holidayOverlayEnabled', null),
       HomeWidget.saveWidgetData<String?>(_calendarEventMonthsKey, null),
       HomeWidget.saveWidgetData<String?>(_deviceCalendarEventMonthsKey, null),
+      HomeWidget.saveWidgetData<String?>(_holidayEventMonthsKey, null),
     ];
 
     for (final yearMonth in calendarMonths) {
@@ -90,6 +94,14 @@ class WidgetService {
       clears.add(
         HomeWidget.saveWidgetData<String?>(
           'deviceCalendarEvents_$yearMonth',
+          null,
+        ),
+      );
+    }
+    for (final yearMonth in holidayMonths) {
+      clears.add(
+        HomeWidget.saveWidgetData<String?>(
+          'holidayEvents_$yearMonth',
           null,
         ),
       );
@@ -167,6 +179,30 @@ class WidgetService {
         jsonEncode(events),
       ),
       _trackMonth(_deviceCalendarEventMonthsKey, yearMonth),
+    ]);
+    await _refresh();
+  }
+
+  /// Enable or disable holiday display in widgets.
+  /// Widgets gate their read of `holidayEvents_{ym}` on this flag.
+  static Future<void> setHolidayOverlayEnabled(bool enabled) async {
+    await HomeWidget.saveWidgetData('holidayOverlayEnabled', enabled);
+    await _refresh();
+  }
+
+  /// Push auto-detected OS holiday events for [yearMonth] to the widget.
+  /// Widget reads these under `holidayEvents_{yearMonth}` and paints the
+  /// matching day numbers red.
+  static Future<void> updateHolidayEvents(
+    List<Map<String, dynamic>> events,
+    String yearMonth,
+  ) async {
+    await Future.wait([
+      HomeWidget.saveWidgetData(
+        'holidayEvents_$yearMonth',
+        jsonEncode(events),
+      ),
+      _trackMonth(_holidayEventMonthsKey, yearMonth),
     ]);
     await _refresh();
   }

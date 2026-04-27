@@ -5,6 +5,7 @@ import '../core/api_client.dart';
 import '../core/push_notification_service.dart';
 import '../core/widget_service.dart';
 import '../models/user.dart';
+import 'chat_provider.dart';
 import 'couple_provider.dart';
 
 // Auth state enum
@@ -109,10 +110,7 @@ class AuthNotifier extends Notifier<AuthState> {
         ref.read(coupleProvider.notifier).restoreInviteCode(pendingInviteCode);
       }
 
-      state = state.copyWith(
-        status: AuthStatus.authenticated,
-        user: user,
-      );
+      state = state.copyWith(status: AuthStatus.authenticated, user: user);
     } on DioException catch (e) {
       // While this method was awaiting /auth/me the Dio interceptor may have
       // already run the 401-refresh-failed path, which triggers forceLogout
@@ -165,17 +163,14 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   /// Login with email and password.
-  Future<bool> login({
-    required String email,
-    required String password,
-  }) async {
+  Future<bool> login({required String email, required String password}) async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final response = await _dio.post('/auth/login', data: {
-        'email': email,
-        'password': password,
-      });
+      final response = await _dio.post(
+        '/auth/login',
+        data: {'email': email, 'password': password},
+      );
 
       final data = response.data as Map<String, dynamic>;
       await ApiClient.saveTokens(
@@ -204,17 +199,13 @@ class AuthNotifier extends Notifier<AuthState> {
       return true;
     } on DioException catch (e) {
       final data = e.response?.data;
-      final message = (data is Map ? data['error'] ?? data['message'] : null) as String? ?? '로그인에 실패했습니다';
-      state = state.copyWith(
-        isLoading: false,
-        error: message,
-      );
+      final message =
+          (data is Map ? data['error'] ?? data['message'] : null) as String? ??
+          '로그인에 실패했습니다';
+      state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: '알 수 없는 오류가 발생했습니다',
-      );
+      state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
       return false;
     }
   }
@@ -229,12 +220,15 @@ class AuthNotifier extends Notifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final response = await _dio.post('/auth/register', data: {
-        'email': email,
-        'password': password,
-        'nickname': nickname,
-        if (birthDate != null) 'birthDate': birthDate.toIso8601String(),
-      });
+      final response = await _dio.post(
+        '/auth/register',
+        data: {
+          'email': email,
+          'password': password,
+          'nickname': nickname,
+          if (birthDate != null) 'birthDate': birthDate.toIso8601String(),
+        },
+      );
 
       final data = response.data as Map<String, dynamic>;
       await ApiClient.saveTokens(
@@ -253,23 +247,20 @@ class AuthNotifier extends Notifier<AuthState> {
       return true;
     } on DioException catch (e) {
       final data = e.response?.data;
-      final message = (data is Map ? data['error'] ?? data['message'] : null) as String? ?? '회원가입에 실패했습니다';
-      state = state.copyWith(
-        isLoading: false,
-        error: message,
-      );
+      final message =
+          (data is Map ? data['error'] ?? data['message'] : null) as String? ??
+          '회원가입에 실패했습니다';
+      state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: '알 수 없는 오류가 발생했습니다',
-      );
+      state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
       return false;
     }
   }
 
   /// Logout.
   Future<void> logout() async {
+    ref.read(chatProvider.notifier).disconnect();
     await ApiClient.clearTokens();
     await WidgetService.clearData();
     PushNotificationService.reset();
@@ -293,6 +284,7 @@ class AuthNotifier extends Notifier<AuthState> {
       }
       return;
     }
+    ref.read(chatProvider.notifier).disconnect();
     await ApiClient.clearTokens();
     await WidgetService.clearData();
     PushNotificationService.reset();

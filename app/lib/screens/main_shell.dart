@@ -17,10 +17,7 @@ import '../providers/letter_provider.dart';
 class MainShell extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
 
-  const MainShell({
-    super.key,
-    required this.navigationShell,
-  });
+  const MainShell({super.key, required this.navigationShell});
 
   @override
   ConsumerState<MainShell> createState() => _MainShellState();
@@ -61,8 +58,8 @@ class _MainShellState extends ConsumerState<MainShell>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // 앱 포그라운드 복귀 시 소켓 재연결 보장
-      ref.read(chatProvider.notifier).ensureConnected();
+      // 앱 포그라운드 복귀 시 기존 transport를 신뢰하지 않고 소켓을 새로 만든다.
+      ref.read(chatProvider.notifier).refreshConnectionOnResume();
     }
   }
 
@@ -76,7 +73,9 @@ class _MainShellState extends ConsumerState<MainShell>
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: const Row(
             children: [
               Icon(Icons.info_outline, color: Colors.orange, size: 24),
@@ -133,91 +132,88 @@ class _MainShellState extends ConsumerState<MainShell>
         );
       },
       child: Scaffold(
-      body: Column(
-        children: [
-          const OfflineBanner(),
-          Expanded(child: widget.navigationShell),
-        ],
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
+        body: Column(
+          children: [
+            const OfflineBanner(),
+            Expanded(child: widget.navigationShell),
           ],
         ),
-        child: BottomNavigationBar(
-          currentIndex: widget.navigationShell.currentIndex,
-          onTap: (index) {
-            // 탭 이동 시 뱃지 클리어
-            if (index == 1) {
-              ref.read(badgeProvider.notifier).clearChatBadge();
-            } else if (index == 3) {
-              ref.read(badgeProvider.notifier).clearFeedBadge();
-            }
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: BottomNavigationBar(
+            currentIndex: widget.navigationShell.currentIndex,
+            onTap: (index) {
+              // 탭 이동 시 뱃지 클리어
+              if (index == 1) {
+                ref.read(badgeProvider.notifier).clearChatBadge();
+              } else if (index == 3) {
+                ref.read(badgeProvider.notifier).clearFeedBadge();
+              }
 
-            // 채팅 탭 활성 상태 관리 (indexedStack은 dispose 안 되므로 여기서 제어)
-            final chatNotifier = ref.read(chatProvider.notifier);
-            chatNotifier.setChatScreenActive(index == 1);
-            // 채팅 탭 진입 시 읽음 처리
-            if (index == 1) {
-              chatNotifier.markAsRead();
-            }
+              // 채팅 탭 활성 상태 관리 (indexedStack은 dispose 안 되므로 여기서 제어)
+              final chatNotifier = ref.read(chatProvider.notifier);
+              chatNotifier.setChatScreenActive(index == 1);
+              // 채팅 탭 진입 시 읽음 처리
+              if (index == 1) {
+                chatNotifier.markAsRead();
+              }
 
-            // Navigator.push로 열린 하위 화면들 pop (탭 루트로 복귀)
-            shellBranchKeys[index]
-                ?.currentState
-                ?.popUntil((route) => route.isFirst);
-            widget.navigationShell.goBranch(
-              index,
-              initialLocation: true,
-            );
-          },
-          items: [
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: '홈',
-            ),
-            BottomNavigationBarItem(
-              icon: _BadgeIcon(
-                icon: Icons.chat_bubble_outline,
-                count: badges.unreadChatCount,
+              // Navigator.push로 열린 하위 화면들 pop (탭 루트로 복귀)
+              shellBranchKeys[index]?.currentState?.popUntil(
+                (route) => route.isFirst,
+              );
+              widget.navigationShell.goBranch(index, initialLocation: true);
+            },
+            items: [
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.home_outlined),
+                activeIcon: Icon(Icons.home),
+                label: '홈',
               ),
-              activeIcon: _BadgeIcon(
-                icon: Icons.chat_bubble,
-                count: badges.unreadChatCount,
+              BottomNavigationBarItem(
+                icon: _BadgeIcon(
+                  icon: Icons.chat_bubble_outline,
+                  count: badges.unreadChatCount,
+                ),
+                activeIcon: _BadgeIcon(
+                  icon: Icons.chat_bubble,
+                  count: badges.unreadChatCount,
+                ),
+                label: '채팅',
               ),
-              label: '채팅',
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today_outlined),
-              activeIcon: Icon(Icons.calendar_today),
-              label: '캘린더',
-            ),
-            BottomNavigationBarItem(
-              icon: _BadgeIcon(
-                icon: Icons.feed_outlined,
-                count: badges.unseenFeedCount,
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.calendar_today_outlined),
+                activeIcon: Icon(Icons.calendar_today),
+                label: '캘린더',
               ),
-              activeIcon: _BadgeIcon(
-                icon: Icons.feed,
-                count: badges.unseenFeedCount,
+              BottomNavigationBarItem(
+                icon: _BadgeIcon(
+                  icon: Icons.feed_outlined,
+                  count: badges.unseenFeedCount,
+                ),
+                activeIcon: _BadgeIcon(
+                  icon: Icons.feed,
+                  count: badges.unseenFeedCount,
+                ),
+                label: '피드',
               ),
-              label: '피드',
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.more_horiz),
-              activeIcon: Icon(Icons.more_horiz),
-              label: '더보기',
-            ),
-          ],
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.more_horiz),
+                activeIcon: Icon(Icons.more_horiz),
+                label: '더보기',
+              ),
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 }
