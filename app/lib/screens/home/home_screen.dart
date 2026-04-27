@@ -20,7 +20,6 @@ import '../../providers/calendar_provider.dart';
 import '../../providers/question_provider.dart';
 import '../../providers/wishlist_provider.dart';
 import '../../models/daily_question.dart';
-import '../../models/wish_item.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -509,14 +508,21 @@ class _WishlistPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final favoriteItems = state.items.where((item) => item.isFavorite).toList();
-    final activeFavoriteItems = favoriteItems
-        .where((item) => !item.isCompleted)
-        .toList();
-    final completedItems = state.items
-        .where((item) => item.isCompleted && item.isFavorite)
-        .toList();
-    final previewItems = favoriteItems.take(4).toList();
+    final totalCount = state.items.length;
+    final favoriteItems =
+        state.items.where((item) => item.isFavorite).toList();
+    final previewFavorites = favoriteItems.take(3).toList();
+
+    final String subtitle;
+    if (state.isLoading && state.items.isEmpty) {
+      subtitle = '불러오는 중...';
+    } else if (state.error != null && state.items.isEmpty) {
+      subtitle = '위시리스트를 불러오지 못했어요';
+    } else if (totalCount == 0) {
+      subtitle = '아직 위시리스트가 없어요';
+    } else {
+      subtitle = '$totalCount개의 위시리스트가 있어요';
+    }
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -552,18 +558,18 @@ class _WishlistPreviewCard extends StatelessWidget {
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          '즐겨찾는 위시',
+                      children: [
+                        const Text(
+                          '위시리스트',
                           style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
-                          '홈에서는 콕 찜해둔 위시만 빠르게 볼 수 있어요',
-                          style: TextStyle(
+                          subtitle,
+                          style: const TextStyle(
                             fontSize: 12,
                             color: AppTheme.textSecondary,
                           ),
@@ -577,103 +583,63 @@ class _WishlistPreviewCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: _WishlistMetricChip(
-                      label: '남은 즐겨찾기',
-                      value: '${activeFavoriteItems.length}',
-                      accentColor: const Color(0xFFE07A5F),
-                      backgroundColor: const Color(0xFFFFF5F0),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _WishlistMetricChip(
-                      label: '완료한 항목',
-                      value: '${completedItems.length}',
-                      accentColor: const Color(0xFF4D8C74),
-                      backgroundColor: const Color(0xFFEAF7F0),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              if (state.isLoading && state.items.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (state.error != null && state.items.isEmpty)
+              if (previewFavorites.isNotEmpty) ...[
+                const SizedBox(height: 14),
                 Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFFCFA),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Text(
-                    state.error!,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                )
-              else if (favoriteItems.isEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFFCFA),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFF2E4DB)),
-                  ),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '아직 즐겨찾기가 없어요',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        '위시리스트에서 하트를 눌러두면 홈에서 따로 모아볼 수 있어요.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppTheme.textSecondary,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFFCFA),
-                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: const Color(0xFFF2E4DB)),
                   ),
                   child: Column(
                     children: [
-                      for (final item in previewItems) ...[
-                        _WishlistPreviewRow(item: item),
-                        if (item != previewItems.last)
-                          const SizedBox(height: 10),
+                      for (int i = 0; i < previewFavorites.length; i++) ...[
+                        if (i > 0)
+                          Divider(
+                            height: 14,
+                            thickness: 0.6,
+                            color: Colors.grey.shade200,
+                          ),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.favorite,
+                              size: 13,
+                              color: Color(0xFFE07A5F),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                previewFavorites[i].title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: previewFavorites[i].isCompleted
+                                      ? AppTheme.textHint
+                                      : AppTheme.textPrimary,
+                                  decoration: previewFavorites[i].isCompleted
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
-                      if (favoriteItems.length > previewItems.length) ...[
-                        const SizedBox(height: 12),
+                      if (favoriteItems.length > previewFavorites.length) ...[
+                        Divider(
+                          height: 14,
+                          thickness: 0.6,
+                          color: Colors.grey.shade200,
+                        ),
                         Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
-                            '+ ${favoriteItems.length - previewItems.length}개의 즐겨찾기 위시 더 있어요',
+                            '+ ${favoriteItems.length - previewFavorites.length}개 더',
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -685,156 +651,11 @@ class _WishlistPreviewCard extends StatelessWidget {
                     ],
                   ),
                 ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _WishlistMetricChip extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color accentColor;
-  final Color backgroundColor;
-
-  const _WishlistMetricChip({
-    required this.label,
-    required this.value,
-    required this.accentColor,
-    required this.backgroundColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: accentColor,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WishlistPreviewRow extends StatelessWidget {
-  final WishItem item;
-
-  const _WishlistPreviewRow({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFF1E9),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            item.category.emoji,
-            style: const TextStyle(fontSize: 16),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (item.isCompleted) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEAF7F0),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: const Text(
-                        '완료',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF4D8C74),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF1E9),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      item.category.label,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFFE07A5F),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if ((item.memo ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  item.memo!.trim(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
               ],
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
