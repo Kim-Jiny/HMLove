@@ -44,6 +44,15 @@ router.get('/today', async (req, res) => {
     const questionIdx = getQuestionIndex(coupleId, todayStr);
     const questionText = QUESTION_POOL[questionIdx] || '오늘의 질문을 준비 중이에요.';
 
+    // 둘 다 답변하지 않고 지나간 과거 질문은 정리 — 히스토리에서 빠지고, 같은 questionIdx가 미래에 다시 등장 가능
+    await prisma.dailyQuestion.deleteMany({
+      where: {
+        coupleId,
+        date: { lt: todayDate },
+        answers: { none: {} },
+      },
+    });
+
     // upsert: 오늘 질문이 없으면 생성
     const dailyQuestion = await prisma.dailyQuestion.upsert({
       where: { coupleId_date: { coupleId, date: todayDate } },
@@ -190,7 +199,11 @@ router.get('/history', async (req, res) => {
     const todayDate = new Date(todayStr + 'T00:00:00.000Z');
 
     const questions = await prisma.dailyQuestion.findMany({
-      where: { coupleId, date: { lt: todayDate } },
+      where: {
+        coupleId,
+        date: { lt: todayDate },
+        answers: { some: {} }, // 둘 다 답변하지 않은 날은 히스토리에서 제외
+      },
       orderBy: { date: 'desc' },
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),

@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:device_calendar/device_calendar.dart' as dc;
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -214,8 +216,9 @@ class CalendarNotifier extends Notifier<CalendarState> {
       }
 
       // 공휴일 오버레이 (기기 캘린더 연동과 독립)
+      // 위젯이 다른 월을 보고 있을 수 있어 range로 fetch.
       if (state.holidayOverlayEnabled) {
-        _fetchHolidayEvents(yearMonth);
+        _fetchHolidayEventsForRange(yearMonth);
       }
     } on DioException catch (e) {
       final message =
@@ -270,7 +273,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
   Future<void> bootstrapHolidayOverlay() async {
     if (DeviceCalendarService.isHolidayOverlayInitialized()) {
       if (state.holidayOverlayEnabled && _currentYearMonth.isNotEmpty) {
-        await _fetchHolidayEvents(_currentYearMonth);
+        await _fetchHolidayEventsForRange(_currentYearMonth);
         await WidgetService.setHolidayOverlayEnabled(true);
       }
       return;
@@ -287,7 +290,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
       await WidgetService.setHolidayOverlayEnabled(true);
       state = state.copyWith(holidayOverlayEnabled: true);
       if (_currentYearMonth.isNotEmpty) {
-        await _fetchHolidayEvents(_currentYearMonth);
+        await _fetchHolidayEventsForRange(_currentYearMonth);
       }
     }
   }
@@ -303,65 +306,167 @@ class CalendarNotifier extends Notifier<CalendarState> {
     await WidgetService.setHolidayOverlayEnabled(enabled);
     if (enabled) {
       if (_currentYearMonth.isNotEmpty) {
-        await _fetchHolidayEvents(_currentYearMonth);
+        await _fetchHolidayEventsForRange(_currentYearMonth);
       }
     } else if (_currentYearMonth.isNotEmpty) {
-      await WidgetService.updateHolidayEvents(const [], _currentYearMonth);
+      // OFF: 추적 중인 모든 월의 휴일 데이터 제거 (앱 월 ±1 + 위젯 월 ±1)
+      final months = <String>{
+        _shiftYearMonth(_currentYearMonth, -1),
+        _currentYearMonth,
+        _shiftYearMonth(_currentYearMonth, 1),
+      };
+      final widgetYm = await WidgetService.getDisplayedCalendarYearMonth();
+      if (widgetYm != null && _isValidYearMonth(widgetYm)) {
+        months.add(_shiftYearMonth(widgetYm, -1));
+        months.add(widgetYm);
+        months.add(_shiftYearMonth(widgetYm, 1));
+      }
+      for (final ym in months) {
+        await WidgetService.updateHolidayEvents(const [], ym);
+      }
     }
   }
 
-  Future<void> _fetchHolidayEvents(String yearMonth) async {
+  /// device_calendar 플러그인의 [dc.Event.start]에서 사용자가 의도한 "달력 날짜"를
+  /// year/month/day로 추출한다.
+  ///
+  /// 두 가지 플랫폼 함정을 모두 처리:
+  ///
+  /// 1) Android allDay 시프트:
+  ///    플러그인이 `device_calendar/lib/src/models/event.dart` 4.x에서
+  ///    `Platform.isAndroid && allDay`인 경우 timezone offset만큼 timestamp를
+  ///    빼버림. 로컬 자정 저장 캘린더(한국 OS 공휴일 등)는 전날로 밀린다.
+  ///    → 같은 offset을 다시 더해 원본 timestamp 복원.
+  ///
+  /// 2) iOS floating allDay + timezone 패키지 미초기화:
+  ///    iOS 플러그인은 floating 이벤트에 대해 timezone identifier를 nil로 보내고,
+  ///    플러그인 Dart 코드는 `tz.local`로 fallback. 앱이 `tz.setLocalLocation()`을
+  ///    호출하지 않았으면 `tz.local`은 UTC라서 TZDateTime이 UTC 기준이 됨.
+  ///    `TZDateTime.toLocal()`은 location == _local이면 변환 안 하므로 UTC 그대로 반환.
+  ///    → millisecondsSinceEpoch를 통해 Dart 표준 DateTime.toLocal()로 우회하여
+  ///    OS의 실제 로컬 TZ로 변환.
+  DateTime _normalizeEventStartDate(dc.Event e) {
+    final raw = e.start ?? DateTime.now();
+    final adjusted = (Platform.isAndroid && (e.allDay ?? false))
+        ? raw.add(Duration(milliseconds: raw.timeZoneOffset.inMilliseconds))
+        : raw;
+    final asLocal = DateTime.fromMillisecondsSinceEpoch(
+      adjusted.millisecondsSinceEpoch,
+      isUtc: true,
+    ).toLocal();
+    return DateTime(asLocal.year, asLocal.month, asLocal.day);
+  }
+
+  /// 'yyyy-MM' 형식인지 검증
+  bool _isValidYearMonth(String s) {
+    final parts = s.split('-');
+    if (parts.length != 2) return false;
+    final y = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    return y != null && m != null && m >= 1 && m <= 12;
+  }
+
+  /// 'yyyy-MM'에 [delta]개월을 더한 'yyyy-MM' 반환
+  String _shiftYearMonth(String yearMonth, int delta) {
+    final parts = yearMonth.split('-');
+    int y = int.parse(parts[0]);
+    int m = int.parse(parts[1]) + delta;
+    while (m < 1) {
+      m += 12;
+      y -= 1;
+    }
+    while (m > 12) {
+      m -= 12;
+      y += 1;
+    }
+    return '$y-${m.toString().padLeft(2, '0')}';
+  }
+
+  /// 공휴일을 앵커 월 ±1 + 위젯이 표시 중인 월에 대해 모두 가져와
+  /// 위젯에 월별 푸시 + 앱 state는 누적 결과로 한 번에 갱신.
+  /// 앱과 위젯의 월이 다를 수 있고(prev/next 네비게이션) 사용자가 위젯에서 ±1 정도
+  /// 이동해도 즉시 보이도록 인접 월까지 캐시한다.
+  Future<void> _fetchHolidayEventsForRange(String anchorYearMonth) async {
     try {
+      final months = <String>{
+        _shiftYearMonth(anchorYearMonth, -1),
+        anchorYearMonth,
+        _shiftYearMonth(anchorYearMonth, 1),
+      };
+      final widgetYm = await WidgetService.getDisplayedCalendarYearMonth();
+      if (widgetYm != null && _isValidYearMonth(widgetYm)) {
+        months.add(_shiftYearMonth(widgetYm, -1));
+        months.add(widgetYm);
+        months.add(_shiftYearMonth(widgetYm, 1));
+      }
+
       final holidayCalendars =
           await DeviceCalendarService.getHolidayCalendars();
       if (holidayCalendars.isEmpty) {
         state = state.copyWith(holidayEvents: const []);
-        await WidgetService.updateHolidayEvents(const [], yearMonth);
+        for (final ym in months) {
+          await WidgetService.updateHolidayEvents(const [], ym);
+        }
         return;
       }
 
       final calendarIds =
           holidayCalendars.map((c) => c.id!).whereType<String>().toList();
-      final parts = yearMonth.split('-');
-      final year = int.parse(parts[0]);
-      final month = int.parse(parts[1]);
-      final start = DateTime(year, month, 1);
-      final end = DateTime(year, month + 1, 0, 23, 59, 59);
 
-      final rawEvents = await DeviceCalendarService.getEvents(
-        calendarIds: calendarIds,
-        start: start,
-        end: end,
-      );
-
-      final holidayEvents = rawEvents.map((e) {
-        final eventDate = e.start ?? DateTime.now();
-        return CalendarEvent(
-          id: 'holiday_${e.calendarId ?? ''}_${e.eventId ?? ''}',
-          title: e.title ?? '',
-          date: DateTime(eventDate.year, eventDate.month, eventDate.day),
-          eventType: 'holiday',
-          color: '#D32F2F',
-        );
-      }).toList();
-
-      state = state.copyWith(holidayEvents: holidayEvents);
-
-      await WidgetService.updateHolidayEvents(
-        holidayEvents
-            .map((e) => {
-                  'date': DateFormat('yyyy-MM-dd').format(e.date),
-                  'title': e.title,
-                  'color': e.color ?? '#D32F2F',
-                  'isAnniversary': false,
-                  'eventType': 'holiday',
-                })
-            .toList(),
-        yearMonth,
-      );
+      // 월별로 fetch → 위젯에는 그 월만 저장(per-month key), 앱 state에는 누적
+      final all = <CalendarEvent>[];
+      for (final ym in months) {
+        final list = await _fetchHolidayEventsForMonth(ym, calendarIds);
+        all.addAll(list);
+      }
+      state = state.copyWith(holidayEvents: all);
     } catch (e) {
-      debugPrint('[Holidays] fetch error: $e');
+      debugPrint('[Holidays] range fetch error: $e');
     }
+  }
+
+  /// 단일 월의 공휴일을 fetch해서 위젯의 per-month 키에 저장하고 리스트 반환.
+  /// state는 건드리지 않음 — 호출자가 누적해서 한 번에 갱신해야 함.
+  Future<List<CalendarEvent>> _fetchHolidayEventsForMonth(
+    String yearMonth,
+    List<String> calendarIds,
+  ) async {
+    final parts = yearMonth.split('-');
+    final year = int.parse(parts[0]);
+    final month = int.parse(parts[1]);
+    final start = DateTime(year, month, 1);
+    final end = DateTime(year, month + 1, 0, 23, 59, 59);
+
+    final rawEvents = await DeviceCalendarService.getEvents(
+      calendarIds: calendarIds,
+      start: start,
+      end: end,
+    );
+
+    final holidayEvents = rawEvents.map((e) {
+      final dateOnly = _normalizeEventStartDate(e);
+      return CalendarEvent(
+        id: 'holiday_${e.calendarId ?? ''}_${e.eventId ?? ''}',
+        title: e.title ?? '',
+        date: dateOnly,
+        eventType: 'holiday',
+        color: '#D32F2F',
+      );
+    }).toList();
+
+    await WidgetService.updateHolidayEvents(
+      holidayEvents
+          .map((e) => {
+                'date': DateFormat('yyyy-MM-dd').format(e.date),
+                'title': e.title,
+                'color': e.color ?? '#D32F2F',
+                'isAnniversary': false,
+                'eventType': 'holiday',
+              })
+          .toList(),
+      yearMonth,
+    );
+    return holidayEvents;
   }
 
   /// 기기 캘린더 목록 조회
@@ -413,11 +518,11 @@ class CalendarNotifier extends Notifier<CalendarState> {
       );
 
       final calendarEvents = deviceEvents.map((e) {
-        final eventDate = e.start ?? DateTime.now();
+        final dateOnly = _normalizeEventStartDate(e);
         return CalendarEvent(
           id: 'device_${e.eventId}',
           title: e.title ?? '(제목 없음)',
-          date: eventDate,
+          date: dateOnly,
           description: e.description,
           eventType: 'device',
         );

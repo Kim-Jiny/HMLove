@@ -31,8 +31,9 @@ if (serviceAccountEnv) {
  * @param {string} opts.body
  * @param {object} opts.data
  * @param {boolean} [opts.sound=true] - 소리 활성화 여부
+ * @param {boolean} [opts.mutableContent=false] - iOS Notification Service Extension 트리거 여부 (위젯 갱신 등 사전 작업)
  */
-export async function sendPushNotification({ token, title, body, data, sound = true }) {
+export async function sendPushNotification({ token, title, body, data, sound = true, mutableContent = false }) {
   if (!token) return;
 
   try {
@@ -93,11 +94,12 @@ export async function sendPushNotification({ token, title, body, data, sound = t
           aps: {
             badge: badgeCount,
             ...(sound ? { sound: 'default' } : {}),
+            ...(mutableContent ? { 'mutable-content': 1 } : {}),
           },
         },
       },
     });
-    console.log(`[Push] Sent to token: ${token.substring(0, 20)}... (sound: ${sound})`);
+    console.log(`[Push] Sent to token: ${token.substring(0, 20)}... (sound: ${sound}, mutable: ${mutableContent})`);
   } catch (err) {
     // 토큰이 유효하지 않으면 DB에서 삭제
     if (err.code === 'messaging/registration-token-not-registered' ||
@@ -250,9 +252,15 @@ export async function notifyPartner({ userId, coupleId, title, body, data, silen
       // 카테고리별 소리 설정 확인 (개별 소리 토글)
       const sound = prefKey ? prefs[`${prefKey}_sound`] !== false : true;
 
-      await sendPushNotification({ token: partner.fcmToken, title, body, data, sound });
+      // iOS Notification Service Extension이 위젯 데이터를 갱신해야 하는 type 화이트리스트.
+      // mutable-content:1을 설정하면 alert가 표시되기 전 NSE가 깨어나 백그라운드 작업을 수행한다.
+      // (silent push는 OS가 throttle하지만 alert push는 즉시 전달됨)
+      const mutableContent = type === 'calendar';
+
+      await sendPushNotification({ token: partner.fcmToken, title, body, data, sound, mutableContent });
 
       // 동일 partner 토큰으로 사일런트 푸시도 전송 (DB 재조회 없음)
+      // Android는 이 silent push로 위젯 갱신, iOS는 위 NSE로 갱신
       if (silentData) {
         await sendSilentPush({ token: partner.fcmToken, data: silentData });
       }

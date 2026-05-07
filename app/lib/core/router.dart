@@ -50,6 +50,25 @@ final routerProvider = Provider<GoRouter>((ref) {
     debugLogDiagnostics: true,
     refreshListenable: authNotifier,
     redirect: (context, state) {
+      // 위젯 등에서 들어오는 외부 스킴(hmlove://...) 은 경로로 변환.
+      // Android의 HomeWidgetLaunchIntent가 URI 데이터로 Activity를 깨우면
+      // Flutter가 이를 deep link로 받아 GoRouter의 초기 location으로 넘긴다.
+      // 매칭 라우트가 없어 GoException을 던지므로 여기서 미리 변환.
+      final scheme = state.uri.scheme;
+      if (scheme.isNotEmpty && scheme != 'http' && scheme != 'https') {
+        final target = state.uri.host.isNotEmpty
+            ? state.uri.host
+            : (state.uri.pathSegments.isNotEmpty
+                ? state.uri.pathSegments.first
+                : '');
+        switch (target) {
+          case 'calendar':
+            return '/calendar';
+          default:
+            return '/';
+        }
+      }
+
       final authState = ref.read(authProvider);
       final status = authState.status;
       final isLoggedIn = status == AuthStatus.authenticated;

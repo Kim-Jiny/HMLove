@@ -54,42 +54,57 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       final baseUrl = await HomeWidget.getWidgetData<String>('apiBaseUrl');
       if (token != null && baseUrl != null) {
         final now = DateTime.now();
-        final ym = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+        final currentYm =
+            '${now.year}-${now.month.toString().padLeft(2, '0')}';
+        // 위젯이 실제 표시 중인 월(prev/next 네비게이션 반영)도 같이 갱신
+        final displayedYm =
+            await HomeWidget.getWidgetData<String>('calendarYearMonth');
+        final months = <String>{
+          currentYm,
+          if (displayedYm != null && displayedYm.isNotEmpty) displayedYm,
+        };
         final client = HttpClient();
         try {
-          final request = await client.getUrl(
-            Uri.parse('$baseUrl/calendar/$ym'),
-          );
-          request.headers.set('Authorization', 'Bearer $token');
-          final response = await request.close();
-          if (response.statusCode == 200) {
-            final body = await response.transform(utf8.decoder).join();
-            final data = jsonDecode(body) as Map<String, dynamic>;
-            final events = data['events'] as List<dynamic>;
-            final widgetEvents = events
-                .where((e) => e['_auto'] != true)
-                .map((e) {
-                  final event = e as Map<String, dynamic>;
-                  final isAnniversary = event['isAnniversary'] == true;
-                  final eventType = event['eventType'] as String? ?? 'schedule';
-                  return {
-                    'date': (event['date'] as String).substring(0, 10),
-                    'title': event['title'],
-                    'color': event['color'] ??
-                        _defaultWidgetEventColor(eventType, isAnniversary),
-                    'isAnniversary': isAnniversary,
-                    'eventType': eventType,
-                  };
-                })
-                .toList();
-            await HomeWidget.saveWidgetData(
-              'calendarEvents',
-              jsonEncode(widgetEvents),
-            );
-            await HomeWidget.saveWidgetData(
-              'calendarEvents_$ym',
-              jsonEncode(widgetEvents),
-            );
+          for (final ym in months) {
+            try {
+              final request = await client.getUrl(
+                Uri.parse('$baseUrl/calendar/$ym'),
+              );
+              request.headers.set('Authorization', 'Bearer $token');
+              final response = await request.close();
+              if (response.statusCode == 200) {
+                final body = await response.transform(utf8.decoder).join();
+                final data = jsonDecode(body) as Map<String, dynamic>;
+                final events = data['events'] as List<dynamic>;
+                final widgetEvents = events
+                    .where((e) => e['_auto'] != true)
+                    .map((e) {
+                      final event = e as Map<String, dynamic>;
+                      final isAnniversary = event['isAnniversary'] == true;
+                      final eventType =
+                          event['eventType'] as String? ?? 'schedule';
+                      return {
+                        'date': (event['date'] as String).substring(0, 10),
+                        'title': event['title'],
+                        'color': event['color'] ??
+                            _defaultWidgetEventColor(eventType, isAnniversary),
+                        'isAnniversary': isAnniversary,
+                        'eventType': eventType,
+                      };
+                    })
+                    .toList();
+                final encoded = jsonEncode(widgetEvents);
+                await HomeWidget.saveWidgetData(
+                  'calendarEvents_$ym',
+                  encoded,
+                );
+                if (ym == currentYm) {
+                  await HomeWidget.saveWidgetData('calendarEvents', encoded);
+                }
+              }
+            } catch (_) {
+              // 단일 월 실패는 무시하고 다음 월 진행
+            }
           }
         } finally {
           client.close();

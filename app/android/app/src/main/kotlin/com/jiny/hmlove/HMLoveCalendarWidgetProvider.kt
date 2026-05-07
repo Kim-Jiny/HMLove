@@ -249,23 +249,26 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
     }
 
     /**
-     * Extract just the yyyy-MM-dd dates from a holiday events JSON blob.
-     * We only need the dates (to recolor the day number), not the titles.
+     * Extract yyyy-MM-dd → title map from a holiday events JSON blob.
+     * 같은 날짜에 여러 휴일이 있으면 첫 항목만 남는다(드문 케이스).
      */
-    private fun parseHolidayDates(json: String?): Set<String> {
-        if (json.isNullOrEmpty()) return emptySet()
+    private fun parseHolidayTitles(json: String?): Map<String, String> {
+        if (json.isNullOrEmpty()) return emptyMap()
         return try {
             val arr = JSONArray(json)
-            val out = HashSet<String>(arr.length())
+            val out = HashMap<String, String>(arr.length())
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
                 val raw = obj.optString("date", "")
                 val prefix = raw.take(10)
-                if (prefix.isNotEmpty()) out.add(prefix)
+                val title = obj.optString("title", "")
+                if (prefix.isNotEmpty() && title.isNotEmpty() && !out.containsKey(prefix)) {
+                    out[prefix] = title
+                }
             }
             out
         } catch (_: Exception) {
-            emptySet()
+            emptyMap()
         }
     }
 
@@ -415,9 +418,10 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                     }
                     // Explicit user navigation bypasses the fetch cooldown — the
                     // user is asking for that month's data right now.
+                    val newMonthKey = newMonth.format(MONTH_FORMATTER)
                     prefs.edit()
-                        .putString("calendarYearMonth", newMonth.format(MONTH_FORMATTER))
-                        .remove(PREF_KEY_FETCH_FAIL_PREFIX + newMonth.format(MONTH_FORMATTER))
+                        .putString("calendarYearMonth", newMonthKey)
+                        .remove(PREF_KEY_FETCH_FAIL_PREFIX + newMonthKey)
                         .apply()
 
                     val appWidgetManager = AppWidgetManager.getInstance(context)
@@ -427,6 +431,11 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                     if (ids.isNotEmpty()) {
                         onUpdate(context, appWidgetManager, ids)
                     }
+                    // 캐시 유무와 무관하게 항상 서버 재조회 — 다른 기기에서 일정이
+                    // 변경된 경우(특히 위젯이 보고 있지 않던 달) 캐시가 stale일 수 있다.
+                    // fetchMonthFromServer는 inFlightFetches로 중복 호출을 막고,
+                    // 완료 시 main thread에서 다시 onUpdate를 호출해 갱신된 데이터로 재렌더한다.
+                    fetchMonthFromServer(context, newMonthKey)
                 } catch (_: Exception) {
                     // Swallow — widget will retry on next update cycle
                 }
@@ -563,13 +572,14 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                     list.sortBy { it.sortPriority }
                 }
 
-                // Auto-detected OS holidays (separate toggle). We only need the
-                // dates — they recolor the day number red without adding chips.
+                // Auto-detected OS holidays (separate toggle). 날짜→이름 맵.
+                // 셀에서는 일정보다 위에 휴일명을 빨간 텍스트(배경 없음)로 그리고,
+                // 날짜 숫자도 빨간색으로 칠한다.
                 val holidayEnabled = prefs.getBoolean("holidayOverlayEnabled", false)
-                val holidayDates: Set<String> = if (holidayEnabled) {
-                    parseHolidayDates(prefs.getString("holidayEvents_$displayMonthKey", null))
+                val holidayTitles: Map<String, String> = if (holidayEnabled) {
+                    parseHolidayTitles(prefs.getString("holidayEvents_$displayMonthKey", null))
                 } else {
-                    emptySet()
+                    emptyMap()
                 }
 
                 // Build calendar grid
@@ -620,8 +630,12 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
 
                     val events = if (isCurrentMonth) eventDates[dateStr]?.take(5) else null
                     val hasEvents = !events.isNullOrEmpty()
+                    val holidayTitle = if (isCurrentMonth) holidayTitles[dateStr] else null
+                    val isHoliday = holidayTitle != null
 
-                    val cellView = if (hasEvents) {
+                    // 휴일 텍스트는 cell_events_container에 들어가야 하므로 휴일이 있어도
+                    // event 레이아웃을 사용한다.
+                    val cellView = if (hasEvents || isHoliday) {
                         RemoteViews(context.packageName, R.layout.widget_calendar_cell_event)
                     } else {
                         RemoteViews(context.packageName, R.layout.widget_calendar_cell)
@@ -633,8 +647,6 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                         day == today.dayOfMonth
 
                     cellView.setTextViewText(R.id.cell_day, day.toString())
-
-                    val isHoliday = isCurrentMonth && holidayDates.contains(dateStr)
 
                     if (isToday) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -660,6 +672,16 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                         cellView.setTextColor(R.id.cell_day, theme.primary)
                     } else {
                         cellView.setTextColor(R.id.cell_day, theme.textPrimary)
+                    }
+
+                    // 휴일명을 가장 위에 (배경 없는 빨간 텍스트)
+                    if (holidayTitle != null) {
+                        val holidayView = RemoteViews(
+                            context.packageName,
+                            R.layout.widget_holiday_text_item
+                        )
+                        holidayView.setTextViewText(R.id.holiday_text, holidayTitle)
+                        cellView.addView(R.id.cell_events_container, holidayView)
                     }
 
                     // Add event bars dynamically

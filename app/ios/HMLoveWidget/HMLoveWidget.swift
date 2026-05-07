@@ -188,9 +188,9 @@ struct CoupleData {
     let calendarEvents: [CalendarEventData]
     let calendarYearMonth: String
     let calendarTheme: CalendarWidgetTheme
-    /// yyyy-MM-dd strings for dates the OS flagged as holidays.
-    /// Empty when the user has disabled the holiday overlay.
-    let holidayDates: Set<String>
+    /// yyyy-MM-dd → 휴일명 맵. 빈 맵이면 휴일 오버레이가 꺼져있거나 그 달에 휴일이 없음.
+    /// 셀에 빨간 텍스트로 표시(배경 없음) + 날짜 숫자 빨간색 처리.
+    let holidayTitles: [String: String]
 
     static let placeholder = CoupleData(
         isConnected: true,
@@ -206,7 +206,7 @@ struct CoupleData {
         calendarEvents: [],
         calendarYearMonth: "",
         calendarTheme: .defaultTheme,
-        holidayDates: []
+        holidayTitles: [:]
     )
 
     static let notConnected = CoupleData(
@@ -219,7 +219,7 @@ struct CoupleData {
         calendarEvents: [],
         calendarYearMonth: "",
         calendarTheme: .defaultTheme,
-        holidayDates: []
+        holidayTitles: [:]
     )
 }
 
@@ -427,12 +427,18 @@ struct CoupleTimelineProvider: AppIntentTimelineProvider {
         // Parse calendar events for the currently displayed month.
         // Prefer per-month cache (calendarEvents_{ym}); fall back to legacy blob.
         let calendarYearMonth = defaults.string(forKey: "calendarYearMonth") ?? ""
-        let perMonthEventsJson: String? = {
-            if !calendarYearMonth.isEmpty {
-                return defaults.string(forKey: "calendarEvents_\(calendarYearMonth)")
-            }
-            return nil
-        }()
+        // 사용자가 prev/next/today를 한 번도 안 누르면 calendarYearMonth는 빈 문자열.
+        // 이때도 그리드는 현재 월(`displayDate` fallback)을 렌더하므로 per-month
+        // 키를 읽을 때도 동일하게 현재 월로 fallback해야 device/holiday 데이터가 정상 표시됨.
+        let monthFormatterForFallback = DateFormatter()
+        monthFormatterForFallback.dateFormat = "yyyy-MM"
+        monthFormatterForFallback.locale = Locale(identifier: "en_US_POSIX")
+        monthFormatterForFallback.calendar = Calendar(identifier: .gregorian)
+        let effectiveYearMonth = calendarYearMonth.isEmpty
+            ? monthFormatterForFallback.string(from: Date())
+            : calendarYearMonth
+        let perMonthEventsJson: String? =
+            defaults.string(forKey: "calendarEvents_\(effectiveYearMonth)")
         let resolvedEventsJson = perMonthEventsJson ?? defaults.string(forKey: "calendarEvents")
         var calendarEvents: [CalendarEventData] =
             Self.parseWidgetEvents(resolvedEventsJson)
@@ -441,23 +447,22 @@ struct CoupleTimelineProvider: AppIntentTimelineProvider {
         // Device events live under a separate per-month key so a server-side
         // timeline refresh doesn't accidentally wipe them.
         let deviceCalendarEnabled = defaults.bool(forKey: "deviceCalendarEnabled")
-        if deviceCalendarEnabled && !calendarYearMonth.isEmpty {
+        if deviceCalendarEnabled {
             let deviceJson = defaults.string(
-                forKey: "deviceCalendarEvents_\(calendarYearMonth)"
+                forKey: "deviceCalendarEvents_\(effectiveYearMonth)"
             )
             calendarEvents.append(contentsOf: Self.parseWidgetEvents(deviceJson))
         }
 
-        // Auto-detected OS holiday overlay (separate toggle). Loaded as a
-        // date Set so we can recolor matching day numbers without cluttering
-        // the event chip list.
-        var holidayDates: Set<String> = []
+        // Auto-detected OS holiday overlay (separate toggle).
+        // 셀에 휴일명을 빨간 텍스트로 표시 + 날짜 숫자도 빨간색.
+        var holidayTitles: [String: String] = [:]
         let holidayEnabled = defaults.bool(forKey: "holidayOverlayEnabled")
-        if holidayEnabled && !calendarYearMonth.isEmpty {
+        if holidayEnabled {
             let holidayJson = defaults.string(
-                forKey: "holidayEvents_\(calendarYearMonth)"
+                forKey: "holidayEvents_\(effectiveYearMonth)"
             )
-            holidayDates = Self.parseHolidayDates(holidayJson)
+            holidayTitles = Self.parseHolidayTitles(holidayJson)
         }
 
         return CoupleData(
@@ -476,24 +481,27 @@ struct CoupleTimelineProvider: AppIntentTimelineProvider {
             calendarTheme: CalendarWidgetTheme.theme(
                 for: configuration.theme?.rawValue
             ),
-            holidayDates: holidayDates
+            holidayTitles: holidayTitles
         )
     }
 
-    private static func parseHolidayDates(_ json: String?) -> Set<String> {
+    private static func parseHolidayTitles(_ json: String?) -> [String: String] {
         guard let json = json,
               let data = json.data(using: .utf8),
               let array = try? JSONSerialization.jsonObject(with: data)
                 as? [[String: Any]] else {
-            return []
+            return [:]
         }
-        var dates: Set<String> = []
+        var titles: [String: String] = [:]
         for dict in array {
-            guard let raw = dict["date"] as? String else { continue }
+            guard let raw = dict["date"] as? String,
+                  let title = dict["title"] as? String else { continue }
             let prefix = String(raw.prefix(10))
-            if !prefix.isEmpty { dates.insert(prefix) }
+            if !prefix.isEmpty && !title.isEmpty && titles[prefix] == nil {
+                titles[prefix] = title
+            }
         }
-        return dates
+        return titles
     }
 
     private func loadData() -> CoupleData {
@@ -811,9 +819,9 @@ struct LargeWidgetView: View {
         return f
     }()
 
-    private func isHoliday(_ date: Date) -> Bool {
-        guard !data.holidayDates.isEmpty else { return false }
-        return data.holidayDates.contains(Self.holidayKeyFormatter.string(from: date))
+    private func holidayTitle(for date: Date) -> String? {
+        guard !data.holidayTitles.isEmpty else { return nil }
+        return data.holidayTitles[Self.holidayKeyFormatter.string(from: date)]
     }
 
     @ViewBuilder
@@ -923,7 +931,8 @@ struct LargeWidgetView: View {
                                 let dayItem = days[index]
                                 let dayEvents = dayItem.isCurrentMonth ? Array(eventsForDate(dayItem.date).prefix(5)) : []
                                 let today = dayItem.isCurrentMonth && isToday(dayItem.date)
-                                let holiday = dayItem.isCurrentMonth && isHoliday(dayItem.date)
+                                let holidayName = dayItem.isCurrentMonth ? holidayTitle(for: dayItem.date) : nil
+                                let holiday = holidayName != nil
 
                                 VStack(spacing: 0) {
                                     ZStack {
@@ -943,6 +952,17 @@ struct LargeWidgetView: View {
                                             )
                                     }
                                     .frame(height: 14)
+
+                                    // 휴일명 — 배경 없는 빨간 텍스트 (일정보다 위)
+                                    if let name = holidayName {
+                                        Text(name)
+                                            .font(.system(size: 6, weight: .bold))
+                                            .foregroundColor(Color(hex: "D32F2F"))
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
+                                            .padding(.horizontal, 1)
+                                            .frame(maxWidth: .infinity, minHeight: 8, maxHeight: 8)
+                                    }
 
                                     ForEach(Array(dayEvents.enumerated()), id: \.offset) { _, event in
                                         Text(event.title)

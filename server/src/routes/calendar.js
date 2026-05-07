@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requireCouple } from '../middleware/auth.js';
 import prisma from '../utils/prisma.js';
-import { notifyPartner, notifyPartnerSilent } from '../utils/firebase.js';
+import { notifyPartner } from '../utils/firebase.js';
 import { getAutoAnniversariesForMonth } from '../utils/anniversary.js';
 
 const router = Router();
@@ -201,8 +201,16 @@ router.put('/:id', async (req, res) => {
       event: event,
     });
 
-    // 사일런트 푸시 (위젯 갱신 용도)
-    notifyPartnerSilent({ userId: req.user.id, coupleId: req.user.coupleId, data: { type: 'calendar_sync' } });
+    // 알림 prefs(noti_calendar)에 따라 visible+silent 또는 silent only로 발송.
+    // visible push는 iOS NSE를 트리거하여 위젯 즉시 갱신, silent는 Android 위젯 갱신용.
+    notifyPartner({
+      userId: req.user.id,
+      coupleId: req.user.coupleId,
+      title: req.user.nickname || '상대방',
+      body: `일정 수정: ${event.title}`,
+      data: { type: 'calendar' },
+      silentData: { type: 'calendar_sync' },
+    });
 
     const eventType = event.isAnniversary ? 'anniversary' : 'schedule';
     res.json({ event: { ...event, eventType } });
@@ -232,8 +240,15 @@ router.delete('/:id', async (req, res) => {
       eventId: id,
     });
 
-    // 사일런트 푸시 (위젯 갱신 용도)
-    notifyPartnerSilent({ userId: req.user.id, coupleId: req.user.coupleId, data: { type: 'calendar_sync' } });
+    // 알림 prefs에 따라 visible+silent 또는 silent only로 발송 (위젯 즉시 갱신용)
+    notifyPartner({
+      userId: req.user.id,
+      coupleId: req.user.coupleId,
+      title: req.user.nickname || '상대방',
+      body: `일정 삭제: ${existing.title}`,
+      data: { type: 'calendar' },
+      silentData: { type: 'calendar_sync' },
+    });
 
     res.json({ message: '일정이 삭제되었습니다.' });
   } catch (err) {

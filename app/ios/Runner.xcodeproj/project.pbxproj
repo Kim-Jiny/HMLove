@@ -12,6 +12,7 @@
 		305661EE2F501D5300963329 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 305661ED2F501D5300963329 /* WidgetKit.framework */; };
 		305661F02F501D5300963329 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 305661EF2F501D5300963329 /* SwiftUI.framework */; };
 		305661FB2F501D5500963329 /* HMLoveWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 305661EC2F501D5300963329 /* HMLoveWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		30F15FF12FAC674F00B80914 /* HMLoveNotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 30F15FEA2FAC674F00B80914 /* HMLoveNotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
 		74797BB42F14289BDB562020 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5869D8E6A521B79BCAD66F8D /* Pods_Runner.framework */; };
@@ -31,6 +32,13 @@
 			remoteGlobalIDString = 305661EB2F501D5300963329;
 			remoteInfo = HMLoveWidgetExtension;
 		};
+		30F15FEF2FAC674F00B80914 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 30F15FE92FAC674F00B80914;
+			remoteInfo = HMLoveNotificationService;
+		};
 		331C8085294A63A400263BE5 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
@@ -47,6 +55,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
+				30F15FF12FAC674F00B80914 /* HMLoveNotificationService.appex in Embed Foundation Extensions */,
 				305661FB2F501D5500963329 /* HMLoveWidgetExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
@@ -73,6 +82,7 @@
 		305661EC2F501D5300963329 /* HMLoveWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HMLoveWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		305661ED2F501D5300963329 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = /System/Library/Frameworks/WidgetKit.framework; sourceTree = "<absolute>"; };
 		305661EF2F501D5300963329 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = /System/Library/Frameworks/SwiftUI.framework; sourceTree = "<absolute>"; };
+		30F15FEA2FAC674F00B80914 /* HMLoveNotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HMLoveNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		369B556BD9B68DCA0ABF96F5 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
@@ -105,6 +115,13 @@
 			);
 			target = 305661EB2F501D5300963329 /* HMLoveWidgetExtension */;
 		};
+		30F15FEC2FAC674F00B80914 /* Exceptions for "HMLoveNotificationService" folder in "HMLoveNotificationService" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 30F15FE92FAC674F00B80914 /* HMLoveNotificationService */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -120,6 +137,18 @@
 			path = HMLoveWidget;
 			sourceTree = "<group>";
 		};
+		30F15FEB2FAC674F00B80914 /* HMLoveNotificationService */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				30F15FEC2FAC674F00B80914 /* Exceptions for "HMLoveNotificationService" folder in "HMLoveNotificationService" target */,
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = HMLoveNotificationService;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -129,6 +158,13 @@
 			files = (
 				305661F02F501D5300963329 /* SwiftUI.framework in Frameworks */,
 				305661EE2F501D5300963329 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		30F15FE72FAC674F00B80914 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -177,6 +213,7 @@
 				9740EEB11CF90186004384FC /* Flutter */,
 				97C146F01CF9000F007C117D /* Runner */,
 				305661F12F501D5300963329 /* HMLoveWidget */,
+				30F15FEB2FAC674F00B80914 /* HMLoveNotificationService */,
 				97C146EF1CF9000F007C117D /* Products */,
 				331C8082294A63A400263BE5 /* RunnerTests */,
 				D1A0833C86543355A0EFC809 /* Pods */,
@@ -191,6 +228,7 @@
 				97C146EE1CF9000F007C117D /* Runner.app */,
 				331C8081294A63A400263BE5 /* RunnerTests.xctest */,
 				305661EC2F501D5300963329 /* HMLoveWidgetExtension.appex */,
+				30F15FEA2FAC674F00B80914 /* HMLoveNotificationService.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -259,6 +297,26 @@
 			productReference = 305661EC2F501D5300963329 /* HMLoveWidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		30F15FE92FAC674F00B80914 /* HMLoveNotificationService */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 30F15FF32FAC674F00B80914 /* Build configuration list for PBXNativeTarget "HMLoveNotificationService" */;
+			buildPhases = (
+				30F15FE62FAC674F00B80914 /* Sources */,
+				30F15FE72FAC674F00B80914 /* Frameworks */,
+				30F15FE82FAC674F00B80914 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				30F15FEB2FAC674F00B80914 /* HMLoveNotificationService */,
+			);
+			name = HMLoveNotificationService;
+			productName = HMLoveNotificationService;
+			productReference = 30F15FEA2FAC674F00B80914 /* HMLoveNotificationService.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		331C8080294A63A400263BE5 /* RunnerTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 331C8087294A63A400263BE5 /* Build configuration list for PBXNativeTarget "RunnerTests" */;
@@ -297,6 +355,7 @@
 			);
 			dependencies = (
 				305661FA2F501D5500963329 /* PBXTargetDependency */,
+				30F15FF02FAC674F00B80914 /* PBXTargetDependency */,
 			);
 			name = Runner;
 			productName = Runner;
@@ -315,6 +374,9 @@
 				ORGANIZATIONNAME = "";
 				TargetAttributes = {
 					305661EB2F501D5300963329 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					30F15FE92FAC674F00B80914 = {
 						CreatedOnToolsVersion = 26.2;
 					};
 					331C8080294A63A400263BE5 = {
@@ -343,12 +405,20 @@
 				97C146ED1CF9000F007C117D /* Runner */,
 				331C8080294A63A400263BE5 /* RunnerTests */,
 				305661EB2F501D5300963329 /* HMLoveWidgetExtension */,
+				30F15FE92FAC674F00B80914 /* HMLoveNotificationService */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		305661EA2F501D5300963329 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		30F15FE82FAC674F00B80914 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -496,6 +566,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		30F15FE62FAC674F00B80914 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		331C807D294A63A400263BE5 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -521,6 +598,11 @@
 			isa = PBXTargetDependency;
 			target = 305661EB2F501D5300963329 /* HMLoveWidgetExtension */;
 			targetProxy = 305661F92F501D5500963329 /* PBXContainerItemProxy */;
+		};
+		30F15FF02FAC674F00B80914 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 30F15FE92FAC674F00B80914 /* HMLoveNotificationService */;
+			targetProxy = 30F15FEF2FAC674F00B80914 /* PBXContainerItemProxy */;
 		};
 		331C8086294A63A400263BE5 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -745,6 +827,129 @@
 			};
 			name = Profile;
 		};
+		30F15FF42FAC674F00B80914 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = HMLoveNotificationService/HMLoveNotificationService.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HW9XJ9J5M2;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HMLoveNotificationService/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = HMLoveNotificationService;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jiny.hmlove.HMLoveNotificationService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		30F15FF52FAC674F00B80914 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = HMLoveNotificationService/HMLoveNotificationService.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HW9XJ9J5M2;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HMLoveNotificationService/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = HMLoveNotificationService;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jiny.hmlove.HMLoveNotificationService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		30F15FF62FAC674F00B80914 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = HMLoveNotificationService/HMLoveNotificationService.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = HW9XJ9J5M2;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HMLoveNotificationService/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = HMLoveNotificationService;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jiny.hmlove.HMLoveNotificationService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Profile;
+		};
 		331C8088294A63A400263BE5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = AAE7BBAE68AC2A4E25816C9C /* Pods-RunnerTests.debug.xcconfig */;
@@ -964,6 +1169,16 @@
 				305661FD2F501D5500963329 /* Debug */,
 				305661FE2F501D5500963329 /* Release */,
 				305661FF2F501D5500963329 /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		30F15FF32FAC674F00B80914 /* Build configuration list for PBXNativeTarget "HMLoveNotificationService" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				30F15FF42FAC674F00B80914 /* Debug */,
+				30F15FF52FAC674F00B80914 /* Release */,
+				30F15FF62FAC674F00B80914 /* Profile */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -132,6 +132,11 @@ class WidgetService {
     await _refresh();
   }
 
+  /// 위젯이 현재 표시 중인 월(prev/next 네비게이션 반영). null/빈문자면 미설정 상태.
+  static Future<String?> getDisplayedCalendarYearMonth() async {
+    return HomeWidget.getWidgetData<String>('calendarYearMonth');
+  }
+
   /// Update calendar events for large calendar widget.
   ///
   /// Events are cached per-month under `calendarEvents_{yearMonth}` so the
