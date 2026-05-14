@@ -10,6 +10,7 @@ import '../core/router.dart';
 import '../core/theme.dart';
 import '../providers/auth_provider.dart';
 import '../providers/badge_provider.dart';
+import '../providers/calendar_provider.dart';
 import '../providers/chat_provider.dart';
 import '../providers/couple_provider.dart';
 import '../providers/letter_provider.dart';
@@ -40,6 +41,10 @@ class _MainShellState extends ConsumerState<MainShell>
       if (token != null) {
         ref.read(chatProvider.notifier).connect(token);
       }
+      // 콜드 스타트 시점엔 lifecycle이 이미 resumed라서 didChangeAppLifecycleState
+      // 가 안 불릴 수 있다. 백그라운드에서 위젯이 본 월(pending hydration)을
+      // 한 번 따라잡아 둔다 (extras 비면 즉시 return).
+      ref.read(calendarProvider.notifier).catchUpWidgetMissingMonths();
     });
     // 푸시 알림 초기화 - UI가 완전히 빌드된 후 실행
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -60,6 +65,9 @@ class _MainShellState extends ConsumerState<MainShell>
     if (state == AppLifecycleState.resumed) {
       // 앱 포그라운드 복귀 시 기존 transport를 신뢰하지 않고 소켓을 새로 만든다.
       ref.read(chatProvider.notifier).refreshConnectionOnResume();
+      // 위젯이 백그라운드에서 prev/next로 이동했을 수 있다. EventKit에 접근할 수
+      // 없는 위젯 익스텐션을 대신해 device/holiday 캐시를 채워준다.
+      ref.read(calendarProvider.notifier).catchUpWidgetMissingMonths();
     }
   }
 

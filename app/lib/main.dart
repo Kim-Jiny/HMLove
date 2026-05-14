@@ -159,6 +159,11 @@ void main() async {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   });
 
+  // _HMLoveAppState.initState 가 HomeWidget.initiallyLaunchedFromHomeWidget()
+  // 을 호출하는데, 이건 setAppGroupId 가 먼저 끝나야 PlatformException(-7) 안 남.
+  // setAppGroupId는 단순 문자열 저장이라 빠르고, 실패해도 _guardedInit가 흡수.
+  await _guardedInit('home_widget', WidgetService.initialize);
+
   runApp(
     const ProviderScope(
       child: HMLoveApp(),
@@ -166,7 +171,8 @@ void main() async {
   );
 
   // 스플래시 빠져나온 뒤 백그라운드로 나머지 초기화. 실패해도 앱은 진행.
-  // 순서: FCM 억제 → 위젯 → 사운드 → AdMob → NaverMap
+  // 순서: FCM 억제 → 사운드 → AdMob → NaverMap
+  // (home_widget 은 위에서 runApp 전에 처리됨)
   // (AdMob, NaverMap 은 폴드/특정 디바이스에서 블록 보고 있어 반드시 비차단으로)
   // ignore: unawaited_futures
   _initDeferred();
@@ -177,7 +183,6 @@ Future<void> _initDeferred() async {
     'FCM suppressForeground',
     PushNotificationService.suppressForegroundNotifications,
   );
-  await _guardedInit('home_widget', WidgetService.initialize);
   await _guardedInit(
     'notificationSound',
     NotificationSoundService.initialize,

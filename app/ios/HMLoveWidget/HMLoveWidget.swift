@@ -14,6 +14,10 @@ import AppIntents
 private let calendarAppGroupId = "group.com.jiny.hmlove"
 private let calendarMonthKey = "calendarYearMonth"
 private let calendarEventMonthsKey = "widgetCalendarEventMonths"
+/// 위젯이 표시한 월 중 device/holiday 캐시가 비어있을 수 있는 월 집합.
+/// 앱이 포어그라운드 복귀 시 이 집합을 읽어 부족한 월을 채우고 비운다.
+/// (위젯 익스텐션은 EventKit 권한이 없어 직접 채울 수 없음.)
+private let calendarPendingHydrationKey = "widgetPendingHydrationMonths"
 
 struct CalendarWidgetTheme {
     let id: String
@@ -84,13 +88,33 @@ private func shiftCalendarWidgetMonth(by months: Int) {
     let base = cached.isEmpty ? Date() : (formatter.date(from: cached) ?? Date())
     let calendar = Calendar(identifier: .gregorian)
     guard let newDate = calendar.date(byAdding: .month, value: months, to: base) else { return }
-    defaults.set(formatter.string(from: newDate), forKey: calendarMonthKey)
+    let newYearMonth = formatter.string(from: newDate)
+    defaults.set(newYearMonth, forKey: calendarMonthKey)
+    markPendingHydration(defaults: defaults, yearMonth: newYearMonth)
 }
 
 @available(iOS 16.0, *)
 private func resetCalendarWidgetMonthToToday() {
     guard let defaults = UserDefaults(suiteName: calendarAppGroupId) else { return }
-    defaults.set(calendarMonthFormatter().string(from: Date()), forKey: calendarMonthKey)
+    let yearMonth = calendarMonthFormatter().string(from: Date())
+    defaults.set(yearMonth, forKey: calendarMonthKey)
+    markPendingHydration(defaults: defaults, yearMonth: yearMonth)
+}
+
+/// 위젯이 표시한 월을 pending 집합에 추가. 앱이 다음 resumed에서 읽어 채움.
+private func markPendingHydration(defaults: UserDefaults, yearMonth: String) {
+    guard !yearMonth.isEmpty else { return }
+    let existing = defaults.string(forKey: calendarPendingHydrationKey) ?? ""
+    let decoded = (existing.data(using: .utf8).flatMap {
+        try? JSONSerialization.jsonObject(with: $0) as? [String]
+    }) ?? []
+    var months = Set(decoded.filter { !$0.isEmpty })
+    guard months.insert(yearMonth).inserted else { return }
+    let sorted = months.sorted()
+    if let jsonData = try? JSONSerialization.data(withJSONObject: sorted),
+       let jsonString = String(data: jsonData, encoding: .utf8) {
+        defaults.set(jsonString, forKey: calendarPendingHydrationKey)
+    }
 }
 
 private func trackCachedMonth(defaults: UserDefaults, storageKey: String, yearMonth: String) {
@@ -303,6 +327,10 @@ struct CoupleTimelineProvider: AppIntentTimelineProvider {
         }()
         let yearMonth = displayedYearMonth
         let currentYearMonth = formatter.string(from: now)
+
+        // 위젯이 표시 중인 월을 항상 pending hydration에 마킹. 앱이 다음 포어그라운드
+        // 복귀 시 device/holiday 캐시를 채워준다 (위젯은 EventKit 권한 없음).
+        markPendingHydration(defaults: defaults, yearMonth: yearMonth)
 
         guard let url = URL(string: "\(baseUrl)/calendar/\(yearMonth)") else {
             completion(nil)

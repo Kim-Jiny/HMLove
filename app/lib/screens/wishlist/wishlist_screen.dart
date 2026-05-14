@@ -23,6 +23,9 @@ class _WishlistScreenState extends ConsumerState<WishlistScreen> {
   }
 
   void _showAddSheet() {
+    // 보고있는 탭의 카테고리를 기본값으로. 전체(filterCategory == null)면 기타.
+    final initialCategory =
+        ref.read(wishlistProvider).filterCategory ?? WishCategory.OTHER;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -30,6 +33,7 @@ class _WishlistScreenState extends ConsumerState<WishlistScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (_) => _AddWishSheet(
+        initialCategory: initialCategory,
         onAdd: (title, memo, category) async {
           final success = await ref
               .read(wishlistProvider.notifier)
@@ -400,10 +404,14 @@ class _WishCard extends StatelessWidget {
 }
 
 class _AddWishSheet extends StatefulWidget {
+  final WishCategory initialCategory;
   final Future<void> Function(String title, String? memo, WishCategory category)
   onAdd;
 
-  const _AddWishSheet({required this.onAdd});
+  const _AddWishSheet({
+    required this.initialCategory,
+    required this.onAdd,
+  });
 
   @override
   State<_AddWishSheet> createState() => _AddWishSheetState();
@@ -412,7 +420,7 @@ class _AddWishSheet extends StatefulWidget {
 class _AddWishSheetState extends State<_AddWishSheet> {
   final _titleController = TextEditingController();
   final _memoController = TextEditingController();
-  WishCategory _category = WishCategory.OTHER;
+  late WishCategory _category = widget.initialCategory;
   bool _isSubmitting = false;
 
   @override

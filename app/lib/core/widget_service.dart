@@ -13,6 +13,9 @@ const _androidCalendarWidgetName = 'HMLoveCalendarWidgetProvider';
 const _calendarEventMonthsKey = 'widgetCalendarEventMonths';
 const _deviceCalendarEventMonthsKey = 'widgetDeviceCalendarEventMonths';
 const _holidayEventMonthsKey = 'widgetHolidayEventMonths';
+/// 위젯 prev/next 네비게이션이 발생한 월(앱 캐시가 비어있을 수 있음).
+/// 앱이 포어그라운드 복귀 시 읽어 device/holiday 캐시를 채우고 비운다.
+const _pendingHydrationKey = 'widgetPendingHydrationMonths';
 
 class WidgetService {
   WidgetService._();
@@ -83,6 +86,7 @@ class WidgetService {
       HomeWidget.saveWidgetData<String?>(_calendarEventMonthsKey, null),
       HomeWidget.saveWidgetData<String?>(_deviceCalendarEventMonthsKey, null),
       HomeWidget.saveWidgetData<String?>(_holidayEventMonthsKey, null),
+      HomeWidget.saveWidgetData<String?>(_pendingHydrationKey, null),
     ];
 
     for (final yearMonth in calendarMonths) {
@@ -135,6 +139,17 @@ class WidgetService {
   /// 위젯이 현재 표시 중인 월(prev/next 네비게이션 반영). null/빈문자면 미설정 상태.
   static Future<String?> getDisplayedCalendarYearMonth() async {
     return HomeWidget.getWidgetData<String>('calendarYearMonth');
+  }
+
+  /// 위젯이 표시했지만 앱이 device/holiday 데이터를 채우지 못했을 수 있는 월 목록.
+  /// 위젯 익스텐션은 EventKit 권한이 없어 직접 채우지 못하므로 앱이 따라잡아야 함.
+  static Future<List<String>> getPendingHydrationMonths() async {
+    return _loadTrackedMonths(_pendingHydrationKey);
+  }
+
+  /// pending hydration 집합을 비움. 앱이 처리 완료한 뒤 호출.
+  static Future<void> clearPendingHydrationMonths() async {
+    await HomeWidget.saveWidgetData<String?>(_pendingHydrationKey, null);
   }
 
   /// Update calendar events for large calendar widget.

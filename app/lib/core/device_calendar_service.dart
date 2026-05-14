@@ -80,14 +80,27 @@ class DeviceCalendarService {
   }
 
   /// OS가 제공하는 공휴일 캘린더 자동 감지. 읽기전용 구독 캘린더 중
-  /// 이름에 언어별 "공휴일" 키워드를 포함하는 항목만 반환하므로
+  /// 캘린더 이름에 "공휴일/휴일" 키워드를 포함하는 항목만 반환하므로
   /// 한국/일본/영어권/유럽권 등 지역 무관하게 자동 동작한다.
+  ///
+  /// 매칭은 **calendar.name 만** 검색한다 — Google Calendar는 절기/세시풍속/
+  /// 기념일까지 모두 `*holiday@group.v.calendar.google.com` 라는 같은 account
+  /// 네임스페이스를 쓰기 때문에 accountName 으로 매칭하면 절기·세시풍속이
+  /// 빨간 공휴일로 잘못 표시된다. (실제 공휴일 캘린더의 name 은 "대한민국의
+  /// 휴일" / "Holidays in South Korea" 처럼 키워드를 포함하므로 name 만으로 충분.)
+  ///
+  /// 키워드는 "공휴일/휴일" 의미를 직접 담는 단어만 사용한다.
+  /// `한국`/`korean`/`south korea` 같은 국가명 단독은 비공휴일 구독(예:
+  /// "Korean Drama", "한국 야구")과 충돌할 수 있어 제외.
+  /// 읽기전용(=구독) 캘린더로 제한해 "내 휴가" 같은 사용자 일정과 충돌 방지.
+  /// `isReadOnly` 가 null로 오는 OEM(샤오미·일부 삼성 등)도 있어 명시적으로
+  /// `false`인 경우만 배제한다 (null은 통과).
   static const _holidayKeywords = [
-    'holiday', 'holidays',
-    '공휴일',
+    'holiday', 'holidays', 'public holiday',
+    '공휴일', '휴일',
     '祝日', '祝祭日', '節日', '节日',
-    'feriado', 'feriados',
-    'férié', 'fériés', 'jours fériés',
+    'feriado', 'feriados', 'feriados nacionales',
+    'férié', 'fériés', 'jour férié', 'jours fériés',
     'feiertag', 'feiertage',
     'festivo', 'festivi', 'festività',
     'helgdag', 'helgdagar', 'helligdag', 'helligdage',
@@ -102,13 +115,28 @@ class DeviceCalendarService {
 
   static Future<List<Calendar>> getHolidayCalendars() async {
     final all = await getCalendars();
-    return all.where((c) {
-      if (c.isReadOnly != true) return false;
-      final name = (c.name ?? '').toLowerCase();
-      if (name.isEmpty) return false;
-      return _holidayKeywords.any((kw) => name.contains(kw.toLowerCase()));
-    }).toList();
+    final matched = all.where((c) => _looksLikeHolidayCalendar(c)).toList();
+    if (matched.isNotEmpty) return matched;
+
+    // 디버그: 어떤 후보들이 있었는지 한 줄로 남김 (사용자 문의 디버깅용)
+    debugPrint(
+      '[DeviceCalendar] No holiday calendar matched. Candidates: '
+      '${all.map((c) => '${c.name}/${c.accountName}/ro=${c.isReadOnly}').join(', ')}',
+    );
+    return matched;
   }
+
+  /// 휴일 캘린더 후보 판정. UI 진단 화면도 같은 로직을 쓸 수 있도록 노출.
+  static bool _looksLikeHolidayCalendar(Calendar c) {
+    if (c.isReadOnly == false) return false; // 명시적 false만 배제
+    final name = (c.name ?? '').toLowerCase();
+    if (name.isEmpty) return false;
+    return _holidayKeywords.any((kw) => name.contains(kw.toLowerCase()));
+  }
+
+  /// 진단 UI용 — 캘린더 한 건이 공휴일 후보로 매칭되는지 외부에서 조회.
+  static bool isHolidayCalendarCandidate(Calendar c) =>
+      _looksLikeHolidayCalendar(c);
 
   // --- 공휴일 오버레이 설정 ---
 

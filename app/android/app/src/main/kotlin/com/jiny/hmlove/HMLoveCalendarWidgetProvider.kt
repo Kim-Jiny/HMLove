@@ -48,6 +48,10 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
         const val ACTION_TODAY_MONTH = "com.jiny.hmlove.CALENDAR_TODAY_MONTH"
         private val MONTH_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM")
         private const val PREF_KEY_CALENDAR_EVENT_MONTHS = "widgetCalendarEventMonths"
+        // 위젯이 표시한 월 중 device/holiday 캐시가 비어있을 수 있는 월 집합.
+        // 앱이 포어그라운드 복귀 시 이 집합을 읽어 부족한 월을 채우고 비운다.
+        // (위젯 프로세스에서는 device_calendar 플러그인을 호출할 수 없음.)
+        private const val PREF_KEY_PENDING_HYDRATION = "widgetPendingHydrationMonths"
 
         // Guard against spamming the server when the same month is in-flight.
         private val inFlightFetches = ConcurrentHashMap.newKeySet<String>()
@@ -282,6 +286,16 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
         return System.currentTimeMillis() - lastFail < FETCH_FAIL_COOLDOWN_MS
     }
 
+    /**
+     * 위젯이 표시한 월을 pending hydration 집합에 추가. 앱이 다음 포어그라운드
+     * 복귀 시 device/holiday 캐시를 채워준다 (위젯 프로세스는 device_calendar
+     * 플러그인을 호출할 수 없음).
+     */
+    private fun markPendingHydration(prefs: SharedPreferences, yearMonth: String) {
+        if (yearMonth.isEmpty()) return
+        trackCachedMonth(prefs, PREF_KEY_PENDING_HYDRATION, yearMonth)
+    }
+
     private fun trackCachedMonth(
         prefs: SharedPreferences,
         storageKey: String,
@@ -423,6 +437,7 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                         .putString("calendarYearMonth", newMonthKey)
                         .remove(PREF_KEY_FETCH_FAIL_PREFIX + newMonthKey)
                         .apply()
+                    markPendingHydration(prefs, newMonthKey)
 
                     val appWidgetManager = AppWidgetManager.getInstance(context)
                     val ids = appWidgetManager.getAppWidgetIds(
@@ -534,6 +549,10 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                 // Parse calendar events for the displayed month.
                 // Prefer per-month cache; fall back to the generic blob (legacy).
                 val displayMonthKey = displayMonth.format(MONTH_FORMATTER)
+                // 위젯이 표시 중인 월을 항상 pending hydration에 마킹. 앱이 다음 포어그라운드
+                // 복귀 시 device/holiday 캐시를 채워준다 (위젯 프로세스는 device_calendar
+                // 플러그인을 호출할 수 없음).
+                markPendingHydration(prefs, displayMonthKey)
                 val perMonthJson = prefs.getString("calendarEvents_$displayMonthKey", null)
                 val eventsJson = perMonthJson
                     ?: if (displayMonth == currentMonth) {

@@ -185,6 +185,35 @@ class CalendarNotifier extends Notifier<CalendarState> {
     await fetchEvents(ym);
   }
 
+  /// 위젯에서 prev/next 네비게이션이 일어난 월(pending) + 현재 위젯 표시 월의
+  /// device/holiday 캐시를 채운다. 위젯 익스텐션은 EventKit 권한이 없어 직접
+  /// 채울 수 없으므로 앱이 포어그라운드 복귀 시 따라잡는 보완 흐름.
+  Future<void> catchUpWidgetMissingMonths() async {
+    try {
+      final pending = await WidgetService.getPendingHydrationMonths();
+      final extras = <String>{...pending};
+      final widgetYm = await WidgetService.getDisplayedCalendarYearMonth();
+      if (widgetYm != null && _isValidYearMonth(widgetYm)) {
+        extras.add(widgetYm);
+      }
+      if (extras.isEmpty) return;
+
+      final anchor = _currentYearMonth.isNotEmpty
+          ? _currentYearMonth
+          : '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}';
+
+      if (state.holidayOverlayEnabled) {
+        await _fetchHolidayEventsForRange(anchor, extraMonths: extras);
+      }
+      if (state.deviceCalendarEnabled) {
+        await _fetchDeviceEventsForRange(anchor, extraMonths: extras);
+      }
+      await WidgetService.clearPendingHydrationMonths();
+    } catch (e) {
+      debugPrint('[Widget] catchUpWidgetMissingMonths error: $e');
+    }
+  }
+
   /// Fetch events for a given year-month (e.g. '2026-02').
   Future<void> fetchEvents(String yearMonth) async {
     _currentYearMonth = yearMonth;
@@ -211,7 +240,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
 
       // 기기 캘린더 연동
       if (state.deviceCalendarEnabled) {
-        _fetchDeviceEvents(yearMonth);
+        _fetchDeviceEventsForRange(yearMonth);
         _syncServerEventsToDevice(events);
       }
 
@@ -251,7 +280,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
       }
 
       if (_currentYearMonth.isNotEmpty) {
-        await _fetchDeviceEvents(_currentYearMonth);
+        await _fetchDeviceEventsForRange(_currentYearMonth);
       }
     } else {
       await DeviceCalendarService.setSyncEnabled(false);
@@ -309,18 +338,8 @@ class CalendarNotifier extends Notifier<CalendarState> {
         await _fetchHolidayEventsForRange(_currentYearMonth);
       }
     } else if (_currentYearMonth.isNotEmpty) {
-      // OFF: 추적 중인 모든 월의 휴일 데이터 제거 (앱 월 ±1 + 위젯 월 ±1)
-      final months = <String>{
-        _shiftYearMonth(_currentYearMonth, -1),
-        _currentYearMonth,
-        _shiftYearMonth(_currentYearMonth, 1),
-      };
-      final widgetYm = await WidgetService.getDisplayedCalendarYearMonth();
-      if (widgetYm != null && _isValidYearMonth(widgetYm)) {
-        months.add(_shiftYearMonth(widgetYm, -1));
-        months.add(widgetYm);
-        months.add(_shiftYearMonth(widgetYm, 1));
-      }
+      // OFF: prefetch 반경 내 모든 월의 휴일 데이터를 위젯에서 비움.
+      final months = await _buildPrefetchMonths(_currentYearMonth);
       for (final ym in months) {
         await WidgetService.updateHolidayEvents(const [], ym);
       }
@@ -382,23 +401,46 @@ class CalendarNotifier extends Notifier<CalendarState> {
     return '$y-${m.toString().padLeft(2, '0')}';
   }
 
-  /// 공휴일을 앵커 월 ±1 + 위젯이 표시 중인 월에 대해 모두 가져와
-  /// 위젯에 월별 푸시 + 앱 state는 누적 결과로 한 번에 갱신.
-  /// 앱과 위젯의 월이 다를 수 있고(prev/next 네비게이션) 사용자가 위젯에서 ±1 정도
-  /// 이동해도 즉시 보이도록 인접 월까지 캐시한다.
-  Future<void> _fetchHolidayEventsForRange(String anchorYearMonth) async {
-    try {
-      final months = <String>{
-        _shiftYearMonth(anchorYearMonth, -1),
-        anchorYearMonth,
-        _shiftYearMonth(anchorYearMonth, 1),
-      };
-      final widgetYm = await WidgetService.getDisplayedCalendarYearMonth();
-      if (widgetYm != null && _isValidYearMonth(widgetYm)) {
-        months.add(_shiftYearMonth(widgetYm, -1));
-        months.add(widgetYm);
-        months.add(_shiftYearMonth(widgetYm, 1));
+  /// 위젯 prefetch 반경 (anchor / widgetYm 기준 ±N개월).
+  /// 앱이 보고 있는 달 기준으로 ±N을 미리 캐시해 두면 사용자가 위젯에서 N칸까지
+  /// 이동해도 device/holiday 데이터가 즉시 보인다. EventKit 호출이 가벼워 ±3 사용.
+  static const int _widgetPrefetchRadius = 3;
+
+  /// anchor / widget 표시 월 / 추가 월의 ±radius 합집합. 항상 anchor 자체 포함.
+  Future<Set<String>> _buildPrefetchMonths(
+    String anchorYearMonth, {
+    Iterable<String> extraMonths = const [],
+  }) async {
+    final months = <String>{};
+    void addRange(String center) {
+      if (!_isValidYearMonth(center)) return;
+      for (var i = -_widgetPrefetchRadius; i <= _widgetPrefetchRadius; i++) {
+        months.add(_shiftYearMonth(center, i));
       }
+    }
+
+    addRange(anchorYearMonth);
+    final widgetYm = await WidgetService.getDisplayedCalendarYearMonth();
+    if (widgetYm != null && widgetYm.isNotEmpty) {
+      addRange(widgetYm);
+    }
+    for (final ym in extraMonths) {
+      if (_isValidYearMonth(ym)) months.add(ym);
+    }
+    return months;
+  }
+
+  /// 공휴일을 앵커 월 ±radius + 위젯이 표시 중인 월 ±radius + extraMonths 에 대해
+  /// 모두 가져와 위젯에 월별 푸시 + 앱 state는 누적 결과로 한 번에 갱신.
+  Future<void> _fetchHolidayEventsForRange(
+    String anchorYearMonth, {
+    Iterable<String> extraMonths = const [],
+  }) async {
+    try {
+      final months = await _buildPrefetchMonths(
+        anchorYearMonth,
+        extraMonths: extraMonths,
+      );
 
       final holidayCalendars =
           await DeviceCalendarService.getHolidayCalendars();
@@ -490,21 +532,48 @@ class CalendarNotifier extends Notifier<CalendarState> {
     await DeviceCalendarService.saveSelectedCalendarIds(ids);
 
     if (_currentYearMonth.isNotEmpty) {
-      await _fetchDeviceEvents(_currentYearMonth);
+      await _fetchDeviceEventsForRange(_currentYearMonth);
     }
   }
 
-  /// 기기 캘린더 이벤트 가져오기
-  Future<void> _fetchDeviceEvents(String yearMonth) async {
+  /// 기기 캘린더 이벤트를 prefetch 반경(±radius + 위젯월 + extras)에 대해 fetch.
+  /// 위젯에는 월별 키로 푸시하고 앱 state에는 누적 결과로 갱신.
+  Future<void> _fetchDeviceEventsForRange(
+    String anchorYearMonth, {
+    Iterable<String> extraMonths = const [],
+  }) async {
     try {
+      final months = await _buildPrefetchMonths(
+        anchorYearMonth,
+        extraMonths: extraMonths,
+      );
       final calendarIds = DeviceCalendarService.getSelectedCalendarIds();
+
       if (calendarIds.isEmpty) {
         state = state.copyWith(deviceEvents: []);
-        // 선택된 기기 캘린더가 없으면 위젯의 오버레이도 비움.
-        await WidgetService.updateDeviceCalendarEvents(const [], yearMonth);
+        for (final ym in months) {
+          await WidgetService.updateDeviceCalendarEvents(const [], ym);
+        }
         return;
       }
 
+      final all = <CalendarEvent>[];
+      for (final ym in months) {
+        all.addAll(await _fetchDeviceEventsForMonth(ym, calendarIds));
+      }
+      state = state.copyWith(deviceEvents: all);
+    } catch (e) {
+      debugPrint('[DeviceCalendar] range fetch error: $e');
+    }
+  }
+
+  /// 단일 월의 기기 캘린더 이벤트를 fetch + 위젯 per-month 키로 푸시 후 리스트 반환.
+  /// state는 건드리지 않음 — 호출자가 누적해서 한 번에 갱신.
+  Future<List<CalendarEvent>> _fetchDeviceEventsForMonth(
+    String yearMonth,
+    List<String> calendarIds,
+  ) async {
+    try {
       final parts = yearMonth.split('-');
       final year = int.parse(parts[0]);
       final month = int.parse(parts[1]);
@@ -528,15 +597,14 @@ class CalendarNotifier extends Notifier<CalendarState> {
         );
       }).toList();
 
-      state = state.copyWith(deviceEvents: calendarEvents);
-
-      // 위젯에도 per-month 오버레이로 동일한 데이터 푸시.
       await WidgetService.updateDeviceCalendarEvents(
         _toWidgetEventJson(calendarEvents),
         yearMonth,
       );
+      return calendarEvents;
     } catch (e) {
-      debugPrint('[DeviceCalendar] fetchDeviceEvents error: $e');
+      debugPrint('[DeviceCalendar] fetch month $yearMonth error: $e');
+      return const [];
     }
   }
 

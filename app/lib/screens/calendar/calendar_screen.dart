@@ -66,10 +66,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       width: 6,
       height: 6,
       margin: const EdgeInsets.symmetric(horizontal: 1.5),
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 
@@ -148,10 +145,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             const SizedBox(height: 20),
             const Text(
               '추가하기',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 24),
             _AddOptionTile(
@@ -194,7 +188,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   }
 
   void _showEventDetail(CalendarEvent event) {
-    final isUserEvent = !event.isAuto &&
+    final isUserEvent =
+        !event.isAuto &&
         event.eventType != 'feed' &&
         event.eventType != 'device' &&
         event.eventType != 'holiday';
@@ -235,7 +230,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 if (event.isAuto)
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFCE4EC),
                       borderRadius: BorderRadius.circular(6),
@@ -290,10 +287,15 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                         Navigator.pop(context);
                         _showDeleteConfirm(event);
                       },
-                      icon: const Icon(Icons.delete_outline,
-                          size: 18, color: Colors.red),
-                      label: const Text('삭제',
-                          style: TextStyle(color: Colors.red)),
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        size: 18,
+                        color: Colors.red,
+                      ),
+                      label: const Text(
+                        '삭제',
+                        style: TextStyle(color: Colors.red),
+                      ),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Colors.red),
                       ),
@@ -315,12 +317,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         children: [
           Icon(icon, size: 18, color: AppTheme.textSecondary),
           const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
         ],
       ),
     );
@@ -332,9 +329,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('일정 삭제', style: TextStyle(fontSize: 16)),
         content: Text("'${event.title}' 일정을 삭제하시겠습니까?"),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -364,8 +359,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
   void _showEditEventDialog(CalendarEvent event) {
     final titleController = TextEditingController(text: event.title);
-    final descriptionController =
-        TextEditingController(text: event.description ?? '');
+    final descriptionController = TextEditingController(
+      text: event.description ?? '',
+    );
     bool isAnniversary = event.isAnniversary;
     String repeatType = event.repeatType ?? 'NONE';
     bool isSubmitting = false;
@@ -424,8 +420,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       value: isAnniversary,
                       onChanged: (v) =>
                           setDialogState(() => isAnniversary = v ?? false),
-                      title: const Text('기념일로 표시',
-                          style: TextStyle(fontSize: 14)),
+                      title: const Text(
+                        '기념일로 표시',
+                        style: TextStyle(fontSize: 14),
+                      ),
                       contentPadding: EdgeInsets.zero,
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
@@ -467,8 +465,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                                 title: title,
                                 description:
                                     descriptionController.text.trim().isEmpty
-                                        ? null
-                                        : descriptionController.text.trim(),
+                                    ? null
+                                    : descriptionController.text.trim(),
                                 isAnniversary: isAnniversary,
                                 repeatType: repeatType,
                               );
@@ -479,9 +477,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                               showTopSnackBar(outerContext, '일정이 수정되었습니다');
                             } else {
                               final error = ref.read(calendarProvider).error;
-                              showTopSnackBar(outerContext,
-                                  error ?? '일정 수정에 실패했습니다',
-                                  isError: true);
+                              showTopSnackBar(
+                                outerContext,
+                                error ?? '일정 수정에 실패했습니다',
+                                isError: true,
+                              );
                             }
                           }
                         },
@@ -490,7 +490,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : const Text('수정'),
                 ),
@@ -547,7 +549,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     const SizedBox(height: 20),
                     const Text(
                       '새 일정',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
@@ -586,8 +591,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       value: isAnniversary,
                       onChanged: (v) =>
                           setDialogState(() => isAnniversary = v ?? false),
-                      title: const Text('기념일로 표시',
-                          style: TextStyle(fontSize: 14)),
+                      title: const Text(
+                        '기념일로 표시',
+                        style: TextStyle(fontSize: 14),
+                      ),
                       contentPadding: EdgeInsets.zero,
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
@@ -640,18 +647,20 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
                                       setDialogState(() => isSubmitting = true);
 
-                                      final date = _selectedDay ?? DateTime.now();
+                                      final date =
+                                          _selectedDay ?? DateTime.now();
                                       final success = await ref
                                           .read(calendarProvider.notifier)
                                           .createEvent(
                                             title: title,
                                             date: date,
-                                            description: descriptionController
-                                                    .text
+                                            description:
+                                                descriptionController.text
                                                     .trim()
                                                     .isEmpty
                                                 ? null
-                                                : descriptionController.text.trim(),
+                                                : descriptionController.text
+                                                      .trim(),
                                             isAnniversary: isAnniversary,
                                             repeatType: repeatType,
                                           );
@@ -660,9 +669,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                                         Navigator.pop(context);
                                         if (success) {
                                           showTopSnackBar(
-                                              outerContext, '일정이 추가되었습니다');
+                                            outerContext,
+                                            '일정이 추가되었습니다',
+                                          );
                                         } else {
-                                          final error = ref.read(calendarProvider).error;
+                                          final error = ref
+                                              .read(calendarProvider)
+                                              .error;
                                           showTopSnackBar(
                                             outerContext,
                                             error ?? '일정 추가에 실패했습니다',
@@ -819,10 +832,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   }
                   final dots = <Widget>[];
                   if (hasMission) {
-                    dots.add(const Text(
-                      '\u2764\uFE0F',
-                      style: TextStyle(fontSize: 6),
-                    ));
+                    dots.add(
+                      const Text('\u2764\uFE0F', style: TextStyle(fontSize: 6)),
+                    );
                   }
                   if (types.contains('anniversary')) {
                     dots.add(_buildDot(const Color(0xFFE91E63)));
@@ -842,10 +854,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
                   return Positioned(
                     bottom: 1,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: dots,
-                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: dots),
                   );
                 },
               ),
@@ -881,7 +890,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     SizedBox(width: 4),
                     Text(
                       '미션',
-                      style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -909,26 +921,28 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               child: Row(
                 children: calendarState
                     .getMoodsForDay(_selectedDay!)
-                    .map((mood) => Padding(
-                          padding: const EdgeInsets.only(right: 16),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _moodKeyToEmoji(mood.emoji),
-                                style: const TextStyle(fontSize: 20),
+                    .map(
+                      (mood) => Padding(
+                        padding: const EdgeInsets.only(right: 16),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _moodKeyToEmoji(mood.emoji),
+                              style: const TextStyle(fontSize: 20),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              mood.nickname,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.textSecondary,
                               ),
-                              const SizedBox(width: 6),
-                              Text(
-                                mood.nickname,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ))
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
                     .toList(),
               ),
             ),
@@ -938,7 +952,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             child: RefreshIndicator(
               onRefresh: () async {
                 final yearMonth = DateFormat('yyyy-MM').format(_focusedDay);
-                await ref.read(calendarProvider.notifier).fetchEvents(yearMonth);
+                await ref
+                    .read(calendarProvider.notifier)
+                    .fetchEvents(yearMonth);
               },
               child: _buildEventsList(selectedEvents),
             ),
@@ -1013,9 +1029,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         } else if (isAutoAnniversary) {
           iconBgColor = const Color(0xFFFCE4EC);
           iconColor = const Color(0xFFE91E63);
-          icon = event.title.contains('생일')
-              ? Icons.cake
-              : Icons.celebration;
+          icon = event.title.contains('생일') ? Icons.cake : Icons.celebration;
         } else if (event.isAnniversary) {
           iconBgColor = AppTheme.primaryLight.withValues(alpha: 0.2);
           iconColor = AppTheme.primaryColor;
@@ -1027,7 +1041,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         }
 
         // 사용자가 만든 일정만 탭/삭제 가능
-        final isUserEvent = !event.isAuto &&
+        final isUserEvent =
+            !event.isAuto &&
             event.eventType != 'feed' &&
             event.eventType != 'device' &&
             event.eventType != 'holiday';
@@ -1035,9 +1050,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         return Card(
           child: ListTile(
             onTap: () => _showEventDetail(event),
-            onLongPress: isUserEvent
-                ? () => _showDeleteConfirm(event)
-                : null,
+            onLongPress: isUserEvent ? () => _showDeleteConfirm(event) : null,
             leading: Container(
               width: 40,
               height: 40,
@@ -1063,7 +1076,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 5, vertical: 1),
+                      horizontal: 5,
+                      vertical: 1,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFCE4EC),
                       borderRadius: BorderRadius.circular(4),
@@ -1081,10 +1096,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               ],
             ),
             subtitle: event.description != null
-                ? Text(
-                    event.description!,
-                    style: const TextStyle(fontSize: 12),
-                  )
+                ? Text(event.description!, style: const TextStyle(fontSize: 12))
                 : null,
             trailing: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1174,10 +1186,7 @@ class _AddOptionTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(
-              Icons.chevron_right,
-              color: AppTheme.textHint,
-            ),
+            const Icon(Icons.chevron_right, color: AppTheme.textHint),
           ],
         ),
       ),
@@ -1282,6 +1291,25 @@ class _DeviceCalendarSettingsSheetState
     return false;
   }
 
+  /// 공휴일이 안 보일 때 사용자가 직접 진단할 수 있는 시트.
+  /// 권한 → 기기 캘린더 목록 → 휴일 후보 매칭 결과 → 가이드 순으로 보여준다.
+  Future<void> _showHolidayDiagnosis(BuildContext context) async {
+    final hasPerm = await DeviceCalendarService.hasPermission();
+    final calendars = hasPerm
+        ? await DeviceCalendarService.getCalendars()
+        : <dc.Calendar>[];
+    if (!context.mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) =>
+          _HolidayDiagnosisSheet(hasPermission: hasPerm, calendars: calendars),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -1291,122 +1319,244 @@ class _DeviceCalendarSettingsSheetState
         top: 16,
         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            '기기 캘린더 연동',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '구글/애플 캘린더와 일정을 동기화합니다',
-            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-          ),
-          const SizedBox(height: 20),
-
-          // 공휴일 표시 토글 (기기 캘린더 동기화와 독립)
-          SwitchListTile(
-            value: _holidayEnabled,
-            onChanged: (enabled) async {
-              if (enabled) {
-                final hasPermission = await _ensurePermission();
-                if (!hasPermission) return;
-              }
-              await widget.notifier.toggleHolidayOverlay(enabled);
-              setState(() => _holidayEnabled = enabled);
-              widget.onChanged();
-            },
-            title: const Text(
-              '공휴일 표시',
-              style: TextStyle(fontWeight: FontWeight.w600),
+            const SizedBox(height: 20),
+            const Text(
+              '기기 캘린더 연동',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            subtitle: const Text(
-              '기기 설정의 공휴일 캘린더를 자동 감지해 표시',
-              style: TextStyle(fontSize: 12),
-            ),
-            secondary: Icon(
-              Icons.flag_outlined,
-              color: _holidayEnabled
-                  ? const Color(0xFFD32F2F)
-                  : AppTheme.textHint,
-            ),
-            activeColor: const Color(0xFFD32F2F),
-            contentPadding: EdgeInsets.zero,
-          ),
-          const Divider(height: 8),
-
-          // 동기화 토글
-          SwitchListTile(
-            value: _isEnabled,
-            onChanged: (enabled) async {
-              if (enabled) {
-                final hasPermission = await _ensurePermission();
-                if (!hasPermission) return;
-              }
-
-              await widget.notifier.toggleDeviceCalendar(enabled);
-              setState(() => _isEnabled = enabled);
-
-              if (enabled) {
-                await _loadCalendars();
-                // 쓰기 캘린더 자동 설정 (없으면 첫 번째 쓰기 가능 캘린더)
-                if (_defaultWriteCalendarId == null &&
-                    _writableCalendars.isNotEmpty) {
-                  final firstId = _writableCalendars.first.id!;
-                  await widget.notifier.setDefaultWriteCalendarId(firstId);
-                  setState(() => _defaultWriteCalendarId = firstId);
-                }
-              } else {
-                setState(() {
-                  _calendars = [];
-                  _writableCalendars = [];
-                  _selectedIds = [];
-                });
-              }
-              widget.onChanged();
-            },
-            title: const Text(
-              '캘린더 동기화',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              _isEnabled ? '연동 중' : '꺼짐',
-              style: const TextStyle(fontSize: 12),
-            ),
-            secondary: Icon(
-              Icons.calendar_month,
-              color: _isEnabled ? AppTheme.primaryColor : AppTheme.textHint,
-            ),
-            activeColor: AppTheme.primaryColor,
-            contentPadding: EdgeInsets.zero,
-          ),
-
-          // 캘린더 목록
-          if (_isEnabled && _isLoading)
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: CircularProgressIndicator(),
-            ),
-          if (_isEnabled && !_isLoading && _calendars.isNotEmpty) ...[
-            const Divider(),
             const SizedBox(height: 8),
+            const Text(
+              '구글/애플 캘린더와 일정을 동기화합니다',
+              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 20),
 
-            // 기본 쓰기 캘린더 선택
-            if (_writableCalendars.isNotEmpty) ...[
+            // 공휴일 표시 토글 (기기 캘린더 동기화와 독립)
+            SwitchListTile(
+              value: _holidayEnabled,
+              onChanged: (enabled) async {
+                if (enabled) {
+                  final hasPermission = await _ensurePermission();
+                  if (!hasPermission) return;
+                }
+                await widget.notifier.toggleHolidayOverlay(enabled);
+                setState(() => _holidayEnabled = enabled);
+                widget.onChanged();
+              },
+              title: const Text(
+                '공휴일 표시',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text(
+                '기기 설정의 공휴일 캘린더를 자동 감지해 표시',
+                style: TextStyle(fontSize: 12),
+              ),
+              secondary: Icon(
+                Icons.flag_outlined,
+                color: _holidayEnabled
+                    ? const Color(0xFFD32F2F)
+                    : AppTheme.textHint,
+              ),
+              activeColor: const Color(0xFFD32F2F),
+              contentPadding: EdgeInsets.zero,
+            ),
+            // 공휴일이 안 보일 때 원인을 사용자가 직접 확인할 수 있는 진단.
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _showHolidayDiagnosis(context),
+                icon: const Icon(Icons.help_outline, size: 16),
+                label: const Text(
+                  '공휴일이 안 보이나요?',
+                  style: TextStyle(fontSize: 12),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  foregroundColor: AppTheme.textSecondary,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ),
+            const Divider(height: 8),
+
+            // 동기화 토글
+            SwitchListTile(
+              value: _isEnabled,
+              onChanged: (enabled) async {
+                if (enabled) {
+                  final hasPermission = await _ensurePermission();
+                  if (!hasPermission) return;
+                }
+
+                await widget.notifier.toggleDeviceCalendar(enabled);
+                setState(() => _isEnabled = enabled);
+
+                if (enabled) {
+                  await _loadCalendars();
+                  // 쓰기 캘린더 자동 설정 (없으면 첫 번째 쓰기 가능 캘린더)
+                  if (_defaultWriteCalendarId == null &&
+                      _writableCalendars.isNotEmpty) {
+                    final firstId = _writableCalendars.first.id!;
+                    await widget.notifier.setDefaultWriteCalendarId(firstId);
+                    setState(() => _defaultWriteCalendarId = firstId);
+                  }
+                } else {
+                  setState(() {
+                    _calendars = [];
+                    _writableCalendars = [];
+                    _selectedIds = [];
+                  });
+                }
+                widget.onChanged();
+              },
+              title: const Text(
+                '캘린더 동기화',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                _isEnabled ? '연동 중' : '꺼짐',
+                style: const TextStyle(fontSize: 12),
+              ),
+              secondary: Icon(
+                Icons.calendar_month,
+                color: _isEnabled ? AppTheme.primaryColor : AppTheme.textHint,
+              ),
+              activeColor: AppTheme.primaryColor,
+              contentPadding: EdgeInsets.zero,
+            ),
+
+            // 캘린더 목록
+            if (_isEnabled && _isLoading)
+              const Padding(
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(),
+              ),
+            if (_isEnabled && !_isLoading && _calendars.isNotEmpty) ...[
+              const Divider(),
+              const SizedBox(height: 8),
+
+              // 기본 쓰기 캘린더 선택
+              if (_writableCalendars.isNotEmpty) ...[
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '일정 기록 캘린더',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '앱에서 추가한 일정이 저장될 캘린더',
+                    style: TextStyle(fontSize: 11, color: AppTheme.textHint),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value:
+                          _writableCalendars.any(
+                            (c) => c.id == _defaultWriteCalendarId,
+                          )
+                          ? _defaultWriteCalendarId
+                          : _writableCalendars.first.id,
+                      isExpanded: true,
+                      icon: const Icon(Icons.keyboard_arrow_down),
+                      items: _writableCalendars.map((cal) {
+                        return DropdownMenuItem<String>(
+                          value: cal.id,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 10,
+                                height: 10,
+                                margin: const EdgeInsets.only(right: 8),
+                                decoration: BoxDecoration(
+                                  color: cal.color != null
+                                      ? Color(cal.color!)
+                                      : const Color(0xFF4CAF50),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  cal.name ?? '(이름 없음)',
+                                  style: const TextStyle(fontSize: 14),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (id) async {
+                        if (id == null) return;
+                        await widget.notifier.setDefaultWriteCalendarId(id);
+                        setState(() => _defaultWriteCalendarId = id);
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // 상대방 일정 동기화 토글
+              SwitchListTile(
+                value: _syncPartner,
+                onChanged: (value) async {
+                  await widget.notifier.setSyncPartnerEnabled(value);
+                  setState(() => _syncPartner = value);
+                },
+                title: const Text(
+                  '상대방 일정도 동기화',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                subtitle: const Text(
+                  '상대방이 추가한 일정도 기기 캘린더에 저장',
+                  style: TextStyle(fontSize: 11, color: AppTheme.textHint),
+                ),
+                secondary: Icon(
+                  Icons.people_outline,
+                  color: _syncPartner
+                      ? AppTheme.primaryColor
+                      : AppTheme.textHint,
+                ),
+                activeColor: AppTheme.primaryColor,
+                contentPadding: EdgeInsets.zero,
+              ),
+              const Divider(),
+              const SizedBox(height: 8),
+
+              // 표시할 캘린더 선택
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  '일정 기록 캘린더',
+                  '표시할 캘린더',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -1414,171 +1564,332 @@ class _DeviceCalendarSettingsSheetState
                   ),
                 ),
               ),
-              const SizedBox(height: 2),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '앱에서 추가한 일정이 저장될 캘린더',
-                  style: TextStyle(fontSize: 11, color: AppTheme.textHint),
+              const SizedBox(height: 4),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.25,
                 ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _writableCalendars.any(
-                            (c) => c.id == _defaultWriteCalendarId)
-                        ? _defaultWriteCalendarId
-                        : _writableCalendars.first.id,
-                    isExpanded: true,
-                    icon: const Icon(Icons.keyboard_arrow_down),
-                    items: _writableCalendars.map((cal) {
-                      return DropdownMenuItem<String>(
-                        value: cal.id,
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 10,
-                              height: 10,
-                              margin: const EdgeInsets.only(right: 8),
-                              decoration: BoxDecoration(
-                                color: cal.color != null
-                                    ? Color(cal.color!)
-                                    : const Color(0xFF4CAF50),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                cal.name ?? '(이름 없음)',
-                                style: const TextStyle(fontSize: 14),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _calendars.length,
+                  itemBuilder: (context, index) {
+                    final cal = _calendars[index];
+                    final isSelected = _selectedIds.contains(cal.id);
+                    return CheckboxListTile(
+                      value: isSelected,
+                      onChanged: (checked) async {
+                        await widget.notifier.toggleCalendarSelection(
+                          cal.id!,
+                          checked ?? false,
+                        );
+                        setState(() {
+                          if (checked == true) {
+                            _selectedIds.add(cal.id!);
+                          } else {
+                            _selectedIds.remove(cal.id);
+                          }
+                        });
+                        widget.onChanged();
+                      },
+                      title: Text(
+                        cal.name ?? '(이름 없음)',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      subtitle: cal.accountName != null
+                          ? Text(
+                              cal.accountName!,
+                              style: const TextStyle(fontSize: 11),
+                            )
+                          : null,
+                      secondary: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: cal.color != null
+                              ? Color(cal.color!)
+                              : const Color(0xFF4CAF50),
+                          shape: BoxShape.circle,
                         ),
-                      );
-                    }).toList(),
-                    onChanged: (id) async {
-                      if (id == null) return;
-                      await widget.notifier.setDefaultWriteCalendarId(id);
-                      setState(() => _defaultWriteCalendarId = id);
-                    },
-                  ),
+                      ),
+                      activeColor: AppTheme.primaryColor,
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.trailing,
+                    );
+                  },
                 ),
               ),
-              const SizedBox(height: 16),
             ],
-
-            // 상대방 일정 동기화 토글
-            SwitchListTile(
-              value: _syncPartner,
-              onChanged: (value) async {
-                await widget.notifier.setSyncPartnerEnabled(value);
-                setState(() => _syncPartner = value);
-              },
-              title: const Text(
-                '상대방 일정도 동기화',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            if (_isEnabled && !_isLoading && _calendars.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(20),
+                child: Text(
+                  '사용 가능한 캘린더가 없습니다',
+                  style: TextStyle(color: AppTheme.textSecondary),
+                ),
               ),
-              subtitle: const Text(
-                '상대방이 추가한 일정도 기기 캘린더에 저장',
-                style: TextStyle(fontSize: 11, color: AppTheme.textHint),
-              ),
-              secondary: Icon(
-                Icons.people_outline,
-                color: _syncPartner ? AppTheme.primaryColor : AppTheme.textHint,
-              ),
-              activeColor: AppTheme.primaryColor,
-              contentPadding: EdgeInsets.zero,
-            ),
-            const Divider(),
             const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-            // 표시할 캘린더 선택
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '표시할 캘린더',
+/// 공휴일 자동 감지가 비어있을 때 사용자가 직접 원인을 확인할 수 있는 시트.
+/// - 권한 상태
+/// - 기기에 등록된 캘린더 목록 (이름·계정·읽기전용·후보 매칭 여부)
+/// - 후보가 0개면 한국 사용자 기준 가이드 표시
+class _HolidayDiagnosisSheet extends StatelessWidget {
+  final bool hasPermission;
+  final List<dc.Calendar> calendars;
+
+  const _HolidayDiagnosisSheet({
+    required this.hasPermission,
+    required this.calendars,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final candidates = calendars
+        .where(DeviceCalendarService.isHolidayCalendarCandidate)
+        .toList();
+    final hasCandidate = candidates.isNotEmpty;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 12,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '공휴일 진단',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            // 1. 권한 상태
+            _StatusRow(
+              ok: hasPermission,
+              label: hasPermission ? '캘린더 권한 허용됨' : '캘린더 권한 거부됨',
+            ),
+            const SizedBox(height: 6),
+            // 2. 후보 매칭 결과
+            _StatusRow(
+              ok: hasCandidate,
+              label: hasCandidate
+                  ? '공휴일 캘린더 ${candidates.length}개 감지됨'
+                  : '자동 감지된 공휴일 캘린더가 없음',
+            ),
+            const SizedBox(height: 16),
+            if (calendars.isNotEmpty) ...[
+              const Text(
+                '기기 캘린더 목록',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppTheme.textSecondary,
                 ),
               ),
-            ),
-            const SizedBox(height: 4),
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.25,
-              ),
-              child: ListView.builder(
+              const SizedBox(height: 8),
+              // 외부 SingleChildScrollView가 스크롤을 담당. 내부 ListView는 layout만.
+              ListView.separated(
                 shrinkWrap: true,
-                itemCount: _calendars.length,
-                itemBuilder: (context, index) {
-                  final cal = _calendars[index];
-                  final isSelected = _selectedIds.contains(cal.id);
-                  return CheckboxListTile(
-                    value: isSelected,
-                    onChanged: (checked) async {
-                      await widget.notifier.toggleCalendarSelection(
-                        cal.id!,
-                        checked ?? false,
-                      );
-                      setState(() {
-                        if (checked == true) {
-                          _selectedIds.add(cal.id!);
-                        } else {
-                          _selectedIds.remove(cal.id);
-                        }
-                      });
-                      widget.onChanged();
-                    },
-                    title: Text(
-                      cal.name ?? '(이름 없음)',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    subtitle: cal.accountName != null
-                        ? Text(
-                            cal.accountName!,
-                            style: const TextStyle(fontSize: 11),
-                          )
-                        : null,
-                    secondary: Container(
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: calendars.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (_, i) {
+                  final c = calendars[i];
+                  final isCandidate =
+                      DeviceCalendarService.isHolidayCalendarCandidate(c);
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
                       width: 12,
                       height: 12,
                       decoration: BoxDecoration(
-                        color: cal.color != null
-                            ? Color(cal.color!)
-                            : const Color(0xFF4CAF50),
+                        color: c.color != null ? Color(c.color!) : Colors.grey,
                         shape: BoxShape.circle,
                       ),
                     ),
-                    activeColor: AppTheme.primaryColor,
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.trailing,
+                    title: Text(
+                      c.name?.isNotEmpty == true ? c.name! : '(이름 없음)',
+                      style: const TextStyle(fontSize: 14),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      '${c.accountName ?? "-"} · '
+                      '${c.isReadOnly == true
+                          ? "읽기전용"
+                          : c.isReadOnly == false
+                          ? "쓰기가능"
+                          : "?"}',
+                      style: const TextStyle(fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: isCandidate
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(
+                                0xFFD32F2F,
+                              ).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              '공휴일',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFFD32F2F),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          )
+                        : null,
                   );
                 },
               ),
-            ),
-          ],
-          if (_isEnabled && !_isLoading && _calendars.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Text(
-                '사용 가능한 캘린더가 없습니다',
-                style: TextStyle(color: AppTheme.textSecondary),
+              const SizedBox(height: 16),
+            ],
+            if (!hasPermission) ...[
+              // 권한 거부 케이스: 캘린더 앱 가이드보다 권한 허용이 먼저.
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF3E0),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  '캘린더 권한이 거부돼 공휴일 캘린더를 읽을 수 없습니다.\n'
+                  '시스템 설정에서 캘린더 권한을 허용해주세요.',
+                  style: TextStyle(fontSize: 12, height: 1.5),
+                ),
               ),
-            ),
-          const SizedBox(height: 8),
-        ],
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await Geolocator.openAppSettings();
+                  },
+                  icon: const Icon(Icons.settings),
+                  label: const Text('설정으로 이동'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ] else if (!hasCandidate) ...[
+              // 권한은 있는데 후보가 없음 → 캘린더 구독 가이드.
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF3E0),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      '공휴일을 표시하려면',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      '1. Google 캘린더 앱 설치 후 로그인\n'
+                      '2. 앱 메뉴 → 설정 → 휴일 → 대한민국 추가\n'
+                      '3. 동기화 후 이 화면을 다시 열기\n\n'
+                      '삼성 캘린더 사용자: 캘린더 앱 → ☰ → 캘린더 관리에서\n'
+                      '"대한민국 휴일"을 켜주세요.',
+                      style: TextStyle(fontSize: 12, height: 1.5),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('확인'),
+                ),
+              ),
+            ] else
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('확인'),
+                ),
+              ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _StatusRow extends StatelessWidget {
+  final bool ok;
+  final String label;
+
+  const _StatusRow({required this.ok, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          ok ? Icons.check_circle : Icons.cancel,
+          size: 18,
+          color: ok ? const Color(0xFF388E3C) : const Color(0xFFD32F2F),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
+      ],
     );
   }
 }
