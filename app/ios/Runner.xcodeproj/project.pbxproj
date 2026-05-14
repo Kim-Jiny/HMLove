@@ -115,7 +115,7 @@
 			);
 			target = 305661EB2F501D5300963329 /* HMLoveWidgetExtension */;
 		};
-		30F15FEC2FAC674F00B80914 /* Exceptions for "HMLoveNotificationService" folder in "HMLoveNotificationService" target */ = {
+		30F160002FAC675000B80914 /* Exceptions for "HMLoveNotificationService" folder in "HMLoveNotificationService" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -140,7 +140,7 @@
 		30F15FEB2FAC674F00B80914 /* HMLoveNotificationService */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				30F15FEC2FAC674F00B80914 /* Exceptions for "HMLoveNotificationService" folder in "HMLoveNotificationService" target */,
+				30F160002FAC675000B80914 /* Exceptions for "HMLoveNotificationService" folder in "HMLoveNotificationService" target */,
 			);
 			explicitFileTypes = {
 			};
