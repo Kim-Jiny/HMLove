@@ -51,6 +51,16 @@ final routerProvider = Provider<GoRouter>((ref) {
     debugLogDiagnostics: true,
     refreshListenable: authNotifier,
     redirect: (context, state) {
+      final authState = ref.read(authProvider);
+      final status = authState.status;
+      final isLoggedIn = status == AuthStatus.authenticated;
+      final hasCouple = (authState.user?.isCoupleComplete ?? false) ||
+          (authState.user?.hasExistingCoupleData ?? false);
+      // 소셜 신규 가입 진행 중인지. socialLogin 이 needsSignup 응답을 받으면
+      // 이 값이 set 되고 _AuthChangeNotifier 가 redirect 를 재평가시킨다.
+      final pendingSocialSignup = authState.pendingSocialSignup != null;
+      final currentPath = state.matchedLocation;
+
       // 위젯/소셜 로그인 등에서 들어오는 외부 스킴(hmlove://..., kakao{key}://oauth) 은
       // 경로로 변환. Android의 HomeWidgetLaunchIntent나 iOS SceneDelegate가
       // deep link를 Flutter 로 넘기면 GoRouter 초기 location 으로 들어오는데,
@@ -66,17 +76,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           case 'calendar':
             return '/calendar';
           default:
-            // 카카오 OAuth 콜백 등 알 수 없는 스킴 — splash 가 auth 상태 보고 알아서 분기.
-            return '/splash';
+            // 카카오 OAuth 콜백 등 알 수 없는 스킴. 진행 중인 소셜 가입이 있으면
+            // 가입 화면으로, 아니면 splash 가 auth 상태 보고 분기.
+            return pendingSocialSignup ? '/social-signup' : '/splash';
         }
       }
-
-      final authState = ref.read(authProvider);
-      final status = authState.status;
-      final isLoggedIn = status == AuthStatus.authenticated;
-      final hasCouple = (authState.user?.isCoupleComplete ?? false) ||
-          (authState.user?.hasExistingCoupleData ?? false);
-      final currentPath = state.matchedLocation;
 
       // While still checking auth (initial), stay on splash
       if (status == AuthStatus.initial) {
@@ -86,9 +90,18 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Auth resolved — if still on splash, navigate to the right place
       if (currentPath == '/splash') {
-        if (!isLoggedIn) return '/login';
+        if (!isLoggedIn) {
+          return pendingSocialSignup ? '/social-signup' : '/login';
+        }
         if (!hasCouple) return '/couple-connect';
         return '/home';
+      }
+
+      // 소셜 신규 가입 진행 중이면 무조건 가입 화면으로. iOS scene/deep-link 가
+      // LoginScreen 을 unmount 시켜 context.push 가 안 먹는 경우에도 라우터가 복구.
+      if (!isLoggedIn && pendingSocialSignup) {
+        if (currentPath == '/social-signup') return null;
+        return '/social-signup';
       }
 
       // If not authenticated, redirect to login (except register/social-signup)

@@ -89,9 +89,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         break;
 
       case SocialLoginNeedsSignup():
-        // pendingSocialSignup 은 socialLogin 메서드에서 이미 state 에 저장됨.
-        // /social-signup 화면이 그 state 를 직접 읽어서 사용한다.
-        context.push('/social-signup');
+        // pendingSocialSignup 이 state 에 저장되면 router redirect 가
+        // /social-signup 으로 보낸다. iOS scene/deep-link 로 이 화면이
+        // unmount 돼도 라우터가 복구하므로 여기서 직접 push 하지 않는다.
         break;
 
       case SocialLoginEmailExists(:final email, :final provider):
