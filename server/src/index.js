@@ -14,6 +14,7 @@ import prisma from './utils/prisma.js';
 import { sendPushNotification, notifyPartner } from './utils/firebase.js';
 import { getUpcomingAnniversaries } from './utils/anniversary.js';
 import authRoutes from './routes/auth.js';
+import socialRoutes from './routes/social.js';
 import coupleRoutes from './routes/couple.js';
 import calendarRoutes from './routes/calendar.js';
 import feedRoutes from './routes/feed.js';
@@ -125,6 +126,7 @@ app.get('/admin', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/auth/social', socialRoutes);
 app.use('/api/couple', coupleRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/feed', feedRoutes);

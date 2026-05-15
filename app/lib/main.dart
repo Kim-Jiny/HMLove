@@ -20,6 +20,7 @@ import 'core/constants.dart';
 import 'core/notification_sound_service.dart';
 import 'core/push_notification_service.dart';
 import 'core/router.dart';
+import 'core/social_auth_service.dart';
 import 'core/theme.dart';
 import 'core/widget_service.dart';
 import 'firebase_options.dart';
@@ -158,6 +159,15 @@ void main() async {
     );
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   });
+
+  // 카카오 SDK 초기화 — 키가 비어있으면 SDK 호출 시점에 사용자 친화적 에러 처리.
+  if (AppConstants.kakaoNativeAppKey.isNotEmpty) {
+    await _guardedInit('Kakao', () async {
+      SocialAuthService.initKakao(
+        nativeAppKey: AppConstants.kakaoNativeAppKey,
+      );
+    });
+  }
 
   // _HMLoveAppState.initState 가 HomeWidget.initiallyLaunchedFromHomeWidget()
   // 을 호출하는데, 이건 setAppGroupId 가 먼저 끝나야 PlatformException(-7) 안 남.

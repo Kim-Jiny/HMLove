@@ -16,6 +16,7 @@ import 'inquiry_screen.dart';
 import 'notification_settings_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'profile_edit_screen.dart';
+import 'social_link_screen.dart';
 
 final _appVersionProvider = FutureProvider<String>((ref) async {
   final info = await PackageInfo.fromPlatform();
@@ -757,6 +758,21 @@ class MoreScreen extends ConsumerWidget {
             Card(
               child: Column(
                 children: [
+                  _MenuTile(
+                    icon: Icons.link,
+                    title: '계정 연동',
+                    subtitle: '구글·애플·카카오 계정 연결',
+                    color: const Color(0xFF7C4DFF),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SocialLinkScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1, indent: 72),
                   _MenuTile(
                     icon: Icons.heart_broken_outlined,
                     title: '커플 해제',

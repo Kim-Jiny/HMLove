@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# 소셜 로그인 빌드 키 (Kakao 등)
+dart_defines.json
