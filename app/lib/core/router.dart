@@ -135,10 +135,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/social-signup',
-        builder: (context, state) {
-          final args = state.extra as SocialSignupArgs;
-          return SocialSignupScreen(args: args);
-        },
+        builder: (context, state) => const SocialSignupScreen(),
       ),
 
       // Couple connect

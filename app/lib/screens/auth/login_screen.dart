@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import '../../core/social_auth_service.dart';
 import '../../core/theme.dart';
 import '../../providers/auth_provider.dart';
-import 'social_signup_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -88,21 +87,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         }
         break;
 
-      case SocialLoginNeedsSignup(
-          :final signupToken,
-          :final provider,
-          :final suggestedName,
-          :final email,
-        ):
-        context.push(
-          '/social-signup',
-          extra: SocialSignupArgs(
-            signupToken: signupToken,
-            provider: provider,
-            suggestedName: suggestedName,
-            email: email,
-          ),
-        );
+      case SocialLoginNeedsSignup():
+        // pendingSocialSignup 은 socialLogin 메서드에서 이미 state 에 저장됨.
+        // /social-signup 화면이 그 state 를 직접 읽어서 사용한다.
+        context.push('/social-signup');
         break;
 
       case SocialLoginEmailExists(:final email, :final provider):

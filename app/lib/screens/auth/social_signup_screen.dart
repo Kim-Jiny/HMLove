@@ -7,24 +7,8 @@ import '../../core/social_auth_service.dart';
 import '../../core/theme.dart';
 import '../../providers/auth_provider.dart';
 
-class SocialSignupArgs {
-  final String signupToken;
-  final SocialProvider provider;
-  final String? suggestedName;
-  final String? email;
-
-  const SocialSignupArgs({
-    required this.signupToken,
-    required this.provider,
-    this.suggestedName,
-    this.email,
-  });
-}
-
 class SocialSignupScreen extends ConsumerStatefulWidget {
-  final SocialSignupArgs args;
-
-  const SocialSignupScreen({super.key, required this.args});
+  const SocialSignupScreen({super.key});
 
   @override
   ConsumerState<SocialSignupScreen> createState() => _SocialSignupScreenState();
@@ -32,15 +16,20 @@ class SocialSignupScreen extends ConsumerStatefulWidget {
 
 class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _nicknameController;
+  final _nicknameController = TextEditingController();
   DateTime? _birthDate;
+  bool _initialized = false;
 
   @override
-  void initState() {
-    super.initState();
-    _nicknameController = TextEditingController(
-      text: widget.args.suggestedName ?? '',
-    );
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      final pending = ref.read(authProvider).pendingSocialSignup;
+      if (pending?.suggestedName != null && pending!.suggestedName!.isNotEmpty) {
+        _nicknameController.text = pending.suggestedName!;
+      }
+      _initialized = true;
+    }
   }
 
   @override
@@ -75,11 +64,11 @@ class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
     }
   }
 
-  Future<void> _handleSubmit() async {
+  Future<void> _handleSubmit(SocialLoginNeedsSignup pending) async {
     if (!_formKey.currentState!.validate()) return;
 
     final ok = await ref.read(authProvider.notifier).completeSocialSignup(
-          signupToken: widget.args.signupToken,
+          signupToken: pending.signupToken,
           nickname: _nicknameController.text.trim(),
           birthDate: _birthDate,
         );
@@ -95,15 +84,39 @@ class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
     }
   }
 
+  void _cancelAndPop() {
+    ref.read(authProvider.notifier).clearPendingSocialSignup();
+    context.pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final pending = authState.pendingSocialSignup;
+
+    // 직접 진입 / 새로고침 / 취소 후 잘못된 진입 등 안전장치.
+    if (pending == null) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios),
+            onPressed: () => context.go('/login'),
+          ),
+        ),
+        body: const Center(
+          child: Text(
+            '가입 정보가 만료되었어요. 다시 시도해주세요.',
+            style: TextStyle(color: AppTheme.textSecondary),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
-          onPressed: () => context.pop(),
+          onPressed: _cancelAndPop,
         ),
         title: const Text('회원가입'),
       ),
@@ -117,7 +130,7 @@ class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
               children: [
                 const SizedBox(height: 24),
                 Text(
-                  '${widget.args.provider.displayName} 계정으로 시작하기',
+                  '${pending.provider.displayName} 계정으로 시작하기',
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -134,7 +147,7 @@ class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                if (widget.args.email != null && widget.args.email!.isNotEmpty)
+                if (pending.email != null && pending.email!.isNotEmpty)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
@@ -151,7 +164,7 @@ class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            widget.args.email!,
+                            pending.email!,
                             style: const TextStyle(fontSize: 13),
                           ),
                         ),
@@ -211,7 +224,9 @@ class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
                 SizedBox(
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: authState.isLoading ? null : _handleSubmit,
+                    onPressed: authState.isLoading
+                        ? null
+                        : () => _handleSubmit(pending),
                     child: authState.isLoading
                         ? const SizedBox(
                             width: 20,
