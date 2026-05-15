@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:icons_plus/icons_plus.dart';
 
 import '../../core/social_auth_service.dart';
 import '../../core/theme.dart';
@@ -88,9 +89,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         break;
 
       case SocialLoginNeedsSignup():
-        // pendingSocialSignup 은 socialLogin 메서드에서 이미 state 에 저장됨.
-        // /social-signup 화면이 그 state 를 직접 읽어서 사용한다.
-        context.push('/social-signup');
+        // pendingSocialSignup 이 state 에 저장되면 router redirect 가
+        // /social-signup 으로 보낸다. iOS scene/deep-link 로 이 화면이
+        // unmount 돼도 라우터가 복구하므로 여기서 직접 push 하지 않는다.
         break;
 
       case SocialLoginEmailExists(:final email, :final provider):
@@ -248,9 +249,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                 // Login button
                 SizedBox(
-                  height: 50,
+                  height: 52,
                   child: ElevatedButton(
                     onPressed: authState.isLoading ? null : _handleLogin,
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     child: authState.isLoading
                         ? const SizedBox(
                             width: 20,
@@ -263,7 +273,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         : const Text('로그인'),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
 
                 // Register link
                 Row(
@@ -271,26 +281,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   children: [
                     const Text(
                       '아직 계정이 없으신가요?',
-                      style: TextStyle(color: AppTheme.textSecondary),
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 13,
+                      ),
                     ),
                     TextButton(
                       onPressed: () => context.push('/register'),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                       child: const Text(
                         '회원가입',
                         style: TextStyle(
                           color: AppTheme.primaryColor,
                           fontWeight: FontWeight.w600,
+                          fontSize: 13,
                         ),
                       ),
                     ),
                   ],
                 ),
 
-                const SizedBox(height: 8),
-                _buildSocialDivider(),
-                const SizedBox(height: 16),
-                _buildSocialButtons(disabled: authState.isLoading),
                 const SizedBox(height: 24),
+                _buildSocialDivider(),
+                const SizedBox(height: 20),
+                _buildSocialButtons(disabled: authState.isLoading),
+                const SizedBox(height: 32),
               ],
             ),
           ),
@@ -300,51 +319,58 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Widget _buildSocialDivider() {
-    return const Row(
+    return Row(
       children: [
-        Expanded(child: Divider(thickness: 0.6)),
+        const Expanded(
+          child: Divider(thickness: 0.6, color: Color(0xFFE0E0E0)),
+        ),
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Text(
-            '또는',
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+            '또는 간편 로그인',
+            style: TextStyle(
+              color: AppTheme.textSecondary.withValues(alpha: 0.8),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.2,
+            ),
           ),
         ),
-        Expanded(child: Divider(thickness: 0.6)),
+        const Expanded(
+          child: Divider(thickness: 0.6, color: Color(0xFFE0E0E0)),
+        ),
       ],
     );
   }
 
   Widget _buildSocialButtons({required bool disabled}) {
-    return Column(
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _SocialButton(
-          label: '카카오로 시작하기',
-          backgroundColor: const Color(0xFFFEE500),
-          foregroundColor: const Color(0xFF191600),
-          icon: Icons.chat_bubble,
-          disabled: disabled,
-          onPressed: () => _handleSocialLogin(SocialProvider.kakao),
-        ),
-        const SizedBox(height: 10),
-        _SocialButton(
-          label: '구글로 시작하기',
+        _SocialCircleButton(
           backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF1F1F1F),
-          icon: Icons.g_mobiledata,
-          border: const BorderSide(color: Color(0xFFE0E0E0)),
+          borderColor: const Color(0xFFE0E0E0),
+          semanticLabel: '구글 로그인',
           disabled: disabled,
           onPressed: () => _handleSocialLogin(SocialProvider.google),
+          child: Brand(Brands.google, size: 28),
+        ),
+        const SizedBox(width: 20),
+        _SocialCircleButton(
+          backgroundColor: const Color(0xFFFEE500),
+          semanticLabel: '카카오 로그인',
+          disabled: disabled,
+          onPressed: () => _handleSocialLogin(SocialProvider.kakao),
+          child: Brand(Brands.kakaotalk, size: 28),
         ),
         if (Platform.isIOS) ...[
-          const SizedBox(height: 10),
-          _SocialButton(
-            label: 'Apple로 시작하기',
+          const SizedBox(width: 20),
+          _SocialCircleButton(
             backgroundColor: Colors.black,
-            foregroundColor: Colors.white,
-            icon: Icons.apple,
+            semanticLabel: '애플 로그인',
             disabled: disabled,
             onPressed: () => _handleSocialLogin(SocialProvider.apple),
+            child: const Icon(Icons.apple, size: 28, color: Colors.white),
           ),
         ],
       ],
@@ -352,44 +378,48 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-class _SocialButton extends StatelessWidget {
-  final String label;
+class _SocialCircleButton extends StatelessWidget {
+  final Widget child;
   final Color backgroundColor;
-  final Color foregroundColor;
-  final IconData icon;
-  final BorderSide? border;
+  final Color? borderColor;
+  final String semanticLabel;
   final bool disabled;
   final VoidCallback onPressed;
 
-  const _SocialButton({
-    required this.label,
+  const _SocialCircleButton({
+    required this.child,
     required this.backgroundColor,
-    required this.foregroundColor,
-    required this.icon,
+    required this.semanticLabel,
     required this.disabled,
     required this.onPressed,
-    this.border,
+    this.borderColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: ElevatedButton.icon(
-        onPressed: disabled ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor,
-          foregroundColor: foregroundColor,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: border ?? BorderSide.none,
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      enabled: !disabled,
+      child: Opacity(
+        opacity: disabled ? 0.5 : 1.0,
+        child: Material(
+          color: backgroundColor,
+          shape: CircleBorder(
+            side: borderColor != null
+                ? BorderSide(color: borderColor!, width: 1)
+                : BorderSide.none,
           ),
-        ),
-        icon: Icon(icon, size: 22),
-        label: Text(
-          label,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          elevation: 0,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: disabled ? null : onPressed,
+            child: SizedBox(
+              width: 56,
+              height: 56,
+              child: Center(child: child),
+            ),
+          ),
         ),
       ),
     );
