@@ -6,6 +6,7 @@ import '../providers/auth_provider.dart';
 import '../screens/splash_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
+import '../screens/auth/social_signup_screen.dart';
 import '../screens/couple/couple_connect_screen.dart';
 import '../screens/main_shell.dart';
 import '../screens/home/home_screen.dart';
@@ -89,9 +90,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/home';
       }
 
-      // If not authenticated, redirect to login (except register)
+      // If not authenticated, redirect to login (except register/social-signup)
       if (!isLoggedIn) {
-        if (currentPath == '/login' || currentPath == '/register') {
+        if (currentPath == '/login' ||
+            currentPath == '/register' ||
+            currentPath == '/social-signup') {
           return null;
         }
         return '/login';
@@ -129,6 +132,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/social-signup',
+        builder: (context, state) {
+          final args = state.extra as SocialSignupArgs;
+          return SocialSignupScreen(args: args);
+        },
       ),
 
       // Couple connect

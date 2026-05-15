@@ -1,9 +1,13 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/social_auth_service.dart';
 import '../../core/theme.dart';
 import '../../providers/auth_provider.dart';
+import 'social_signup_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -66,6 +70,84 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         context.go('/couple-connect');
       }
     }
+  }
+
+  Future<void> _handleSocialLogin(SocialProvider provider) async {
+    final outcome = await ref.read(authProvider.notifier).socialLogin(provider);
+    if (!mounted) return;
+
+    switch (outcome) {
+      case SocialLoginSuccess():
+        // router redirect 가 인증 상태 변화로 자동 처리하지만,
+        // 명시적으로 push 해서 화면이 깜빡이지 않게 한다.
+        final user = ref.read(currentUserProvider);
+        if (user?.coupleId != null) {
+          context.go('/home');
+        } else {
+          context.go('/couple-connect');
+        }
+        break;
+
+      case SocialLoginNeedsSignup(
+          :final signupToken,
+          :final provider,
+          :final suggestedName,
+          :final email,
+        ):
+        context.push(
+          '/social-signup',
+          extra: SocialSignupArgs(
+            signupToken: signupToken,
+            provider: provider,
+            suggestedName: suggestedName,
+            email: email,
+          ),
+        );
+        break;
+
+      case SocialLoginEmailExists(:final email, :final provider):
+        await _showEmailExistsDialog(email: email, provider: provider);
+        break;
+
+      case SocialLoginFailure(:final message, :final cancelled):
+        if (!cancelled) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        break;
+    }
+  }
+
+  Future<void> _showEmailExistsDialog({
+    required String email,
+    required SocialProvider provider,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('이미 가입된 이메일'),
+          content: Text(
+            '$email 은 이미 가입돼 있어요.\n'
+            '먼저 이메일/비밀번호로 로그인한 다음, 더보기 > 계정 연동에서 '
+            '${provider.displayName} 계정을 연결해주세요.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted) return;
+    // 이메일 칸에 미리 채워주면 사용자 흐름이 매끄러움.
+    _emailController.text = email;
   }
 
   @override
@@ -215,9 +297,111 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ],
                 ),
+
+                const SizedBox(height: 8),
+                _buildSocialDivider(),
+                const SizedBox(height: 16),
+                _buildSocialButtons(disabled: authState.isLoading),
+                const SizedBox(height: 24),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSocialDivider() {
+    return const Row(
+      children: [
+        Expanded(child: Divider(thickness: 0.6)),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            '또는',
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+          ),
+        ),
+        Expanded(child: Divider(thickness: 0.6)),
+      ],
+    );
+  }
+
+  Widget _buildSocialButtons({required bool disabled}) {
+    return Column(
+      children: [
+        _SocialButton(
+          label: '카카오로 시작하기',
+          backgroundColor: const Color(0xFFFEE500),
+          foregroundColor: const Color(0xFF191600),
+          icon: Icons.chat_bubble,
+          disabled: disabled,
+          onPressed: () => _handleSocialLogin(SocialProvider.kakao),
+        ),
+        const SizedBox(height: 10),
+        _SocialButton(
+          label: '구글로 시작하기',
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF1F1F1F),
+          icon: Icons.g_mobiledata,
+          border: const BorderSide(color: Color(0xFFE0E0E0)),
+          disabled: disabled,
+          onPressed: () => _handleSocialLogin(SocialProvider.google),
+        ),
+        if (Platform.isIOS) ...[
+          const SizedBox(height: 10),
+          _SocialButton(
+            label: 'Apple로 시작하기',
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            icon: Icons.apple,
+            disabled: disabled,
+            onPressed: () => _handleSocialLogin(SocialProvider.apple),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SocialButton extends StatelessWidget {
+  final String label;
+  final Color backgroundColor;
+  final Color foregroundColor;
+  final IconData icon;
+  final BorderSide? border;
+  final bool disabled;
+  final VoidCallback onPressed;
+
+  const _SocialButton({
+    required this.label,
+    required this.backgroundColor,
+    required this.foregroundColor,
+    required this.icon,
+    required this.disabled,
+    required this.onPressed,
+    this.border,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 48,
+      child: ElevatedButton.icon(
+        onPressed: disabled ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: backgroundColor,
+          foregroundColor: foregroundColor,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: border ?? BorderSide.none,
+          ),
+        ),
+        icon: Icon(icon, size: 22),
+        label: Text(
+          label,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
         ),
       ),
     );

@@ -10,7 +10,7 @@ datasource db {
 model User {
   id             String    @id @default(uuid())
   email          String    @unique
-  password       String
+  password       String?   // null이면 소셜 전용 가입자
   nickname       String
   profileImage   String?
   birthDate      DateTime?
@@ -37,8 +37,29 @@ model User {
   notifications    Notification[]
   wishItems        WishItem[]      @relation("wishAuthor")
   questionAnswers  QuestionAnswer[]
+  socialAccounts   SocialAccount[]
 
   @@index([coupleId])
+}
+
+enum SocialProvider {
+  GOOGLE
+  APPLE
+  KAKAO
+}
+
+model SocialAccount {
+  id          String         @id @default(uuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    SocialProvider
+  providerId  String         // 각 provider의 고유 식별자 (sub, id 등)
+  email       String?        // provider가 제공한 이메일 (있는 경우)
+  createdAt   DateTime       @default(now())
+
+  @@unique([provider, providerId])
+  @@unique([userId, provider])
+  @@index([userId])
 }
 
 model Couple {

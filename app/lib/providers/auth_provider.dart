@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
 import '../core/push_notification_service.dart';
+import '../core/social_auth_service.dart';
 import '../core/widget_service.dart';
 import '../models/user.dart';
 import 'chat_provider.dart';
@@ -10,6 +11,47 @@ import 'couple_provider.dart';
 
 // Auth state enum
 enum AuthStatus { initial, authenticated, unauthenticated }
+
+/// 소셜 로그인 시도 결과를 LoginScreen 에 전달하기 위한 sealed-style 타입.
+sealed class SocialLoginOutcome {
+  const SocialLoginOutcome();
+}
+
+/// 가입 완료된 유저 → 바로 로그인됨 (state 가 이미 authenticated 로 갱신).
+class SocialLoginSuccess extends SocialLoginOutcome {
+  final User user;
+  const SocialLoginSuccess(this.user);
+}
+
+/// 같은 이메일의 일반 계정이 이미 존재 → 사용자가 그쪽으로 로그인 후 연동.
+class SocialLoginEmailExists extends SocialLoginOutcome {
+  final String email;
+  final SocialProvider provider;
+  const SocialLoginEmailExists({required this.email, required this.provider});
+}
+
+/// 신규 유저 → 닉네임/생일 입력 화면으로 이동.
+class SocialLoginNeedsSignup extends SocialLoginOutcome {
+  final String signupToken;
+  final SocialProvider provider;
+  final String? suggestedName;
+  final String? email;
+  final String? picture;
+  const SocialLoginNeedsSignup({
+    required this.signupToken,
+    required this.provider,
+    this.suggestedName,
+    this.email,
+    this.picture,
+  });
+}
+
+/// 사용자 취소 또는 일반 에러 — error 메시지를 표시.
+class SocialLoginFailure extends SocialLoginOutcome {
+  final String message;
+  final bool cancelled;
+  const SocialLoginFailure(this.message, {this.cancelled = false});
+}
 
 // Auth state class
 class AuthState {
@@ -316,6 +358,182 @@ class AuthNotifier extends Notifier<AuthState> {
   /// Update user profile.
   void updateUser(User user) {
     state = state.copyWith(user: user);
+  }
+
+  /// 서버 응답({user, accessToken, refreshToken})을 받아 토큰 저장 + state 갱신.
+  /// 소셜 로그인/가입 완료에서 공통으로 사용.
+  Future<User> _applyAuthSuccess(Map<String, dynamic> data) async {
+    await ApiClient.saveTokens(
+      accessToken: data['accessToken'] as String,
+      refreshToken: data['refreshToken'] as String,
+    );
+    final userData = data['user'] as Map<String, dynamic>;
+    final user = User.fromJson(userData);
+    await ApiClient.saveUserId(user.id);
+    if (user.coupleId != null) {
+      await ApiClient.saveCoupleId(user.coupleId!);
+    }
+    final pendingInviteCode = userData['pendingInviteCode'] as String?;
+    if (pendingInviteCode != null) {
+      ref.read(coupleProvider.notifier).restoreInviteCode(pendingInviteCode);
+    }
+    state = state.copyWith(
+      status: AuthStatus.authenticated,
+      user: user,
+      isLoading: false,
+    );
+    return user;
+  }
+
+  /// 소셜 로그인 시도.
+  /// - 기존 연동된 계정이면 즉시 로그인 (state authenticated)
+  /// - 같은 이메일의 일반 계정 충돌 시 SocialLoginEmailExists
+  /// - 신규 유저면 SocialLoginNeedsSignup (가입 화면으로 유도)
+  Future<SocialLoginOutcome> socialLogin(SocialProvider provider) async {
+    state = state.copyWith(isLoading: true, error: null);
+    SocialAuthResult socialResult;
+    try {
+      socialResult = await SocialAuthService.signIn(provider);
+    } on SocialAuthCancelledException {
+      state = state.copyWith(isLoading: false);
+      return const SocialLoginFailure('취소되었습니다.', cancelled: true);
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      return SocialLoginFailure('소셜 로그인 실패: $e');
+    }
+
+    try {
+      final response = await _dio.post(
+        '/auth/social/login',
+        data: {
+          'provider': provider.serverName,
+          ...socialResult.tokenPayload,
+        },
+      );
+      final data = response.data as Map<String, dynamic>;
+
+      if (data['needsSignup'] == true) {
+        state = state.copyWith(isLoading: false);
+        final profile = (data['profile'] as Map?)?.cast<String, dynamic>();
+        return SocialLoginNeedsSignup(
+          signupToken: data['signupToken'] as String,
+          provider: provider,
+          suggestedName: (profile?['name'] as String?) ?? socialResult.displayName,
+          email: (profile?['email'] as String?) ?? socialResult.email,
+          picture: profile?['picture'] as String?,
+        );
+      }
+
+      final user = await _applyAuthSuccess(data);
+      return SocialLoginSuccess(user);
+    } on DioException catch (e) {
+      state = state.copyWith(isLoading: false);
+      final data = e.response?.data;
+      if (e.response?.statusCode == 409 &&
+          data is Map &&
+          data['error'] == 'EMAIL_EXISTS') {
+        return SocialLoginEmailExists(
+          email: (data['email'] as String?) ?? socialResult.email ?? '',
+          provider: provider,
+        );
+      }
+      final message = (data is Map ? data['error'] ?? data['message'] : null)
+              as String? ??
+          '소셜 로그인에 실패했습니다.';
+      return SocialLoginFailure(message);
+    } catch (e) {
+      state = state.copyWith(isLoading: false);
+      return SocialLoginFailure('알 수 없는 오류: $e');
+    }
+  }
+
+  /// 소셜 신규 가입 완료 (닉네임/생일 입력 후 호출).
+  Future<bool> completeSocialSignup({
+    required String signupToken,
+    required String nickname,
+    DateTime? birthDate,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await _dio.post(
+        '/auth/social/complete-signup',
+        data: {
+          'signupToken': signupToken,
+          'nickname': nickname,
+          if (birthDate != null) 'birthDate': birthDate.toIso8601String(),
+        },
+      );
+      final data = response.data as Map<String, dynamic>;
+      await _applyAuthSuccess(data);
+      return true;
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final message =
+          (data is Map ? data['error'] ?? data['message'] : null) as String? ??
+              '가입에 실패했습니다.';
+      state = state.copyWith(isLoading: false, error: message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다.');
+      return false;
+    }
+  }
+
+  /// 로그인된 상태에서 새 소셜 provider 연동.
+  /// 성공 시 null, 실패 시 에러 메시지 반환.
+  Future<String?> linkSocial(SocialProvider provider) async {
+    SocialAuthResult socialResult;
+    try {
+      socialResult = await SocialAuthService.signIn(provider);
+    } on SocialAuthCancelledException {
+      return '취소되었습니다.';
+    } catch (e) {
+      return '소셜 인증 실패: $e';
+    }
+
+    try {
+      await _dio.post(
+        '/auth/social/link',
+        data: {
+          'provider': provider.serverName,
+          ...socialResult.tokenPayload,
+        },
+      );
+      return null;
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      return (data is Map ? data['message'] ?? data['error'] : null) as String? ??
+          '연동에 실패했습니다.';
+    } catch (e) {
+      return '알 수 없는 오류: $e';
+    }
+  }
+
+  /// 소셜 연동 해제.
+  Future<String?> unlinkSocial(SocialProvider provider) async {
+    try {
+      await _dio.delete('/auth/social/${provider.serverName}');
+      // 카카오/구글은 디바이스에서 토큰도 정리.
+      await SocialAuthService.signOut(provider);
+      return null;
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      return (data is Map ? data['message'] ?? data['error'] : null) as String? ??
+          '연동 해제에 실패했습니다.';
+    } catch (e) {
+      return '알 수 없는 오류: $e';
+    }
+  }
+
+  /// 현재 사용자의 연동 현황 조회.
+  /// 응답 형식: { hasPassword: bool, providers: [{provider, linked, email, linkedAt}] }
+  Future<Map<String, dynamic>?> fetchLinkedProviders() async {
+    try {
+      final response = await _dio.get('/auth/social/linked');
+      return (response.data as Map).cast<String, dynamic>();
+    } catch (e) {
+      return null;
+    }
   }
 }
 

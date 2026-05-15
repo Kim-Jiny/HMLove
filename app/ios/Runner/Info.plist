@@ -74,6 +74,10 @@
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>nmap</string>
+		<!-- Kakao SDK: KakaoTalk 앱 감지 + 로그인 콜백 -->
+		<string>kakaokompassauth</string>
+		<string>kakaolink</string>
+		<string>kakaoplus</string>
 	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
@@ -83,6 +87,24 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>hmlove</string>
+			</array>
+		</dict>
+		<!-- Google Sign-In: iOS Client ID 의 REVERSED 형태 -->
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.googleusercontent.apps</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.533381747710-plvugua463rc99md9shi8i52pcc43cnf</string>
+			</array>
+		</dict>
+		<!-- Kakao Sign-In: kakao{NATIVE_APP_KEY} -->
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.kakao.sdk</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>kakaoa7f99dc9e91081d6417e9370e026e076</string>
 			</array>
 		</dict>
 	</array>

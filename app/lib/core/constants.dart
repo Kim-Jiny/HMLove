@@ -33,6 +33,13 @@ class AppConstants {
   // Naver Map
   static const String naverMapClientId = 'lk38ez02sj';
 
+  // Kakao SDK — 디벨로퍼스에서 발급받은 네이티브 앱 키.
+  // 빌드 시 --dart-define=KAKAO_NATIVE_APP_KEY=xxx 로 주입.
+  static const String kakaoNativeAppKey = String.fromEnvironment(
+    'KAKAO_NATIVE_APP_KEY',
+    defaultValue: '',
+  );
+
   // Date Formats
   static const String dateFormat = 'yyyy-MM-dd';
   static const String dateTimeFormat = 'yyyy-MM-dd HH:mm:ss';

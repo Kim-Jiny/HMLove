@@ -12,7 +12,20 @@
           "package_name": "com.jiny.hmlove"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "533381747710-5usuuobg5rqpb5jnhjoko0n2niqsmcjl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.jiny.hmlove",
+            "certificate_hash": "92c790774fb6743a6d5b1721992bb4f57c790c01"
+          }
+        },
+        {
+          "client_id": "533381747710-shbuuhdr74epi03emq6mm1cfjali8smk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDC80HRDz6RmUhfWzzYj5q9YN7EDLt7cZM"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "533381747710-shbuuhdr74epi03emq6mm1cfjali8smk.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "533381747710-plvugua463rc99md9shi8i52pcc43cnf.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.jiny.hmlove"
+              }
+            }
+          ]
         }
       }
     }

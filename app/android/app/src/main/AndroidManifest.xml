@@ -86,6 +86,22 @@
             android:exported="false"
             android:theme="@style/WidgetSettingsDialogTheme"
             android:excludeFromRecents="true" />
+
+        <!-- Kakao SDK: 카카오 로그인 OAuth 콜백 처리.
+             scheme 의 'kakao{NATIVE_APP_KEY}' 값을 카카오 디벨로퍼스에서
+             발급받은 네이티브 앱 키로 교체할 것 -->
+        <activity
+            android:name="com.kakao.sdk.auth.AuthCodeHandlerActivity"
+            android:exported="true">
+            <intent-filter android:label="kakao_auth">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="kakaoa7f99dc9e91081d6417e9370e026e076"
+                    android:host="oauth" />
+            </intent-filter>
+        </activity>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
@@ -104,6 +120,12 @@
         <intent>
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="geo"/>
+        </intent>
+        <!-- Kakao SDK: KakaoTalk 앱 감지 (talk login fallback) -->
+        <package android:name="com.kakao.talk" />
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="kakaokompassauth"/>
         </intent>
     </queries>
 </manifest>
