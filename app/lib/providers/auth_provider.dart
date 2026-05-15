@@ -64,12 +64,18 @@ class AuthState {
   /// (e.g. "서버에 연결할 수 없습니다"). Cleared by [AuthNotifier.consumeForceLogoutReason].
   final String? forceLogoutReason;
 
+  /// 신규 소셜 가입을 진행 중인 사용자의 임시 정보. /social-signup 라우트가
+  /// 이 값을 읽음. GoRouter 의 state.extra 는 router refresh 시 손실될 수
+  /// 있어서 Riverpod 으로 보관한다.
+  final SocialLoginNeedsSignup? pendingSocialSignup;
+
   const AuthState({
     this.status = AuthStatus.initial,
     this.user,
     this.error,
     this.isLoading = false,
     this.forceLogoutReason,
+    this.pendingSocialSignup,
   });
 
   AuthState copyWith({
@@ -78,6 +84,7 @@ class AuthState {
     String? error,
     bool? isLoading,
     String? forceLogoutReason,
+    SocialLoginNeedsSignup? pendingSocialSignup,
   }) {
     return AuthState(
       status: status ?? this.status,
@@ -85,6 +92,7 @@ class AuthState {
       error: error,
       isLoading: isLoading ?? this.isLoading,
       forceLogoutReason: forceLogoutReason ?? this.forceLogoutReason,
+      pendingSocialSignup: pendingSocialSignup ?? this.pendingSocialSignup,
     );
   }
 }
@@ -360,6 +368,20 @@ class AuthNotifier extends Notifier<AuthState> {
     state = state.copyWith(user: user);
   }
 
+  /// /social-signup 화면에서 가입 완료/취소 시 보관 중인 정보 삭제.
+  /// copyWith 의 `??` fallback 으로는 null 설정이 불가능해서 별도 메서드.
+  void clearPendingSocialSignup() {
+    if (state.pendingSocialSignup == null) return;
+    state = AuthState(
+      status: state.status,
+      user: state.user,
+      error: state.error,
+      isLoading: state.isLoading,
+      forceLogoutReason: state.forceLogoutReason,
+      pendingSocialSignup: null,
+    );
+  }
+
   /// 서버 응답({user, accessToken, refreshToken})을 받아 토큰 저장 + state 갱신.
   /// 소셜 로그인/가입 완료에서 공통으로 사용.
   Future<User> _applyAuthSuccess(Map<String, dynamic> data) async {
@@ -413,15 +435,20 @@ class AuthNotifier extends Notifier<AuthState> {
       final data = response.data as Map<String, dynamic>;
 
       if (data['needsSignup'] == true) {
-        state = state.copyWith(isLoading: false);
         final profile = (data['profile'] as Map?)?.cast<String, dynamic>();
-        return SocialLoginNeedsSignup(
+        final pending = SocialLoginNeedsSignup(
           signupToken: data['signupToken'] as String,
           provider: provider,
           suggestedName: (profile?['name'] as String?) ?? socialResult.displayName,
           email: (profile?['email'] as String?) ?? socialResult.email,
           picture: profile?['picture'] as String?,
         );
+        // /social-signup 라우트에서 읽을 수 있도록 state 에 보관.
+        state = state.copyWith(
+          isLoading: false,
+          pendingSocialSignup: pending,
+        );
+        return pending;
       }
 
       final user = await _applyAuthSuccess(data);
@@ -465,6 +492,7 @@ class AuthNotifier extends Notifier<AuthState> {
       );
       final data = response.data as Map<String, dynamic>;
       await _applyAuthSuccess(data);
+      clearPendingSocialSignup();
       return true;
     } on DioException catch (e) {
       final data = e.response?.data;
