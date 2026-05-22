@@ -4,7 +4,7 @@ import sharp from 'sharp';
 import { authenticate, requireCouple } from '../middleware/auth.js';
 import prisma from '../utils/prisma.js';
 import { uploadFile, deleteFile } from '../utils/storage.js';
-import { notifyPartner } from '../utils/firebase.js';
+import { notifyPartner, notifyPartnerSilent } from '../utils/firebase.js';
 
 const router = Router();
 router.use(authenticate, requireCouple);
@@ -156,6 +156,14 @@ router.delete('/:id', async (req, res) => {
     const key = doodle.imageUrl.split('/').slice(-2).join('/');
     await Promise.allSettled([deleteFile(key)]);
     await prisma.doodle.delete({ where: { id } });
+
+    // 상대방 위젯이 마지막 그림을 표시 중이었다면 삭제 후 latest/empty 상태로 갱신.
+    // 오래된 그림 삭제여도 최신 데이터를 재조회하는 정도라 안전하다.
+    await notifyPartnerSilent({
+      userId: req.user.id,
+      coupleId: req.user.coupleId,
+      data: { type: 'doodle_widget_refresh', doodleId: id, action: 'deleted' },
+    });
 
     res.json({ message: '그림이 삭제되었습니다.' });
   } catch (err) {
