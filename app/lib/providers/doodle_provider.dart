@@ -98,7 +98,7 @@ class DoodleNotifier extends Notifier<DoodleState> {
   }
 
   /// PNG 바이트로 그림을 전송한다. 성공 시 history 와 latest 도 갱신.
-  Future<Doodle?> sendDoodle(Uint8List pngBytes) async {
+  Future<Doodle?> sendDoodle(Uint8List pngBytes, {bool quiet = false}) async {
     state = state.copyWith(isSending: true, error: null);
     try {
       final formData = FormData.fromMap({
@@ -107,6 +107,7 @@ class DoodleNotifier extends Notifier<DoodleState> {
           filename: 'doodle.png',
           contentType: DioMediaType('image', 'png'),
         ),
+        'quiet': quiet.toString(),
       });
       final response = await _dio.post(
         '/doodle',

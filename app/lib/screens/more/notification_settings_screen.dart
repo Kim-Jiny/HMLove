@@ -80,7 +80,8 @@ class _NotificationSettingsScreenState
   }
 
   bool _getBirthdayMilestone() {
-    return _box.get('noti_anniversary_milestones_birthday', defaultValue: true) as bool;
+    return _box.get('noti_anniversary_milestones_birthday', defaultValue: true)
+        as bool;
   }
 
   void _setBirthdayMilestone(bool value) {
@@ -101,16 +102,34 @@ class _NotificationSettingsScreenState
       // 개별 카테고리 키만 서버에 동기화
       const keys = [
         'noti_all',
-        'noti_chat', 'noti_chat_sound', 'noti_chat_vibrate',
-        'noti_feed', 'noti_feed_sound', 'noti_feed_vibrate',
-        'noti_calendar', 'noti_calendar_sound', 'noti_calendar_vibrate',
-        'noti_anniversary', 'noti_anniversary_sound', 'noti_anniversary_vibrate',
+        'noti_chat',
+        'noti_chat_sound',
+        'noti_chat_vibrate',
+        'noti_feed',
+        'noti_feed_sound',
+        'noti_feed_vibrate',
+        'noti_calendar',
+        'noti_calendar_sound',
+        'noti_calendar_vibrate',
+        'noti_anniversary',
+        'noti_anniversary_sound',
+        'noti_anniversary_vibrate',
         'noti_anniversary_remind_days',
-        'noti_anniversary_milestones_day', 'noti_anniversary_milestones_year',
+        'noti_anniversary_milestones_day',
+        'noti_anniversary_milestones_year',
         'noti_anniversary_milestones_birthday',
-        'noti_letter', 'noti_letter_sound', 'noti_letter_vibrate',
-        'noti_mood', 'noti_mood_sound', 'noti_mood_vibrate',
-        'noti_fight', 'noti_fight_sound', 'noti_fight_vibrate',
+        'noti_letter',
+        'noti_letter_sound',
+        'noti_letter_vibrate',
+        'noti_doodle',
+        'noti_doodle_sound',
+        'noti_doodle_vibrate',
+        'noti_mood',
+        'noti_mood_sound',
+        'noti_mood_vibrate',
+        'noti_fight',
+        'noti_fight_sound',
+        'noti_fight_vibrate',
       ];
       final prefs = <String, dynamic>{};
       for (final key in keys) {
@@ -157,7 +176,10 @@ class _NotificationSettingsScreenState
             vibrateKey: 'noti_chat_vibrate',
             allOn: _allOn,
             box: _box,
-            onChanged: () { setState(() {}); _scheduleSyncToServer(); },
+            onChanged: () {
+              setState(() {});
+              _scheduleSyncToServer();
+            },
           ),
           _NotificationCategory(
             icon: Icons.photo_outlined,
@@ -169,7 +191,10 @@ class _NotificationSettingsScreenState
             vibrateKey: 'noti_feed_vibrate',
             allOn: _allOn,
             box: _box,
-            onChanged: () { setState(() {}); _scheduleSyncToServer(); },
+            onChanged: () {
+              setState(() {});
+              _scheduleSyncToServer();
+            },
           ),
           _NotificationCategory(
             icon: Icons.calendar_today_outlined,
@@ -181,7 +206,10 @@ class _NotificationSettingsScreenState
             vibrateKey: 'noti_calendar_vibrate',
             allOn: _allOn,
             box: _box,
-            onChanged: () { setState(() {}); _scheduleSyncToServer(); },
+            onChanged: () {
+              setState(() {});
+              _scheduleSyncToServer();
+            },
           ),
           _NotificationCategory(
             icon: Icons.cake_outlined,
@@ -193,7 +221,10 @@ class _NotificationSettingsScreenState
             vibrateKey: 'noti_anniversary_vibrate',
             allOn: _allOn,
             box: _box,
-            onChanged: () { setState(() {}); _scheduleSyncToServer(); },
+            onChanged: () {
+              setState(() {});
+              _scheduleSyncToServer();
+            },
           ),
           // 기념일 리마인드 며칠 전 알림 선택
           if (_allOn && _get('noti_anniversary'))
@@ -220,7 +251,10 @@ class _NotificationSettingsScreenState
           if (_allOn && _get('noti_anniversary'))
             _AnniversaryMilestoneSelector(
               label: '주년 마일스톤',
-              options: List.generate(20, (i) => (value: i + 1, label: '${i + 1}주년')),
+              options: List.generate(
+                20,
+                (i) => (value: i + 1, label: '${i + 1}주년'),
+              ),
               selectedValues: _getYearMilestones(),
               onChanged: _setYearMilestones,
             ),
@@ -257,7 +291,25 @@ class _NotificationSettingsScreenState
             vibrateKey: 'noti_letter_vibrate',
             allOn: _allOn,
             box: _box,
-            onChanged: () { setState(() {}); _scheduleSyncToServer(); },
+            onChanged: () {
+              setState(() {});
+              _scheduleSyncToServer();
+            },
+          ),
+          _NotificationCategory(
+            icon: Icons.draw_outlined,
+            iconColor: const Color(0xFFE07A5F),
+            title: '그림 도착',
+            subtitle: '상대방이 그림을 보내면 알림',
+            enabledKey: 'noti_doodle',
+            soundKey: 'noti_doodle_sound',
+            vibrateKey: 'noti_doodle_vibrate',
+            allOn: _allOn,
+            box: _box,
+            onChanged: () {
+              setState(() {});
+              _scheduleSyncToServer();
+            },
           ),
           _NotificationCategory(
             icon: Icons.emoji_emotions_outlined,
@@ -269,7 +321,10 @@ class _NotificationSettingsScreenState
             vibrateKey: 'noti_mood_vibrate',
             allOn: _allOn,
             box: _box,
-            onChanged: () { setState(() {}); _scheduleSyncToServer(); },
+            onChanged: () {
+              setState(() {});
+              _scheduleSyncToServer();
+            },
           ),
           _NotificationCategory(
             icon: Icons.thunderstorm_outlined,
@@ -281,7 +336,10 @@ class _NotificationSettingsScreenState
             vibrateKey: 'noti_fight_vibrate',
             allOn: _allOn,
             box: _box,
-            onChanged: () { setState(() {}); _scheduleSyncToServer(); },
+            onChanged: () {
+              setState(() {});
+              _scheduleSyncToServer();
+            },
           ),
           const SizedBox(height: 32),
         ],
@@ -373,7 +431,10 @@ class _NotificationCategory extends StatelessWidget {
             ),
             child: Icon(icon, color: iconColor, size: 20),
           ),
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+          title: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
           subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
           value: _get(enabledKey),
           activeTrackColor: AppTheme.primaryColor,
@@ -392,7 +453,9 @@ class _NotificationCategory extends StatelessWidget {
                       context: context,
                       isScrollControlled: true,
                       shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(16),
+                        ),
                       ),
                       builder: (_) => _SoundPickerSheet(
                         categoryKey: enabledKey,
@@ -405,11 +468,16 @@ class _NotificationCategory extends StatelessWidget {
                     }
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -428,7 +496,11 @@ class _NotificationCategory extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 2),
-                        const Icon(Icons.expand_more, size: 14, color: AppTheme.primaryColor),
+                        const Icon(
+                          Icons.expand_more,
+                          size: 14,
+                          color: AppTheme.primaryColor,
+                        ),
                       ],
                     ),
                   ),
@@ -518,7 +590,9 @@ class _AnniversaryMilestoneSelector extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                   side: BorderSide(
-                    color: isSelected ? AppTheme.primaryColor : Colors.grey.shade300,
+                    color: isSelected
+                        ? AppTheme.primaryColor
+                        : Colors.grey.shade300,
                   ),
                 ),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -600,7 +674,9 @@ class _AnniversaryRemindDaysSelector extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                   side: BorderSide(
-                    color: isSelected ? AppTheme.primaryColor : Colors.grey.shade300,
+                    color: isSelected
+                        ? AppTheme.primaryColor
+                        : Colors.grey.shade300,
                   ),
                 ),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -704,16 +780,17 @@ class _SoundPickerSheetState extends State<_SoundPickerSheet> {
     super.dispose();
   }
 
-  List<NotificationSound> get _allSounds => NotificationSoundService.getAllSounds();
+  List<NotificationSound> get _allSounds =>
+      NotificationSoundService.getAllSounds();
 
   Future<void> _startRecording() async {
     final id = 'custom_${DateTime.now().millisecondsSinceEpoch}';
     final ok = await NotificationSoundService.startRecording(id);
     if (!ok) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('마이크 권한이 필요합니다')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('마이크 권한이 필요합니다')));
       }
       return;
     }
@@ -758,7 +835,12 @@ class _SoundPickerSheetState extends State<_SoundPickerSheet> {
           TextButton(
             onPressed: () {
               final text = _nameController.text.trim();
-              Navigator.pop(ctx, text.isNotEmpty ? text : '녹음 ${_allSounds.where((s) => s.isCustom).length + 1}');
+              Navigator.pop(
+                ctx,
+                text.isNotEmpty
+                    ? text
+                    : '녹음 ${_allSounds.where((s) => s.isCustom).length + 1}',
+              );
             },
             child: const Text('저장'),
           ),
@@ -811,7 +893,10 @@ class _SoundPickerSheetState extends State<_SoundPickerSheet> {
                 Expanded(
                   child: Text(
                     '${widget.categoryTitle} 알림음',
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 TextButton(
@@ -882,12 +967,16 @@ class _SoundPickerSheetState extends State<_SoundPickerSheet> {
                 ),
                 // 녹음 버튼
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: _isRecording
                       ? _RecordingIndicator(
                           seconds: _recordSeconds,
                           onStop: () {
-                            final id = 'custom_${DateTime.now().millisecondsSinceEpoch}';
+                            final id =
+                                'custom_${DateTime.now().millisecondsSinceEpoch}';
                             _stopRecording(id);
                           },
                         )
@@ -897,7 +986,9 @@ class _SoundPickerSheetState extends State<_SoundPickerSheet> {
                           label: const Text('새로 녹음하기 (최대 5초)'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: AppTheme.primaryColor,
-                            side: const BorderSide(color: AppTheme.primaryColor),
+                            side: const BorderSide(
+                              color: AppTheme.primaryColor,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -950,20 +1041,34 @@ class _SoundTile extends StatelessWidget {
               icon: Icon(
                 Icons.play_circle_outline,
                 size: 22,
-                color: isSelected ? AppTheme.primaryColor : Colors.grey.shade500,
+                color: isSelected
+                    ? AppTheme.primaryColor
+                    : Colors.grey.shade500,
               ),
               onPressed: () => NotificationSoundService.preview(sound.id),
               tooltip: '미리듣기',
             ),
           if (onDelete != null)
             IconButton(
-              icon: Icon(Icons.delete_outline, size: 20, color: Colors.grey.shade400),
+              icon: Icon(
+                Icons.delete_outline,
+                size: 20,
+                color: Colors.grey.shade400,
+              ),
               onPressed: onDelete,
             ),
           if (isSelected)
-            const Icon(Icons.check_circle, color: AppTheme.primaryColor, size: 22)
+            const Icon(
+              Icons.check_circle,
+              color: AppTheme.primaryColor,
+              size: 22,
+            )
           else
-            Icon(Icons.radio_button_unchecked, color: Colors.grey.shade300, size: 22),
+            Icon(
+              Icons.radio_button_unchecked,
+              color: Colors.grey.shade300,
+              size: 22,
+            ),
         ],
       ),
       onTap: onTap,
@@ -976,10 +1081,7 @@ class _RecordingIndicator extends StatelessWidget {
   final int seconds;
   final VoidCallback onStop;
 
-  const _RecordingIndicator({
-    required this.seconds,
-    required this.onStop,
-  });
+  const _RecordingIndicator({required this.seconds, required this.onStop});
 
   @override
   Widget build(BuildContext context) {
@@ -1007,7 +1109,10 @@ class _RecordingIndicator extends StatelessWidget {
               children: [
                 const Text(
                   '녹음 중...',
-                  style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.red,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 // 진행 바

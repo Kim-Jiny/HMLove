@@ -48,6 +48,7 @@ class _DoodleCanvasScreenState extends ConsumerState<DoodleCanvasScreen> {
   Color _currentColor = _palette.first;
   double _currentWidth = _widths[1];
   bool _isEraser = false;
+  bool _quietSend = false;
 
   // 배경 사진 + 변환 상태. 사진은 RepaintBoundary 안의 Stack 맨 아래 레이어에
   // 그리고 ClipRRect 로 캔버스 크기 밖은 자동으로 잘림.
@@ -65,12 +66,14 @@ class _DoodleCanvasScreenState extends ConsumerState<DoodleCanvasScreen> {
 
   void _onPanStart(DragStartDetails details) {
     setState(() {
-      _strokes.add(_Stroke(
-        points: [details.localPosition],
-        color: _currentColor,
-        width: _currentWidth,
-        isEraser: _isEraser,
-      ));
+      _strokes.add(
+        _Stroke(
+          points: [details.localPosition],
+          color: _currentColor,
+          width: _currentWidth,
+          isEraser: _isEraser,
+        ),
+      );
     });
   }
 
@@ -140,8 +143,8 @@ class _DoodleCanvasScreenState extends ConsumerState<DoodleCanvasScreen> {
   }
 
   Future<Uint8List?> _exportPng() async {
-    final boundary = _canvasKey.currentContext?.findRenderObject()
-        as RenderRepaintBoundary?;
+    final boundary =
+        _canvasKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary == null) return null;
     // 서버가 512px로 다운사이즈하므로 클라이언트도 그 근처(~560-600px)만 보내면 충분.
     // pixelRatio 2.0 정도면 선이 깨지지 않으면서 업로드 페이로드도 가벼움.
@@ -162,8 +165,9 @@ class _DoodleCanvasScreenState extends ConsumerState<DoodleCanvasScreen> {
       return;
     }
 
-    final doodle =
-        await ref.read(doodleProvider.notifier).sendDoodle(pngBytes);
+    final doodle = await ref
+        .read(doodleProvider.notifier)
+        .sendDoodle(pngBytes, quiet: _quietSend);
     if (!mounted) return;
     if (doodle == null) {
       final err = ref.read(doodleProvider).error;
@@ -326,8 +330,72 @@ class _DoodleCanvasScreenState extends ConsumerState<DoodleCanvasScreen> {
               onToggleTransform: () =>
                   setState(() => _transformMode = !_transformMode),
             ),
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _QuietSendOption(
+                value: _quietSend,
+                onChanged: isSending
+                    ? null
+                    : (value) => setState(() => _quietSend = value),
+              ),
+            ),
             const SizedBox(height: 12),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuietSendOption extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  const _QuietSendOption({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onChanged == null ? null : () => onChanged!(!value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFF1E6DF)),
+          ),
+          child: Row(
+            children: [
+              Checkbox(
+                value: value,
+                onChanged: onChanged == null
+                    ? null
+                    : (checked) => onChanged!(checked ?? false),
+                activeColor: AppTheme.primaryColor,
+                visualDensity: VisualDensity.compact,
+              ),
+              const SizedBox(width: 4),
+              const Expanded(
+                child: Text(
+                  '조용히 보내기',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF4A3A35),
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.notifications_off_outlined,
+                size: 20,
+                color: Color(0xFF8E6B75),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -350,11 +418,15 @@ class _DoodlePainter extends CustomPainter {
         ..style = PaintingStyle.stroke;
 
       if (stroke.points.length < 2) {
-        canvas.drawCircle(stroke.points.first, stroke.width / 2,
-            paint..style = PaintingStyle.fill);
+        canvas.drawCircle(
+          stroke.points.first,
+          stroke.width / 2,
+          paint..style = PaintingStyle.fill,
+        );
         continue;
       }
-      final path = Path()..moveTo(stroke.points.first.dx, stroke.points.first.dy);
+      final path = Path()
+        ..moveTo(stroke.points.first.dx, stroke.points.first.dy);
       for (var i = 1; i < stroke.points.length; i++) {
         path.lineTo(stroke.points[i].dx, stroke.points[i].dy);
       }
@@ -402,8 +474,11 @@ class _TransformBanner extends StatelessWidget {
             ),
             IconButton(
               tooltip: '사진 제거',
-              icon: const Icon(Icons.delete_outline_rounded,
-                  color: Colors.white, size: 20),
+              icon: const Icon(
+                Icons.delete_outline_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
               onPressed: onRemove,
             ),
             TextButton(
@@ -416,10 +491,7 @@ class _TransformBanner extends StatelessWidget {
               ),
               child: const Text(
                 '완료',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
               ),
             ),
           ],
@@ -522,10 +594,7 @@ class _Toolbar extends StatelessWidget {
                     ),
                   ],
                   const SizedBox(width: 6),
-                  _IconButton(
-                    icon: Icons.undo_rounded,
-                    onTap: onUndo,
-                  ),
+                  _IconButton(icon: Icons.undo_rounded, onTap: onUndo),
                   const SizedBox(width: 6),
                   _IconButton(
                     icon: Icons.delete_outline_rounded,
