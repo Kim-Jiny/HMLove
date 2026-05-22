@@ -21,6 +21,7 @@ const _typeToKeyPrefix = <String, String>{
   'anniversary': 'noti_anniversary',
   'anniversary_remind': 'noti_anniversary',
   'letter': 'noti_letter',
+  'doodle': 'noti_doodle',
   'mood': 'noti_mood',
   'fight': 'noti_fight',
   'notice': 'noti_all',

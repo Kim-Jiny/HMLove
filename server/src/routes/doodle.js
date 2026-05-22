@@ -24,6 +24,12 @@ function getUploadedDoodleFile(req) {
   return req.files?.image?.[0] || req.files?.doodle?.[0] || null;
 }
 
+function parseBoolean(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value !== 'string') return false;
+  return value.toLowerCase() === 'true' || value === '1';
+}
+
 // GET /doodle?cursor=xxx&limit=30  → 받은/보낸 그림 히스토리(최신순)
 router.get('/', async (req, res) => {
   try {
@@ -82,6 +88,7 @@ router.post(
       if (!file) {
         return res.status(400).json({ error: '그림을 첨부해주세요.' });
       }
+      const quiet = parseBoolean(req.body?.quiet);
 
       // 상대방 찾기
       const partner = await prisma.user.findFirst({
@@ -123,27 +130,31 @@ router.post(
         },
       });
 
-      // 상대방에게 푸시 알림 + 위젯 갱신용 silent 푸시
-      notifyPartner({
-        userId: req.user.id,
-        coupleId: req.user.coupleId,
-        title: req.user.nickname || '상대방',
-        body: '🎨 그림이 도착했어요!',
-        data: {
-          type: 'doodle',
-          doodleId: doodle.id,
-          doodleImageUrl: doodle.imageUrl,
-          doodleCreatedAt: doodle.createdAt.toISOString(),
-          doodleSenderName: doodle.sender?.nickname || req.user.nickname || '',
-        },
-        silentData: {
-          type: 'doodle_widget_refresh',
-          doodleId: doodle.id,
-          doodleImageUrl: doodle.imageUrl,
-          doodleCreatedAt: doodle.createdAt.toISOString(),
-          doodleSenderName: doodle.sender?.nickname || req.user.nickname || '',
-        },
-      });
+      const widgetRefreshData = {
+        type: 'doodle_widget_refresh',
+        doodleId: doodle.id,
+        doodleImageUrl: doodle.imageUrl,
+        doodleCreatedAt: doodle.createdAt.toISOString(),
+        doodleSenderName: doodle.sender?.nickname || req.user.nickname || '',
+      };
+
+      if (quiet) {
+        notifyPartnerSilent({
+          userId: req.user.id,
+          coupleId: req.user.coupleId,
+          data: widgetRefreshData,
+        });
+      } else {
+        // 상대방에게 푸시 알림 + 위젯 갱신용 silent 푸시
+        notifyPartner({
+          userId: req.user.id,
+          coupleId: req.user.coupleId,
+          title: req.user.nickname || '상대방',
+          body: '🎨 그림이 도착했어요!',
+          data: { ...widgetRefreshData, type: 'doodle' },
+          silentData: widgetRefreshData,
+        });
+      }
 
       res.status(201).json({ doodle });
     } catch (err) {
