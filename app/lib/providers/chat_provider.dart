@@ -168,34 +168,59 @@ class ChatState {
 class ChatNotifier extends Notifier<ChatState> {
   late final Dio _dio;
   IO.Socket? _socket;
+  String? _socketToken;
+  int _socketGeneration = 0;
   bool _chatScreenActive = false;
   bool _hasConnectedOnce = false;
   bool _recoverStateOnNextConnect = false;
   DateTime? _lastForcedReconnectAt;
   DateTime? _lastRealtimeRefreshAt;
+  DateTime? _lastReadEmitAt;
   Future<void>? _realtimeRefreshInFlight;
   static const Duration _realtimeRefreshThrottle = Duration(seconds: 60);
+  static const Duration _readEmitThrottle = Duration(seconds: 1);
 
   @override
   ChatState build() {
     _dio = ref.read(dioProvider);
 
     ref.onDispose(() {
-      _socket?.dispose();
-      _socket = null;
+      _disposeSocket();
     });
 
     return const ChatState();
   }
 
   /// Connect to the Socket.io server.
-  void connect(String token, {bool recoverState = false}) {
-    _socket?.dispose();
+  void connect(String token, {bool recoverState = false, bool force = false}) {
+    if (token.isEmpty) return;
+
+    final existing = _socket;
+    if (!force && existing != null && _socketToken == token) {
+      if (recoverState) {
+        _recoverStateOnNextConnect = true;
+      }
+      if (existing.connected) {
+        state = state.copyWith(isConnected: true);
+        if (recoverState) {
+          _recoverStateOnNextConnect = false;
+          _syncMissedMessages();
+          _refreshRealtimeState();
+        }
+        return;
+      }
+      existing.connect();
+      return;
+    }
+
+    _disposeSocket();
 
     _hasConnectedOnce = false;
     _recoverStateOnNextConnect = recoverState;
+    _socketToken = token;
+    final generation = ++_socketGeneration;
 
-    _socket = IO.io(
+    final socket = IO.io(
       AppConstants.socketUrl,
       IO.OptionBuilder()
           .setTransports(['websocket', 'polling'])
@@ -207,8 +232,10 @@ class ChatNotifier extends Notifier<ChatState> {
           .disableAutoConnect()
           .build(),
     );
+    _socket = socket;
 
-    _socket!.onConnect((_) {
+    socket.onConnect((_) {
+      if (!_isCurrentSocket(socket, generation)) return;
       final wasConnectedBefore = _hasConnectedOnce;
       final shouldRecoverState = _recoverStateOnNextConnect;
       _hasConnectedOnce = true;
@@ -223,20 +250,24 @@ class ChatNotifier extends Notifier<ChatState> {
       _retrySendingMessages();
     });
 
-    _socket!.onDisconnect((_) {
+    socket.onDisconnect((_) {
+      if (!_isCurrentSocket(socket, generation)) return;
       state = state.copyWith(isConnected: false);
     });
 
-    _socket!.onConnectError((_) {
+    socket.onConnectError((_) {
+      if (!_isCurrentSocket(socket, generation)) return;
       state = state.copyWith(isConnected: false);
     });
 
-    _socket!.on('server:restart', (_) {
+    socket.on('server:restart', (_) {
+      if (!_isCurrentSocket(socket, generation)) return;
       state = state.copyWith(isConnected: false);
       _recoverStateOnNextConnect = true;
     });
 
-    _socket!.on('message:new', (data) {
+    socket.on('message:new', (data) {
+      if (!_isCurrentSocket(socket, generation)) return;
       if (data != null) {
         final map = data as Map<String, dynamic>;
         final message = ChatMessage.fromJson(map);
@@ -266,14 +297,16 @@ class ChatNotifier extends Notifier<ChatState> {
       }
     });
 
-    _socket!.on('message:read', (_) {
+    socket.on('message:read', (_) {
+      if (!_isCurrentSocket(socket, generation)) return;
       final updatedMessages = state.messages.map((msg) {
         return msg.copyWith(isRead: true);
       }).toList();
       state = state.copyWith(messages: updatedMessages);
     });
 
-    _socket!.on('message:edited', (data) {
+    socket.on('message:edited', (data) {
+      if (!_isCurrentSocket(socket, generation)) return;
       if (data != null) {
         final edited = ChatMessage.fromJson(data as Map<String, dynamic>);
         final updated = state.messages.map((msg) {
@@ -283,7 +316,8 @@ class ChatNotifier extends Notifier<ChatState> {
       }
     });
 
-    _socket!.on('message:deleted', (data) {
+    socket.on('message:deleted', (data) {
+      if (!_isCurrentSocket(socket, generation)) return;
       if (data != null) {
         final messageId = (data as Map<String, dynamic>)['messageId'] as String;
         final updated = state.messages
@@ -293,24 +327,29 @@ class ChatNotifier extends Notifier<ChatState> {
       }
     });
 
-    _socket!.on('typing:start', (_) {
+    socket.on('typing:start', (_) {
+      if (!_isCurrentSocket(socket, generation)) return;
       state = state.copyWith(partnerTyping: true);
     });
 
-    _socket!.on('typing:stop', (_) {
+    socket.on('typing:stop', (_) {
+      if (!_isCurrentSocket(socket, generation)) return;
       state = state.copyWith(partnerTyping: false);
     });
 
-    _socket!.on('partner:online', (_) {
+    socket.on('partner:online', (_) {
+      if (!_isCurrentSocket(socket, generation)) return;
       state = state.copyWith(partnerOnline: true);
     });
 
-    _socket!.on('partner:offline', (_) {
+    socket.on('partner:offline', (_) {
+      if (!_isCurrentSocket(socket, generation)) return;
       state = state.copyWith(partnerOnline: false);
     });
 
     // 피드 실시간 수신
-    _socket!.on('feed:new', (data) {
+    socket.on('feed:new', (data) {
+      if (!_isCurrentSocket(socket, generation)) return;
       if (data != null) {
         final map = data as Map<String, dynamic>;
         final feedJson = map['feed'] as Map<String, dynamic>;
@@ -322,7 +361,8 @@ class ChatNotifier extends Notifier<ChatState> {
       }
     });
 
-    _socket!.on('feed:deleted', (data) {
+    socket.on('feed:deleted', (data) {
+      if (!_isCurrentSocket(socket, generation)) return;
       if (data != null) {
         final map = data as Map<String, dynamic>;
         final feedId = map['feedId'] as String;
@@ -331,7 +371,8 @@ class ChatNotifier extends Notifier<ChatState> {
     });
 
     // 피드 댓글 실시간 수신 (상대방 댓글만 반영, 내 댓글은 이미 로컬 처리)
-    _socket!.on('feed:comment:new', (data) {
+    socket.on('feed:comment:new', (data) {
+      if (!_isCurrentSocket(socket, generation)) return;
       if (data != null) {
         final map = data as Map<String, dynamic>;
         final feedId = map['feedId'] as String;
@@ -344,7 +385,8 @@ class ChatNotifier extends Notifier<ChatState> {
       }
     });
 
-    _socket!.on('feed:comment:deleted', (data) {
+    socket.on('feed:comment:deleted', (data) {
+      if (!_isCurrentSocket(socket, generation)) return;
       if (data != null) {
         final map = data as Map<String, dynamic>;
         final feedId = map['feedId'] as String;
@@ -354,26 +396,31 @@ class ChatNotifier extends Notifier<ChatState> {
     });
 
     // 미션 실시간 수신
-    _socket!.on('mission:complete', (data) {
+    socket.on('mission:complete', (data) {
+      if (!_isCurrentSocket(socket, generation)) return;
       if (data != null) {
-        final map = data as Map<String, dynamic>;
-        final missionJson = map['mission'] as Map<String, dynamic>;
+        final map = Map<String, dynamic>.from(data as Map);
+        if (_isOwnActor(map)) return;
+        final missionJson = Map<String, dynamic>.from(map['mission'] as Map);
         final mission = Mission.fromJson(missionJson);
         ref.read(missionProvider.notifier).updateMissionFromSocket(mission);
       }
     });
 
-    _socket!.on('mission:cancel', (data) {
+    socket.on('mission:cancel', (data) {
+      if (!_isCurrentSocket(socket, generation)) return;
       if (data != null) {
-        final map = data as Map<String, dynamic>;
-        final missionJson = map['mission'] as Map<String, dynamic>;
+        final map = Map<String, dynamic>.from(data as Map);
+        if (_isOwnActor(map)) return;
+        final missionJson = Map<String, dynamic>.from(map['mission'] as Map);
         final mission = Mission.fromJson(missionJson);
         ref.read(missionProvider.notifier).updateMissionFromSocket(mission);
       }
     });
 
     // 캘린더 실시간 동기화 (상대방이 변경한 경우만)
-    _socket!.on('calendar:updated', (data) {
+    socket.on('calendar:updated', (data) {
+      if (!_isCurrentSocket(socket, generation)) return;
       if (data != null) {
         final map = data as Map<String, dynamic>;
         final senderId = map['senderId'] as String?;
@@ -385,14 +432,17 @@ class ChatNotifier extends Notifier<ChatState> {
     });
 
     // 위시리스트 실시간 동기화 (상대방 액션만 반영, 내 액션은 API 응답에서 처리)
-    _socket!.on('wish:new', (data) {
+    socket.on('wish:new', (data) {
+      if (!_isCurrentSocket(socket, generation)) return;
       try {
         if (data != null) {
-          final map = data as Map<String, dynamic>;
-          final authorId = map['authorId'] as String?;
+          final map = Map<String, dynamic>.from(data as Map);
+          if (_isOwnActor(map)) return;
+          final itemMap = _socketItemPayload(map);
+          final authorId = itemMap['authorId'] as String?;
           final myId = ApiClient.getUserId();
           if (authorId == myId) return; // 내가 추가한 건 API 응답에서 처리
-          final item = WishItem.fromJson(map);
+          final item = WishItem.fromJson(itemMap);
           ref.read(wishlistProvider.notifier).onSocketNew(item);
         }
       } catch (e) {
@@ -400,10 +450,13 @@ class ChatNotifier extends Notifier<ChatState> {
       }
     });
 
-    _socket!.on('wish:updated', (data) {
+    socket.on('wish:updated', (data) {
+      if (!_isCurrentSocket(socket, generation)) return;
       try {
         if (data != null) {
-          final item = WishItem.fromJson(data as Map<String, dynamic>);
+          final map = Map<String, dynamic>.from(data as Map);
+          if (_isOwnActor(map)) return;
+          final item = WishItem.fromJson(_socketItemPayload(map));
           ref.read(wishlistProvider.notifier).onSocketUpdated(item);
         }
       } catch (e) {
@@ -411,10 +464,13 @@ class ChatNotifier extends Notifier<ChatState> {
       }
     });
 
-    _socket!.on('wish:toggled', (data) {
+    socket.on('wish:toggled', (data) {
+      if (!_isCurrentSocket(socket, generation)) return;
       try {
         if (data != null) {
-          final item = WishItem.fromJson(data as Map<String, dynamic>);
+          final map = Map<String, dynamic>.from(data as Map);
+          if (_isOwnActor(map)) return;
+          final item = WishItem.fromJson(_socketItemPayload(map));
           ref.read(wishlistProvider.notifier).onSocketToggled(item);
         }
       } catch (e) {
@@ -422,10 +478,12 @@ class ChatNotifier extends Notifier<ChatState> {
       }
     });
 
-    _socket!.on('wish:deleted', (data) {
+    socket.on('wish:deleted', (data) {
+      if (!_isCurrentSocket(socket, generation)) return;
       try {
         if (data != null) {
-          final map = data as Map<String, dynamic>;
+          final map = Map<String, dynamic>.from(data as Map);
+          if (_isOwnActor(map)) return;
           final id = map['id'] as String;
           ref.read(wishlistProvider.notifier).onSocketDeleted(id);
         }
@@ -435,9 +493,12 @@ class ChatNotifier extends Notifier<ChatState> {
     });
 
     // 질문 카드 실시간 동기화
-    _socket!.on('question:answered', (data) {
+    socket.on('question:answered', (data) {
+      if (!_isCurrentSocket(socket, generation)) return;
       try {
         if (data != null) {
+          final map = Map<String, dynamic>.from(data as Map);
+          if (_isOwnActor(map, key: 'userId')) return;
           ref.read(questionProvider.notifier).onPartnerAnswered();
         }
       } catch (e) {
@@ -445,7 +506,29 @@ class ChatNotifier extends Notifier<ChatState> {
       }
     });
 
-    _socket!.connect();
+    socket.connect();
+  }
+
+  bool _isCurrentSocket(IO.Socket socket, int generation) {
+    return identical(_socket, socket) && _socketGeneration == generation;
+  }
+
+  bool _isOwnActor(Map<String, dynamic> payload, {String key = 'actorId'}) {
+    final actorId = payload[key] as String?;
+    return actorId != null && actorId == ApiClient.getUserId();
+  }
+
+  Map<String, dynamic> _socketItemPayload(Map<String, dynamic> payload) {
+    final nested = payload['item'];
+    if (nested is Map) return Map<String, dynamic>.from(nested);
+    return payload;
+  }
+
+  void _disposeSocket() {
+    _socket?.dispose();
+    _socket = null;
+    _socketToken = null;
+    _socketGeneration++;
   }
 
   /// 재연결 후 누락 메시지 동기화 — 마지막 메시지 ID 기반 after 파라미터 사용
@@ -529,27 +612,11 @@ class ChatNotifier extends Notifier<ChatState> {
   void ensureConnected() {
     final token = ApiClient.getAccessToken();
     if (token == null) return;
-
-    if (_socket == null) {
-      connect(token);
-    } else if (!_socket!.connected) {
-      // 토큰이 변경되었으면 소켓 재생성, 아니면 재연결만 시도
-      final socketAuth = _socket!.auth as Map?;
-      final socketToken = socketAuth?['token'] as String?;
-      if (socketToken != token) {
-        // 토큰 갱신됨 → 소켓 재생성
-        _socket!.dispose();
-        _socket = null;
-        connect(token, recoverState: true);
-      } else {
-        _recoverStateOnNextConnect = true;
-        _socket!.connect();
-      }
-    }
+    connect(token, recoverState: true);
   }
 
-  /// 앱 복귀 후 기존 소켓 상태를 신뢰하지 않고 새 연결을 강제로 만든다.
-  /// iOS/Android 백그라운드 복귀 시 transport가 죽었는데 connected로 남는 경우를 방지한다.
+  /// 앱 복귀 후 소켓 연결과 HTTP 상태를 보수적으로 따라잡는다.
+  /// 같은 토큰의 활성 소켓은 재사용하고, 끊긴 경우에만 재연결한다.
   void refreshConnectionOnResume() {
     final token = ApiClient.getAccessToken();
     if (token == null) return;
@@ -561,15 +628,20 @@ class ChatNotifier extends Notifier<ChatState> {
     }
     _lastForcedReconnectAt = now;
 
-    _socket?.dispose();
-    _socket = null;
     connect(token, recoverState: true);
+  }
+
+  void forceReconnect({bool recoverState = true}) {
+    final token = ApiClient.getAccessToken();
+    if (token == null) return;
+    connect(token, recoverState: recoverState, force: true);
   }
 
   /// Disconnect from the Socket.io server.
   void disconnect() {
-    _socket?.dispose();
-    _socket = null;
+    _disposeSocket();
+    _recoverStateOnNextConnect = false;
+    _hasConnectedOnce = false;
     state = state.copyWith(isConnected: false);
   }
 
@@ -645,7 +717,7 @@ class ChatNotifier extends Notifier<ChatState> {
           debugPrint('[Chat] message:send ack error: $error');
 
           if (allowReconnectRetry) {
-            refreshConnectionOnResume();
+            forceReconnect();
             return;
           }
 
@@ -744,11 +816,23 @@ class ChatNotifier extends Notifier<ChatState> {
   /// 채팅 화면 활성/비활성 상태 설정
   void setChatScreenActive(bool active) {
     _chatScreenActive = active;
+    if (active) {
+      ensureConnected();
+      markAsRead();
+    }
   }
 
   /// Mark messages as read via socket.
   void markAsRead() {
-    _socket?.emit('message:read');
+    final socket = _socket;
+    if (socket?.connected != true) return;
+
+    final now = DateTime.now();
+    final last = _lastReadEmitAt;
+    if (last != null && now.difference(last) < _readEmitThrottle) return;
+    _lastReadEmitAt = now;
+
+    socket!.emit('message:read');
   }
 
   /// Enter search mode.
@@ -877,8 +961,17 @@ class ChatNotifier extends Notifier<ChatState> {
       final hasMore = data['hasMore'] as bool? ?? (newCursor != null);
 
       if (cursor == null) {
+        final pendingMessages = state.messages
+            .where((m) => m.id.startsWith('temp-'))
+            .toList();
+        final serverIds = messages.map((m) => m.id).toSet();
+        final mergedMessages = [
+          ...pendingMessages.where((m) => !serverIds.contains(m.id)),
+          ...messages,
+        ];
+
         state = ChatState(
-          messages: messages,
+          messages: mergedMessages,
           nextCursor: newCursor,
           hasMore: hasMore,
           isLoading: false,
@@ -887,8 +980,13 @@ class ChatNotifier extends Notifier<ChatState> {
           partnerOnline: state.partnerOnline,
         );
       } else {
+        final existingIds = state.messages.map((m) => m.id).toSet();
+        final olderMessages = messages
+            .where((m) => !existingIds.contains(m.id))
+            .toList();
+
         state = ChatState(
-          messages: [...state.messages, ...messages],
+          messages: [...state.messages, ...olderMessages],
           nextCursor: newCursor,
           hasMore: hasMore,
           isLoading: false,

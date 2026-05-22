@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../core/api_client.dart';
 import '../core/connectivity_service.dart';
 import '../core/push_notification_service.dart';
 import '../core/router.dart';
@@ -37,10 +36,7 @@ class _MainShellState extends ConsumerState<MainShell>
       ref.read(badgeProvider.notifier).fetchBadges();
       ref.read(letterProvider.notifier).fetchLetters();
       // 소켓 연결 (채팅 실시간 수신을 위해)
-      final token = ApiClient.getAccessToken();
-      if (token != null) {
-        ref.read(chatProvider.notifier).connect(token);
-      }
+      ref.read(chatProvider.notifier).ensureConnected();
       // 콜드 스타트 시점엔 lifecycle이 이미 resumed라서 didChangeAppLifecycleState
       // 가 안 불릴 수 있다. 백그라운드에서 위젯이 본 월(pending hydration)을
       // 한 번 따라잡아 둔다 (extras 비면 즉시 return).
@@ -169,10 +165,6 @@ class _MainShellState extends ConsumerState<MainShell>
               // 채팅 탭 활성 상태 관리 (indexedStack은 dispose 안 되므로 여기서 제어)
               final chatNotifier = ref.read(chatProvider.notifier);
               chatNotifier.setChatScreenActive(index == 1);
-              // 채팅 탭 진입 시 읽음 처리
-              if (index == 1) {
-                chatNotifier.markAsRead();
-              }
 
               // Navigator.push로 열린 하위 화면들 pop (탭 루트로 복귀)
               shellBranchKeys[index]?.currentState?.popUntil(

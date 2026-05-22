@@ -128,7 +128,10 @@ router.patch('/:id/complete', async (req, res) => {
     // Socket: 실시간 미션 완료 이벤트
     const io = req.app.get('io');
     if (io) {
-      io.to(`couple:${req.user.coupleId}`).emit('mission:complete', { mission: updated });
+      io.to(`couple:${req.user.coupleId}`).emit('mission:complete', {
+        mission: updated,
+        actorId: req.user.id,
+      });
     }
 
     res.json({ mission: updated });
@@ -154,7 +157,10 @@ router.patch('/:id/cancel', async (req, res) => {
     // Socket: 실시간 미션 취소 이벤트
     const io = req.app.get('io');
     if (io) {
-      io.to(`couple:${req.user.coupleId}`).emit('mission:cancel', { mission: updated });
+      io.to(`couple:${req.user.coupleId}`).emit('mission:cancel', {
+        mission: updated,
+        actorId: req.user.id,
+      });
     }
 
     res.json({ mission: updated });

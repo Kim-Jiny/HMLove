@@ -56,7 +56,7 @@ router.post('/', async (req, res) => {
     // Socket.io broadcast
     const io = req.app.get('io');
     if (io) {
-      io.to(`couple:${coupleId}`).emit('wish:new', item);
+      io.to(`couple:${coupleId}`).emit('wish:new', { item, actorId: userId });
     }
 
     // 파트너에게 푸시 알림
@@ -78,7 +78,7 @@ router.post('/', async (req, res) => {
 // 수정
 router.patch('/:id', async (req, res) => {
   try {
-    const { coupleId } = req.user;
+    const { coupleId, id: userId } = req.user;
     const { id } = req.params;
 
     const { category, title, memo } = req.body;
@@ -107,7 +107,7 @@ router.patch('/:id', async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.to(`couple:${coupleId}`).emit('wish:updated', item);
+      io.to(`couple:${coupleId}`).emit('wish:updated', { item, actorId: userId });
     }
 
     res.json({ item });
@@ -123,7 +123,7 @@ router.patch('/:id', async (req, res) => {
 // 즐겨찾기 토글
 router.patch('/:id/favorite', async (req, res) => {
   try {
-    const { coupleId } = req.user;
+    const { coupleId, id: userId } = req.user;
     const { id } = req.params;
 
     const existing = await prisma.wishItem.findFirst({ where: { id, coupleId } });
@@ -140,7 +140,7 @@ router.patch('/:id/favorite', async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.to(`couple:${coupleId}`).emit('wish:updated', item);
+      io.to(`couple:${coupleId}`).emit('wish:updated', { item, actorId: userId });
     }
 
     res.json({ item });
@@ -176,7 +176,7 @@ router.patch('/:id/toggle', async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.to(`couple:${coupleId}`).emit('wish:toggled', item);
+      io.to(`couple:${coupleId}`).emit('wish:toggled', { item, actorId: userId });
     }
 
     if (newCompleted) {
@@ -202,7 +202,7 @@ router.patch('/:id/toggle', async (req, res) => {
 // 삭제
 router.delete('/:id', async (req, res) => {
   try {
-    const { coupleId } = req.user;
+    const { coupleId, id: userId } = req.user;
     const { id } = req.params;
 
     const existing = await prisma.wishItem.findFirst({ where: { id, coupleId } });
@@ -214,7 +214,7 @@ router.delete('/:id', async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
-      io.to(`couple:${coupleId}`).emit('wish:deleted', { id });
+      io.to(`couple:${coupleId}`).emit('wish:deleted', { id, actorId: userId });
     }
 
     res.json({ success: true });
