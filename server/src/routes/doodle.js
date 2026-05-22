@@ -129,8 +129,20 @@ router.post(
         coupleId: req.user.coupleId,
         title: req.user.nickname || '상대방',
         body: '🎨 그림이 도착했어요!',
-        data: { type: 'doodle', doodleId: doodle.id },
-        silentData: { type: 'doodle_widget_refresh', doodleId: doodle.id },
+        data: {
+          type: 'doodle',
+          doodleId: doodle.id,
+          doodleImageUrl: doodle.imageUrl,
+          doodleCreatedAt: doodle.createdAt.toISOString(),
+          doodleSenderName: doodle.sender?.nickname || req.user.nickname || '',
+        },
+        silentData: {
+          type: 'doodle_widget_refresh',
+          doodleId: doodle.id,
+          doodleImageUrl: doodle.imageUrl,
+          doodleCreatedAt: doodle.createdAt.toISOString(),
+          doodleSenderName: doodle.sender?.nickname || req.user.nickname || '',
+        },
       });
 
       res.status(201).json({ doodle });
