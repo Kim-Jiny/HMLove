@@ -96,6 +96,10 @@ export async function sendPushNotification({ token, title, body, data, sound = t
         },
         payload: {
           aps: {
+            alert: {
+              title: title || '',
+              body: body || '',
+            },
             badge: badgeCount,
             ...(sound ? { sound: 'default' } : {}),
             ...(mutableContent ? { mutableContent: true } : {}),
