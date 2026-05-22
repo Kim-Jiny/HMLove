@@ -104,22 +104,36 @@ class FortuneNotifier extends Notifier<FortuneState> {
   }
 
   /// Check today's fortune (GET, 확인만)
+  void applyTodaySummary(Map<String, dynamic>? data) {
+    if (data == null) return;
+    final exists = data['exists'] as bool? ?? false;
+    final raw = data['fortune'];
+    state = FortuneState(
+      fortune: raw != null
+          ? Fortune.fromJson(raw as Map<String, dynamic>)
+          : null,
+      isLoading: false,
+      exists: exists,
+    );
+  }
+
+  /// Check today's fortune (GET, 확인만)
   Future<void> checkTodayFortune() async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final response = await _dio.get('/fortune/today', queryParameters: {'check': 'true'});
+      final response = await _dio.get(
+        '/fortune/today',
+        queryParameters: {'check': 'true'},
+      );
       final data = response.data as Map<String, dynamic>;
       final exists = data['exists'] as bool;
 
       if (exists && data['fortune'] != null) {
-        final fortune =
-            Fortune.fromJson(data['fortune'] as Map<String, dynamic>);
-        state = FortuneState(
-          fortune: fortune,
-          isLoading: false,
-          exists: true,
+        final fortune = Fortune.fromJson(
+          data['fortune'] as Map<String, dynamic>,
         );
+        state = FortuneState(fortune: fortune, isLoading: false, exists: true);
       } else {
         state = const FortuneState(
           fortune: null,
@@ -132,10 +146,7 @@ class FortuneNotifier extends Notifier<FortuneState> {
           e.response?.data?['message'] as String? ?? '오늘의 운세를 불러오지 못했습니다';
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: '알 수 없는 오류가 발생했습니다',
-      );
+      state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
     }
   }
 
@@ -146,29 +157,20 @@ class FortuneNotifier extends Notifier<FortuneState> {
     try {
       final response = await _dio.post('/fortune/today');
       final data = response.data as Map<String, dynamic>;
-      final fortune =
-          Fortune.fromJson(data['fortune'] as Map<String, dynamic>);
-      state = FortuneState(
-        fortune: fortune,
-        isLoading: false,
-        exists: true,
-      );
+      final fortune = Fortune.fromJson(data['fortune'] as Map<String, dynamic>);
+      state = FortuneState(fortune: fortune, isLoading: false, exists: true);
     } on DioException catch (e) {
       final message =
           e.response?.data?['message'] as String? ?? '운세 생성에 실패했습니다';
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: '알 수 없는 오류가 발생했습니다',
-      );
+      state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
     }
   }
 }
 
 // Providers
-final fortuneProvider =
-    NotifierProvider<FortuneNotifier, FortuneState>(
+final fortuneProvider = NotifierProvider<FortuneNotifier, FortuneState>(
   FortuneNotifier.new,
 );
 

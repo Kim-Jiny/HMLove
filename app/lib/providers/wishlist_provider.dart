@@ -71,6 +71,18 @@ class WishlistNotifier extends Notifier<WishlistState> {
     }
   }
 
+  void applyItems(List<dynamic>? rawItems) {
+    if (rawItems == null) return;
+    final items = rawItems
+        .map((e) => WishItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+    state = state.copyWith(
+      items: _sortItems(items),
+      isLoading: false,
+      error: null,
+    );
+  }
+
   Future<void> fetchItems() async {
     state = state.copyWith(isLoading: true, error: null);
     try {

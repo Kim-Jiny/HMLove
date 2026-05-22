@@ -86,6 +86,17 @@ class DoodleNotifier extends Notifier<DoodleState> {
     }
   }
 
+  void applyLatestReceived(Map<String, dynamic>? data) {
+    final raw = data?['doodle'];
+    if (raw == null) {
+      state = state.copyWith(clearLatest: true);
+      return;
+    }
+    state = state.copyWith(
+      latestReceived: Doodle.fromJson(raw as Map<String, dynamic>),
+    );
+  }
+
   /// PNG 바이트로 그림을 전송한다. 성공 시 history 와 latest 도 갱신.
   Future<Doodle?> sendDoodle(Uint8List pngBytes) async {
     state = state.copyWith(isSending: true, error: null);

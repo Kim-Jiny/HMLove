@@ -49,8 +49,17 @@ private enum DoodleCache {
             forSecurityApplicationGroupIdentifier: doodleAppGroupId
         ) else { return nil }
         let folder = container.appendingPathComponent("doodleCache", isDirectory: true)
-        let fileName = String(urlString.hashValue) + ".png"
+        let fileName = stableCacheFileName(for: urlString)
         return folder.appendingPathComponent(fileName)
+    }
+
+    private static func stableCacheFileName(for text: String) -> String {
+        var hash: UInt64 = 1469598103934665603
+        for byte in text.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 1099511628211
+        }
+        return String(hash, radix: 16) + ".png"
     }
 }
 
@@ -99,16 +108,68 @@ struct DoodleTimelineProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<DoodleEntry>) -> Void) {
-        fetchImageIfNeeded { _ in
-            let data = self.loadData()
-            let now = Date()
-            // 1시간마다 한 번씩 timeline 갱신. push silent 알림이 즉시 깨우긴 하지만
-            // 시간 표시(받은지 N분 전 등)는 주기적으로도 갱신되어야 함.
-            let next = Calendar.current.date(byAdding: .minute, value: 60, to: now) ?? now
-            let entry = DoodleEntry(date: now, data: data)
-            let timeline = Timeline(entries: [entry], policy: .after(next))
-            completion(timeline)
+        fetchLatestDoodle { _ in
+            self.fetchImageIfNeeded { _ in
+                let data = self.loadData()
+                let now = Date()
+                // 1시간마다 한 번씩 timeline 갱신. push silent 알림이 즉시 깨우긴 하지만
+                // 시간 표시(받은지 N분 전 등)는 주기적으로도 갱신되어야 함.
+                let next = Calendar.current.date(byAdding: .minute, value: 60, to: now) ?? now
+                let entry = DoodleEntry(date: now, data: data)
+                let timeline = Timeline(entries: [entry], policy: .after(next))
+                completion(timeline)
+            }
         }
+    }
+
+    /// silent push가 timeline만 깨우는 경우에도 위젯 extension이 직접 최신 그림 메타를 받는다.
+    private func fetchLatestDoodle(completion: @escaping (Bool) -> Void) {
+        guard let defaults = UserDefaults(suiteName: appGroupId),
+              let token = defaults.string(forKey: "authToken"),
+              let baseUrl = defaults.string(forKey: "apiBaseUrl"),
+              !token.isEmpty,
+              !baseUrl.isEmpty else {
+            completion(false)
+            return
+        }
+
+        let trimmedBaseUrl = baseUrl.hasSuffix("/") ? String(baseUrl.dropLast()) : baseUrl
+        guard let url = URL(string: "\(trimmedBaseUrl)/doodle/latest") else {
+            completion(false)
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 8
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            guard let data = data,
+                  error == nil,
+                  let http = response as? HTTPURLResponse,
+                  (200..<300).contains(http.statusCode),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                completion(false)
+                return
+            }
+
+            guard let doodle = json["doodle"] as? [String: Any] else {
+                defaults.removeObject(forKey: "doodleImageUrl")
+                defaults.removeObject(forKey: "doodleReceivedAt")
+                defaults.removeObject(forKey: "doodleSenderName")
+                defaults.synchronize()
+                completion(true)
+                return
+            }
+
+            defaults.set(doodle["imageUrl"] as? String ?? "", forKey: "doodleImageUrl")
+            defaults.set(doodle["createdAt"] as? String ?? "", forKey: "doodleReceivedAt")
+            let senderName = ((doodle["sender"] as? [String: Any])?["nickname"] as? String) ?? ""
+            defaults.set(senderName, forKey: "doodleSenderName")
+            defaults.synchronize()
+            completion(true)
+        }.resume()
     }
 
     /// 캐시에 없으면 imageUrl에서 PNG를 다운받아 캐시.
@@ -193,10 +254,6 @@ struct DoodleWidgetView: View {
                     .resizable()
                     .scaledToFill()
                     .clipped()
-                    .overlay(alignment: .bottomLeading) {
-                        // 받은 사람 / 시간 캡션
-                        captionOverlay
-                    }
             } else if entry.data.imageUrl != nil {
                 // URL은 있지만 캐시 미스 (위젯이 첫 fetch 중)
                 VStack(spacing: 6) {
@@ -213,32 +270,6 @@ struct DoodleWidgetView: View {
             }
         }
         .widgetURL(URL(string: "hmlove://doodle?homeWidget=true"))
-    }
-
-    @ViewBuilder
-    private var captionOverlay: some View {
-        if let received = entry.data.receivedAt {
-            HStack(spacing: 6) {
-                Text(entry.data.senderName?.isEmpty == false
-                     ? entry.data.senderName!
-                     : "상대방")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.white)
-                Text("·")
-                    .font(.system(size: 9))
-                    .foregroundColor(.white.opacity(0.8))
-                Text(received, style: .relative)
-                    .font(.system(size: 10))
-                    .foregroundColor(.white.opacity(0.9))
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                Capsule()
-                    .fill(.black.opacity(0.5))
-            )
-            .padding(8)
-        }
     }
 }
 

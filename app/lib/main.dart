@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show HttpClient, Platform;
+import 'dart:ui' show DartPluginRegistrant;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -42,6 +43,12 @@ String _defaultWidgetEventColor(String eventType, bool isAnniversary) {
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // BG 핸들러는 별도 isolate 라 [Push BG] 태그로 logcat 에서 구분 가능.
+  debugPrint('[Push BG] fired — type=${message.data['type']}, data=${message.data}');
+
+  // 이 isolate 에 pubspec 의 모든 플러그인 등록. 안 하면 home_widget /
+  // HomeWidget.getWidgetData 같은 호출이 채널 미등록으로 null 만 돌려준다.
+  DartPluginRegistrant.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   if (message.data['type'] == 'calendar_sync') {
@@ -115,6 +122,15 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       // 백그라운드 fetch 실패 시 무시 — 포그라운드 복귀 시 갱신됨
     }
     await HomeWidget.updateWidget(androidName: 'HMLoveCalendarWidgetProvider');
+  }
+
+  // 그림 위젯 — silent push (doodle_widget_refresh) 또는 alert push (doodle) 둘 다에서
+  // 서버 latest 를 받아 prefs 갱신 + 위젯 broadcast. (iOS NSE 가 안 도는 경우에도 fallback.)
+  final pushType = message.data['type'];
+  if (pushType == 'doodle_widget_refresh' || pushType == 'doodle') {
+    debugPrint('[Push BG] doodle — refreshing widget…');
+    await WidgetService.refreshDoodleFromServer();
+    debugPrint('[Push BG] doodle — widget refresh done');
   }
 }
 

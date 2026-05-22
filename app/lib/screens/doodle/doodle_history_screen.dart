@@ -17,10 +17,14 @@ class DoodleHistoryScreen extends ConsumerStatefulWidget {
       _DoodleHistoryScreenState();
 }
 
-class _DoodleHistoryScreenState extends ConsumerState<DoodleHistoryScreen> {
+class _DoodleHistoryScreenState extends ConsumerState<DoodleHistoryScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     Future.microtask(() {
       if (!mounted) return;
       ref.read(doodleProvider.notifier).fetchHistory();
@@ -28,65 +32,17 @@ class _DoodleHistoryScreenState extends ConsumerState<DoodleHistoryScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
   Future<void> _openCanvas() async {
     final result = await context.push<bool>('/doodle/canvas');
     if (result == true && mounted) {
       ref.read(doodleProvider.notifier).fetchHistory();
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(doodleProvider);
-    final me = ref.watch(currentUserProvider);
-    final myId = me?.id ?? '';
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('그림 보내기')),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        onPressed: _openCanvas,
-        icon: const Icon(Icons.brush_rounded),
-        label: const Text('그림 그리기'),
-      ),
-      body: RefreshIndicator(
-        color: AppTheme.primaryColor,
-        onRefresh: () async {
-          await Future.wait([
-            ref.read(doodleProvider.notifier).fetchHistory(),
-            ref.read(doodleProvider.notifier).fetchLatestReceived(),
-          ]);
-        },
-        child: state.isLoading && state.doodles.isEmpty
-            ? const Center(child: CircularProgressIndicator())
-            : state.doodles.isEmpty
-                ? ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    children: const [
-                      SizedBox(height: 120),
-                      _EmptyState(),
-                    ],
-                  )
-                : ListView.separated(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-                    itemCount: state.doodles.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 14),
-                    itemBuilder: (context, i) {
-                      final d = state.doodles[i];
-                      final isMine = d.senderId == myId;
-                      return _DoodleTile(
-                        doodle: d,
-                        isMine: isMine,
-                        onDelete: isMine
-                            ? () => _confirmDelete(d)
-                            : null,
-                      );
-                    },
-                  ),
-      ),
-    );
   }
 
   Future<void> _confirmDelete(Doodle d) async {
@@ -110,119 +66,290 @@ class _DoodleHistoryScreenState extends ConsumerState<DoodleHistoryScreen> {
     if (ok != true) return;
     await ref.read(doodleProvider.notifier).deleteDoodle(d.id);
   }
+
+  Future<void> _refresh() async {
+    await Future.wait([
+      ref.read(doodleProvider.notifier).fetchHistory(),
+      ref.read(doodleProvider.notifier).fetchLatestReceived(),
+    ]);
+  }
+
+  void _openViewer(Doodle d) {
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+      builder: (_) => _DoodleViewer(doodle: d),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(doodleProvider);
+    final me = ref.watch(currentUserProvider);
+    final myId = me?.id ?? '';
+
+    final received =
+        state.doodles.where((d) => d.senderId != myId).toList();
+    final sent = state.doodles.where((d) => d.senderId == myId).toList();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('그림 보내기'),
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: AppTheme.primaryColor,
+          unselectedLabelColor: AppTheme.textSecondary,
+          indicatorColor: AppTheme.primaryColor,
+          labelStyle: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+          tabs: [
+            Tab(text: '받은 그림 ${received.length}'),
+            Tab(text: '보낸 그림 ${sent.length}'),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
+        onPressed: _openCanvas,
+        tooltip: '그림 그리기',
+        child: const Icon(Icons.add_rounded, size: 30),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _DoodleGrid(
+            doodles: received,
+            isLoading: state.isLoading,
+            kind: _DoodleListKind.received,
+            onRefresh: _refresh,
+            onTap: _openViewer,
+            onLongPress: null, // 받은 그림은 삭제 불가
+          ),
+          _DoodleGrid(
+            doodles: sent,
+            isLoading: state.isLoading,
+            kind: _DoodleListKind.sent,
+            onRefresh: _refresh,
+            onTap: _openViewer,
+            onLongPress: _confirmDelete,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _DoodleTile extends StatelessWidget {
-  final Doodle doodle;
-  final bool isMine;
-  final VoidCallback? onDelete;
+enum _DoodleListKind { received, sent }
 
-  const _DoodleTile({
-    required this.doodle,
-    required this.isMine,
-    this.onDelete,
+class _DoodleGrid extends StatelessWidget {
+  final List<Doodle> doodles;
+  final bool isLoading;
+  final _DoodleListKind kind;
+  final Future<void> Function() onRefresh;
+  final void Function(Doodle) onTap;
+  final void Function(Doodle)? onLongPress;
+
+  const _DoodleGrid({
+    required this.doodles,
+    required this.isLoading,
+    required this.kind,
+    required this.onRefresh,
+    required this.onTap,
+    required this.onLongPress,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      color: AppTheme.primaryColor,
+      onRefresh: onRefresh,
+      child: isLoading && doodles.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : doodles.isEmpty
+              ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [
+                    const SizedBox(height: 120),
+                    _EmptyState(kind: kind),
+                  ],
+                )
+              : GridView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    childAspectRatio: 1,
+                  ),
+                  itemCount: doodles.length,
+                  itemBuilder: (context, i) {
+                    final d = doodles[i];
+                    return _DoodleGridTile(
+                      doodle: d,
+                      onTap: () => onTap(d),
+                      onLongPress: onLongPress == null
+                          ? null
+                          : () => onLongPress!(d),
+                    );
+                  },
+                ),
+    );
+  }
+}
+
+class _DoodleGridTile extends StatelessWidget {
+  final Doodle doodle;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  const _DoodleGridTile({
+    required this.doodle,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final dateText = DateFormat('M/d HH:mm').format(doodle.createdAt.toLocal());
+
+    return GestureDetector(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            CachedNetworkImage(
+              imageUrl: doodle.imageUrl,
+              fit: BoxFit.cover,
+              placeholder: (_, _) => Container(
+                color: const Color(0xFFF8F1EC),
+                child: const Center(
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 1.6),
+                  ),
+                ),
+              ),
+              errorWidget: (_, _, _) => Container(
+                color: const Color(0xFFF8F1EC),
+                child: const Icon(
+                  Icons.broken_image_outlined,
+                  color: AppTheme.textHint,
+                  size: 20,
+                ),
+              ),
+            ),
+            // 하단 그라데이션 + 날짜 — 작게
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(6, 12, 6, 4),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.45),
+                    ],
+                  ),
+                ),
+                child: Text(
+                  dateText,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DoodleViewer extends StatelessWidget {
+  final Doodle doodle;
+
+  const _DoodleViewer({required this.doodle});
 
   @override
   Widget build(BuildContext context) {
     final dateText =
         DateFormat('yyyy.MM.dd HH:mm').format(doodle.createdAt.toLocal());
-    final subTitle = isMine
-        ? '${doodle.receiverNickname.isEmpty ? "상대방" : doodle.receiverNickname}에게 보냄'
-        : '${doodle.senderNickname.isEmpty ? "상대방" : doodle.senderNickname}이(가) 보냄';
+    final sender = doodle.senderNickname.isEmpty ? '상대방' : doodle.senderNickname;
+    final receiver =
+        doodle.receiverNickname.isEmpty ? '상대방' : doodle.receiverNickname;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFF1E6DF)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(16),
+      child: Stack(
         children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-            child: AspectRatio(
-              aspectRatio: 1,
-              child: CachedNetworkImage(
-                imageUrl: doodle.imageUrl,
-                fit: BoxFit.cover,
-                placeholder: (_, __) => Container(
-                  color: const Color(0xFFF8F1EC),
-                  child: const Center(
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-                errorWidget: (_, __, ___) => Container(
-                  color: const Color(0xFFF8F1EC),
-                  child: const Icon(
-                    Icons.broken_image_outlined,
-                    color: AppTheme.textHint,
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: CachedNetworkImage(
+                    imageUrl: doodle.imageUrl,
+                    fit: BoxFit.cover,
+                    placeholder: (_, _) => Container(
+                      color: const Color(0xFF1F1F1F),
+                      child: const Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                    errorWidget: (_, _, _) => Container(
+                      color: const Color(0xFF1F1F1F),
+                      child: const Icon(
+                        Icons.broken_image_outlined,
+                        color: Colors.white54,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+              const SizedBox(height: 14),
+              Text(
+                '$sender → $receiver',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                dateText,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: (isMine
-                            ? AppTheme.primaryColor
-                            : const Color(0xFF2196F3))
-                        .withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    isMine ? '보냄' : '받음',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: isMine
-                          ? AppTheme.primaryColor
-                          : const Color(0xFF2196F3),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        subTitle,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        dateText,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (onDelete != null)
-                  IconButton(
-                    icon: const Icon(
-                      Icons.delete_outline_rounded,
-                      color: AppTheme.textHint,
-                      size: 20,
-                    ),
-                    onPressed: onDelete,
-                  ),
-              ],
+          Positioned(
+            top: 4,
+            right: 4,
+            child: IconButton(
+              icon: const Icon(Icons.close_rounded, color: Colors.white),
+              onPressed: () => Navigator.of(context).pop(),
             ),
           ),
         ],
@@ -232,10 +359,18 @@ class _DoodleTile extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  final _DoodleListKind kind;
+
+  const _EmptyState({required this.kind});
 
   @override
   Widget build(BuildContext context) {
+    final isReceived = kind == _DoodleListKind.received;
+    final title = isReceived ? '아직 받은 그림이 없어요' : '아직 보낸 그림이 없어요';
+    final subtitle = isReceived
+        ? '상대방이 그림을 보내면 여기에 쌓여요'
+        : '오른쪽 아래 + 버튼으로\n상대방에게 그림을 보내보세요!';
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
@@ -247,25 +382,25 @@ class _EmptyState extends StatelessWidget {
               color: AppTheme.primaryColor.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.brush_rounded,
+            child: Icon(
+              isReceived ? Icons.inbox_rounded : Icons.brush_rounded,
               size: 40,
               color: AppTheme.primaryColor,
             ),
           ),
           const SizedBox(height: 18),
-          const Text(
-            '아직 주고받은 그림이 없어요',
-            style: TextStyle(
+          Text(
+            title,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            '오른쪽 아래 버튼으로 그림을 그려\n상대방의 위젯으로 보내보세요!',
+          Text(
+            subtitle,
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 13,
               color: AppTheme.textSecondary,
               height: 1.5,

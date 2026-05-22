@@ -12,14 +12,13 @@ import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
 import '../../providers/mood_provider.dart';
 import '../../providers/fortune_provider.dart';
-import '../../providers/badge_provider.dart';
 import '../../providers/letter_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/mission_provider.dart';
-import '../../providers/calendar_provider.dart';
 import '../../providers/question_provider.dart';
 import '../../providers/wishlist_provider.dart';
 import '../../providers/doodle_provider.dart';
+import '../../providers/home_summary_provider.dart';
 import '../../models/daily_question.dart';
 import '../../models/doodle.dart';
 
@@ -64,23 +63,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     // Fetch data on load
     Future.microtask(() async {
       if (!mounted) return;
-      await Future.wait([
-        ref.read(coupleProvider.notifier).fetchCouple(),
-        ref.read(moodProvider.notifier).fetchTodayMood(),
-      ]);
+      await fetchAndApplyHomeSummary(ref);
       if (!mounted) return;
       _syncWidgetCouple(ref.read(coupleProvider));
       _syncWidgetMood(ref.read(moodProvider));
-      _syncWidgetSchedule();
       _syncWidgetDoodle(ref.read(doodleProvider));
-
-      ref.read(fortuneProvider.notifier).checkTodayFortune();
-      ref.read(badgeProvider.notifier).fetchBadges();
-      ref.read(notificationProvider.notifier).fetchUnreadCount();
-      ref.read(missionProvider.notifier).fetchTodayMissions();
-      ref.read(questionProvider.notifier).fetchToday();
-      ref.read(wishlistProvider.notifier).fetchItems();
-      ref.read(doodleProvider.notifier).fetchLatestReceived();
     });
   }
 
@@ -96,19 +83,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // App going to background → sync all widget data
       _syncWidgetCouple(ref.read(coupleProvider));
       _syncWidgetMood(ref.read(moodProvider));
-      _syncWidgetSchedule();
       _syncWidgetDoodle(ref.read(doodleProvider));
     } else if (state == AppLifecycleState.resumed) {
       // App returning to foreground → refresh all data
-      ref.read(coupleProvider.notifier).fetchCouple();
-      ref.read(moodProvider.notifier).fetchTodayMood();
-      ref.read(fortuneProvider.notifier).checkTodayFortune();
-      ref.read(badgeProvider.notifier).fetchBadges();
-      ref.read(notificationProvider.notifier).fetchUnreadCount();
-      ref.read(missionProvider.notifier).fetchTodayMissions();
-      ref.read(questionProvider.notifier).fetchToday();
-      ref.read(wishlistProvider.notifier).fetchItems();
-      ref.read(doodleProvider.notifier).fetchLatestReceived();
+      fetchAndApplyHomeSummary(ref);
     }
   }
 
@@ -146,21 +124,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       receivedAt: latest?.createdAt,
       senderName: latest?.senderNickname,
     );
-  }
-
-  Future<void> _syncWidgetSchedule() async {
-    final now = DateTime.now();
-    final yearMonth = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-    await ref.read(calendarProvider.notifier).fetchEvents(yearMonth);
-    if (!mounted) return;
-    final calState = ref.read(calendarProvider);
-    final todayEvents = calState.getEventsForDay(now);
-    if (todayEvents.isNotEmpty) {
-      final titles = todayEvents.take(3).map((e) => '• ${e.title}').join('\n');
-      WidgetService.updateTodaySchedule(titles);
-    } else {
-      WidgetService.updateTodaySchedule(null);
-    }
   }
 
   void _showEditStartDate(DateTime? currentDate) async {
@@ -385,15 +348,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       body: RefreshIndicator(
         color: AppTheme.primaryColor,
         onRefresh: () async {
-          await Future.wait<void>([
-            ref.read(coupleProvider.notifier).fetchCouple(),
-            ref.read(moodProvider.notifier).fetchTodayMood(),
-            ref.read(fortuneProvider.notifier).checkTodayFortune(),
-            ref.read(notificationProvider.notifier).fetchUnreadCount(),
-            ref.read(missionProvider.notifier).fetchTodayMissions(),
-            ref.read(questionProvider.notifier).fetchToday(),
-            ref.read(wishlistProvider.notifier).fetchItems(),
-          ]);
+          await fetchAndApplyHomeSummary(ref);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -533,8 +488,7 @@ class _WishlistPreviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalCount = state.items.length;
-    final favoriteItems =
-        state.items.where((item) => item.isFavorite).toList();
+    final favoriteItems = state.items.where((item) => item.isFavorite).toList();
     final previewFavorites = favoriteItems.take(3).toList();
 
     final String subtitle;
@@ -610,8 +564,10 @@ class _WishlistPreviewCard extends StatelessWidget {
               if (previewFavorites.isNotEmpty) ...[
                 const SizedBox(height: 14),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFFCFA),
                     borderRadius: BorderRadius.circular(14),
@@ -1553,10 +1509,7 @@ class _DoodleCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppTheme.textHint,
-              ),
+              const Icon(Icons.chevron_right_rounded, color: AppTheme.textHint),
             ],
           ),
         ),

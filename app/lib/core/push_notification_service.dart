@@ -9,6 +9,7 @@ import 'constants.dart';
 import 'in_app_notification.dart';
 import 'notification_sound_service.dart';
 import 'router.dart';
+import 'widget_service.dart';
 
 /// 알림 타입 → Hive 설정 키 프리픽스 매핑
 const _typeToKeyPrefix = <String, String>{
@@ -82,9 +83,11 @@ class PushNotificationService {
     });
 
     // 포그라운드 메시지 처리 → 인앱 배너
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       debugPrint('[Push] Foreground message received');
-      debugPrint('[Push]   notification: ${message.notification?.title} / ${message.notification?.body}');
+      debugPrint(
+        '[Push]   notification: ${message.notification?.title} / ${message.notification?.body}',
+      );
       debugPrint('[Push]   data: ${message.data}');
 
       if (message.data['type'] == 'couple_left') {
@@ -95,6 +98,17 @@ class PushNotificationService {
         // 포그라운드에서는 소켓 이벤트가 데이터 갱신 + 위젯 갱신을 처리하므로
         // 사일런트 푸시에서는 배너만 억제하고 위젯 중복 갱신하지 않음
         return;
+      }
+      // 그림 푸시 — 포그라운드에서도 위젯 prefs 를 갱신 (NSE / background handler 가
+      // 실패하거나 도는 게 늦을 경우 대비). silent push 는 배너만 억제.
+      final pushType = message.data['type'];
+      if (pushType == 'doodle_widget_refresh') {
+        await WidgetService.refreshDoodleFromServer();
+        return;
+      }
+      if (pushType == 'doodle') {
+        await WidgetService.refreshDoodleFromServer();
+        // alert push 는 배너 표시도 계속.
       }
       _showInAppBanner(message);
     });
@@ -220,12 +234,13 @@ class PushNotificationService {
       final type = data['type'] as String? ?? '';
 
       // title/body: notification 필드 → data 필드 폴백
-      final title = message.notification?.title ??
-          data['title'] as String? ?? '';
-      final body = message.notification?.body ??
-          data['body'] as String? ?? '';
+      final title =
+          message.notification?.title ?? data['title'] as String? ?? '';
+      final body = message.notification?.body ?? data['body'] as String? ?? '';
 
-      debugPrint('[Push] Banner — title: "$title", body: "$body", type: "$type"');
+      debugPrint(
+        '[Push] Banner — title: "$title", body: "$body", type: "$type"',
+      );
 
       if (title.isEmpty && body.isEmpty) {
         debugPrint('[Push] Empty title and body, skipping banner');
@@ -275,8 +290,10 @@ class PushNotificationService {
       if (!categoryOn) return;
 
       // 카테고리별 소리/진동 설정
-      final shouldSound = box.get('${prefix}_sound', defaultValue: true) as bool;
-      final shouldVibrate = box.get('${prefix}_vibrate', defaultValue: true) as bool;
+      final shouldSound =
+          box.get('${prefix}_sound', defaultValue: true) as bool;
+      final shouldVibrate =
+          box.get('${prefix}_vibrate', defaultValue: true) as bool;
 
       // 사운드 재생
       if (shouldSound) {
@@ -287,7 +304,9 @@ class PushNotificationService {
         HapticFeedback.mediumImpact();
       }
 
-      debugPrint('[Push] Prefs applied — type: $type, sound: $shouldSound, vibrate: $shouldVibrate');
+      debugPrint(
+        '[Push] Prefs applied — type: $type, sound: $shouldSound, vibrate: $shouldVibrate',
+      );
     } catch (e) {
       debugPrint('[Push] Prefs error: $e');
     }

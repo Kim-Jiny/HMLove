@@ -37,6 +37,7 @@ import mapRoutes from './routes/map.js';
 import wishlistRoutes from './routes/wishlist.js';
 import questionRoutes from './routes/question.js';
 import doodleRoutes from './routes/doodle.js';
+import homeRoutes from './routes/home.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -150,6 +151,7 @@ app.use('/api/map', mapRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/question', questionRoutes);
 app.use('/api/doodle', doodleRoutes);
+app.use('/api/home', homeRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

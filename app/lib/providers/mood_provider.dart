@@ -85,12 +85,39 @@ class MoodNotifier extends Notifier<MoodState> {
   }
 
   /// Fetch today's mood for both the user and partner.
+  void applyTodayMoods(List<dynamic>? moods) {
+    if (moods == null) return;
+    final currentUserId = ApiClient.getUserId();
+
+    Mood? myMood;
+    Mood? partnerMood;
+    for (final m in moods) {
+      final moodData = m as Map<String, dynamic>;
+      final user = moodData['user'] as Map<String, dynamic>?;
+      final mood = Mood.fromJson({
+        ...moodData,
+        if (user != null) 'nickname': user['nickname'],
+      });
+      if (mood.userId == currentUserId) {
+        myMood = mood;
+      } else {
+        partnerMood = mood;
+      }
+    }
+
+    state = MoodState(myMood: myMood, partnerMood: partnerMood);
+  }
+
+  /// Fetch today's mood for both the user and partner.
   Future<void> fetchTodayMood() async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
       final localToday = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      final response = await _dio.get('/mood/today', queryParameters: {'date': localToday});
+      final response = await _dio.get(
+        '/mood/today',
+        queryParameters: {'date': localToday},
+      );
       final data = response.data as Map<String, dynamic>;
       final moods = data['moods'] as List<dynamic>;
       final currentUserId = ApiClient.getUserId();
@@ -121,29 +148,28 @@ class MoodNotifier extends Notifier<MoodState> {
           e.response?.data?['message'] as String? ?? '기분 정보를 불러오지 못했습니다';
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: '알 수 없는 오류가 발생했습니다',
-      );
+      state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
     }
   }
 
   /// Set today's mood.
-  Future<bool> setMood({
-    required String emoji,
-    String? message,
-  }) async {
+  Future<bool> setMood({required String emoji, String? message}) async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
       final localToday = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      final response = await _dio.post('/mood', data: {
-        'emoji': emoji,
-        'date': localToday,
-        if (message != null) 'message': message,
-      });
+      final response = await _dio.post(
+        '/mood',
+        data: {
+          'emoji': emoji,
+          'date': localToday,
+          if (message != null) 'message': message,
+        },
+      );
 
-      final moodData = (response.data as Map<String, dynamic>)['mood'] as Map<String, dynamic>;
+      final moodData =
+          (response.data as Map<String, dynamic>)['mood']
+              as Map<String, dynamic>;
       final user = moodData['user'] as Map<String, dynamic>?;
       final mood = Mood.fromJson({
         ...moodData,
@@ -157,10 +183,7 @@ class MoodNotifier extends Notifier<MoodState> {
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: '알 수 없는 오류가 발생했습니다',
-      );
+      state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
       return false;
     }
   }

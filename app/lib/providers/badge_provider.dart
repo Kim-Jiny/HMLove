@@ -10,15 +10,9 @@ class BadgeState {
   final int unreadChatCount;
   final int unseenFeedCount;
 
-  const BadgeState({
-    this.unreadChatCount = 0,
-    this.unseenFeedCount = 0,
-  });
+  const BadgeState({this.unreadChatCount = 0, this.unseenFeedCount = 0});
 
-  BadgeState copyWith({
-    int? unreadChatCount,
-    int? unseenFeedCount,
-  }) {
+  BadgeState copyWith({int? unreadChatCount, int? unseenFeedCount}) {
     return BadgeState(
       unreadChatCount: unreadChatCount ?? this.unreadChatCount,
       unseenFeedCount: unseenFeedCount ?? this.unseenFeedCount,
@@ -41,10 +35,18 @@ class BadgeNotifier extends Notifier<BadgeState> {
     await _fetchFeedUnseen();
   }
 
+  void applyCounts({int? unreadChatCount, int? unseenFeedCount}) {
+    state = state.copyWith(
+      unreadChatCount: unreadChatCount,
+      unseenFeedCount: unseenFeedCount,
+    );
+  }
+
   Future<void> _fetchChatUnread() async {
     try {
       final response = await _dio.get('/chat/unread-count');
-      final count = (response.data as Map<String, dynamic>)['count'] as int? ?? 0;
+      final count =
+          (response.data as Map<String, dynamic>)['count'] as int? ?? 0;
       state = state.copyWith(unreadChatCount: count);
     } catch (e) {
       debugPrint('[Badge] fetchChatUnread error: $e');
@@ -55,11 +57,13 @@ class BadgeNotifier extends Notifier<BadgeState> {
     try {
       final box = Hive.box(AppConstants.settingsBox);
       final since = box.get('lastSeenFeedAt') as String?;
-      final queryParams = <String, dynamic>{
-        if (since != null) 'since': since,
-      };
-      final response = await _dio.get('/feed/unread-count', queryParameters: queryParams);
-      final count = (response.data as Map<String, dynamic>)['count'] as int? ?? 0;
+      final queryParams = <String, dynamic>{if (since != null) 'since': since};
+      final response = await _dio.get(
+        '/feed/unread-count',
+        queryParameters: queryParams,
+      );
+      final count =
+          (response.data as Map<String, dynamic>)['count'] as int? ?? 0;
       state = state.copyWith(unseenFeedCount: count);
     } catch (e) {
       debugPrint('[Badge] fetchFeedUnseen error: $e');

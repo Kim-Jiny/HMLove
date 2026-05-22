@@ -35,9 +35,7 @@ class QuestionState {
     bool? hasMore,
   }) {
     return QuestionState(
-      today: identical(today, _sentinel)
-          ? this.today
-          : today as DailyQuestion?,
+      today: identical(today, _sentinel) ? this.today : today as DailyQuestion?,
       history: history ?? this.history,
       isLoading: isLoading ?? this.isLoading,
       isHistoryLoading: isHistoryLoading ?? this.isHistoryLoading,
@@ -68,18 +66,25 @@ class QuestionNotifier extends Notifier<QuestionState> {
       state = state.copyWith(today: question, isLoading: false, error: null);
     } catch (e) {
       debugPrint('[Question] fetchToday error: $e');
-      state = state.copyWith(
-        isLoading: false,
-        error: '질문을 불러오는데 실패했습니다.',
-      );
+      state = state.copyWith(isLoading: false, error: '질문을 불러오는데 실패했습니다.');
     }
+  }
+
+  void applyTodaySummary(Map<String, dynamic>? data) {
+    if (data == null) return;
+    state = state.copyWith(
+      today: DailyQuestion.fromJson(data),
+      isLoading: false,
+      error: null,
+    );
   }
 
   Future<bool> submitAnswer(String answer) async {
     try {
-      final response = await _dio.post('/question/today/answer', data: {
-        'answer': answer,
-      });
+      final response = await _dio.post(
+        '/question/today/answer',
+        data: {'answer': answer},
+      );
       final data = response.data as Map<String, dynamic>;
       final question = DailyQuestion.fromJson(data);
       state = state.copyWith(today: question);
@@ -100,8 +105,10 @@ class QuestionNotifier extends Notifier<QuestionState> {
       if (!refresh && state.nextCursor != null) {
         params['cursor'] = state.nextCursor;
       }
-      final response =
-          await _dio.get('/question/history', queryParameters: params);
+      final response = await _dio.get(
+        '/question/history',
+        queryParameters: params,
+      );
       final data = response.data as Map<String, dynamic>;
       final items = (data['items'] as List)
           .map((e) => QuestionHistoryItem.fromJson(e as Map<String, dynamic>))

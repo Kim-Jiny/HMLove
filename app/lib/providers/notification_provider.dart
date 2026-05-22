@@ -92,11 +92,16 @@ class NotificationNotifier extends Notifier<NotificationState> {
   Future<void> fetchUnreadCount() async {
     try {
       final response = await _dio.get('/notification/unread-count');
-      final count = (response.data as Map<String, dynamic>)['count'] as int? ?? 0;
+      final count =
+          (response.data as Map<String, dynamic>)['count'] as int? ?? 0;
       state = state.copyWith(unreadCount: count);
     } catch (e) {
       debugPrint('[Notification] fetchUnreadCount error: $e');
     }
+  }
+
+  void applyUnreadCount(int count) {
+    state = state.copyWith(unreadCount: count);
   }
 
   Future<void> fetchNotifications({bool refresh = false}) async {
@@ -143,7 +148,9 @@ class NotificationNotifier extends Notifier<NotificationState> {
     try {
       await _dio.patch('/notification/read-all');
       state = state.copyWith(
-        notifications: state.notifications.map((n) => n.copyWith(isRead: true)).toList(),
+        notifications: state.notifications
+            .map((n) => n.copyWith(isRead: true))
+            .toList(),
         unreadCount: 0,
       );
     } catch (e) {
@@ -169,8 +176,8 @@ class NotificationNotifier extends Notifier<NotificationState> {
 
 final notificationProvider =
     NotifierProvider<NotificationNotifier, NotificationState>(
-  NotificationNotifier.new,
-);
+      NotificationNotifier.new,
+    );
 
 final unreadNotificationCountProvider = Provider<int>((ref) {
   return ref.watch(notificationProvider).unreadCount;

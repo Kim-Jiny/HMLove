@@ -1,12 +1,18 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
+
+import 'api_client.dart';
+import 'constants.dart';
 
 /// App Group ID (iOS) - must match Widget Extension's App Group
 const _appGroupId = 'group.com.jiny.hmlove';
 
 /// Widget names
 const _iosWidgetName = 'HMLoveWidget';
+const _iosDoodleWidgetName = 'HMLoveDoodleWidget';
 const _androidWidgetName = 'HMLoveWidgetProvider';
 const _androidSmallWidgetName = 'HMLoveSmallWidgetProvider';
 const _androidCalendarWidgetName = 'HMLoveCalendarWidgetProvider';
@@ -14,6 +20,7 @@ const _androidDoodleWidgetName = 'HMLoveDoodleWidgetProvider';
 const _calendarEventMonthsKey = 'widgetCalendarEventMonths';
 const _deviceCalendarEventMonthsKey = 'widgetDeviceCalendarEventMonths';
 const _holidayEventMonthsKey = 'widgetHolidayEventMonths';
+
 /// 위젯 prev/next 네비게이션이 발생한 월(앱 캐시가 비어있을 수 있음).
 /// 앱이 포어그라운드 복귀 시 읽어 device/holiday 캐시를 채우고 비운다.
 const _pendingHydrationKey = 'widgetPendingHydrationMonths';
@@ -23,10 +30,24 @@ class WidgetService {
 
   static Future<void> initialize() async {
     await HomeWidget.setAppGroupId(_appGroupId);
+
+    // 앱 시작 시 Hive 에 캐시된 access token 이 있으면 home_widget prefs 에도
+    // 동기화. saveAuthInfo 는 로그인/refresh 시점에만 호출되므로, 이미 로그인된
+    // 상태로 앱을 켜면 이 prefs 가 영영 비어있어서 위젯의 백그라운드 fetch
+    // (Android Kotlin Provider, iOS NSE) 가 토큰을 못 찾는 문제 방지.
+    try {
+      final token = ApiClient.getAccessToken();
+      if (token != null && token.isNotEmpty) {
+        await saveAuthInfo(token, AppConstants.apiBaseUrl);
+      }
+    } catch (e) {
+      debugPrint('[WidgetService] auth sync on init failed: $e');
+    }
   }
 
   /// Save auth info so widget extension can fetch data independently
   static Future<void> saveAuthInfo(String token, String apiBaseUrl) async {
+    await HomeWidget.setAppGroupId(_appGroupId);
     await Future.wait([
       HomeWidget.saveWidgetData('authToken', token),
       HomeWidget.saveWidgetData('apiBaseUrl', apiBaseUrl),
@@ -108,10 +129,7 @@ class WidgetService {
     }
     for (final yearMonth in holidayMonths) {
       clears.add(
-        HomeWidget.saveWidgetData<String?>(
-          'holidayEvents_$yearMonth',
-          null,
-        ),
+        HomeWidget.saveWidgetData<String?>('holidayEvents_$yearMonth', null),
       );
     }
 
@@ -138,6 +156,97 @@ class WidgetService {
   static Future<void> updateTodaySchedule(String? schedule) async {
     await HomeWidget.saveWidgetData('todaySchedule', schedule ?? '');
     await _refresh();
+  }
+
+  /// 서버에서 /doodle/latest 를 직접 받아 위젯용 prefs 를 갱신하고 위젯 update broadcast.
+  /// 백그라운드 isolate (FCM background handler) 와 foreground 핸들러 양쪽에서 호출 가능하도록
+  /// HomeWidget + HttpClient 만 사용 (riverpod 의존성 없음).
+  /// Foreground 에서는 home_widget 플러그인을 통해 prefs 갱신 + 위젯 broadcast.
+  /// Background isolate 에서는 home_widget method channel 이 동작 안 해 token 조회가
+  /// null 로 떨어지므로, prefs fetch 는 Kotlin Provider (HMLoveDoodleWidgetProvider) /
+  /// iOS NSE 가 직접 담당하고 여기선 무조건 broadcast 만 시도한다.
+  static Future<void> refreshDoodleFromServer() async {
+    try {
+      await HomeWidget.setAppGroupId(_appGroupId);
+      final token = await HomeWidget.getWidgetData<String>('authToken');
+      final baseUrl = await HomeWidget.getWidgetData<String>('apiBaseUrl');
+      debugPrint(
+        '[Doodle refresh] token=${token == null ? "null" : "(set)"} '
+        'baseUrl=$baseUrl',
+      );
+
+      if (token != null && baseUrl != null) {
+        // Foreground 또는 plugin 이 BG 에서도 살아있는 경우 — 직접 fetch.
+        final client = HttpClient();
+        try {
+          final request = await client.getUrl(
+            Uri.parse('$baseUrl/doodle/latest'),
+          );
+          request.headers.set('Authorization', 'Bearer $token');
+          final response = await request.close();
+          debugPrint(
+            '[Doodle refresh] /doodle/latest → ${response.statusCode}',
+          );
+          if (response.statusCode == 200) {
+            final body = await response.transform(utf8.decoder).join();
+            final data = jsonDecode(body) as Map<String, dynamic>;
+            final doodle = data['doodle'] as Map<String, dynamic>?;
+            if (doodle != null) {
+              final imageUrl = doodle['imageUrl'] as String?;
+              final createdAt = doodle['createdAt'] as String?;
+              final sender = doodle['sender'] as Map<String, dynamic>?;
+              final senderName = sender?['nickname'] as String?;
+              debugPrint('[Doodle refresh] new url=$imageUrl @ $createdAt');
+              await HomeWidget.saveWidgetData<String?>(
+                'doodleImageUrl',
+                imageUrl,
+              );
+              await HomeWidget.saveWidgetData<String?>(
+                'doodleReceivedAt',
+                createdAt,
+              );
+              await HomeWidget.saveWidgetData<String?>(
+                'doodleSenderName',
+                senderName,
+              );
+            } else {
+              debugPrint('[Doodle refresh] no doodle — clearing keys');
+              await HomeWidget.saveWidgetData<String?>('doodleImageUrl', null);
+              await HomeWidget.saveWidgetData<String?>(
+                'doodleReceivedAt',
+                null,
+              );
+              await HomeWidget.saveWidgetData<String?>(
+                'doodleSenderName',
+                null,
+              );
+            }
+          }
+        } finally {
+          client.close();
+        }
+      } else {
+        debugPrint(
+          '[Doodle refresh] no token in plugin prefs '
+          '(BG isolate?) — native widget provider 가 직접 fetch 할 것',
+        );
+      }
+    } catch (e) {
+      debugPrint('[Doodle refresh] error: $e');
+    }
+
+    // 어느 경우든 위젯 broadcast 시도. BG 에서는 fetch 못 했더라도
+    // Kotlin Provider 의 onUpdate 가 깨어나 직접 서버에서 받아온다.
+    // iOS 는 kind 별 reload — doodle 위젯 kind 는 'HMLoveDoodleWidget' 으로 명시.
+    try {
+      await HomeWidget.updateWidget(
+        androidName: _androidDoodleWidgetName,
+        iOSName: _iosDoodleWidgetName,
+      );
+      debugPrint('[Doodle refresh] HomeWidget.updateWidget broadcast sent');
+    } catch (e) {
+      debugPrint('[Doodle refresh] updateWidget failed: $e');
+    }
   }
 
   /// Update the doodle (그림) shown on the 2x2 doodle widget.
@@ -242,10 +351,7 @@ class WidgetService {
     String yearMonth,
   ) async {
     await Future.wait([
-      HomeWidget.saveWidgetData(
-        'holidayEvents_$yearMonth',
-        jsonEncode(events),
-      ),
+      HomeWidget.saveWidgetData('holidayEvents_$yearMonth', jsonEncode(events)),
       _trackMonth(_holidayEventMonthsKey, yearMonth),
     ]);
     await _refresh();
@@ -289,8 +395,10 @@ class WidgetService {
         iOSName: _iosWidgetName,
         androidName: _androidCalendarWidgetName,
       ),
+      // Doodle widget 은 iOS 에서 별도 kind ('HMLoveDoodleWidget') 라
+      // iOSName 도 다르게 줘야 reloadTimelines 가 doodle 위젯에 적용됨.
       HomeWidget.updateWidget(
-        iOSName: _iosWidgetName,
+        iOSName: _iosDoodleWidgetName,
         androidName: _androidDoodleWidgetName,
       ),
     ]);

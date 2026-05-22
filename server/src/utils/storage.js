@@ -27,8 +27,14 @@ function detectLanBaseUrl() {
   return `http://localhost:${port}`;
 }
 
-const PUBLIC_URL = process.env.STORAGE_PUBLIC_URL
-  || (STORAGE_MODE === 'local' ? detectLanBaseUrl() : 'http://localhost:9000');
+// PUBLIC_URL 결정 규칙:
+//  - local 모드: .env 에 박혀있을 수 있는 운영용 STORAGE_PUBLIC_URL 은 절대 쓰지 않음
+//    (그러면 위젯/앱이 운영 도메인으로 이미지 가져와서 깨짐). .env.local 에 명시한
+//    LOCAL_STORAGE_BASE_URL 우선, 없으면 LAN IP 자동탐지.
+//  - minio 모드 (기본/운영): STORAGE_PUBLIC_URL 그대로. 운영 도메인 동작 변경 없음.
+const PUBLIC_URL = STORAGE_MODE === 'local'
+  ? (process.env.LOCAL_STORAGE_BASE_URL || detectLanBaseUrl())
+  : (process.env.STORAGE_PUBLIC_URL || 'http://localhost:9000');
 
 // S3 클라이언트는 minio 모드에서만 실제로 사용. local 모드에서도 import 부작용은 없음.
 const s3 = STORAGE_MODE === 'minio'

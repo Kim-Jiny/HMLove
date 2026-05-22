@@ -172,6 +172,9 @@ class ChatNotifier extends Notifier<ChatState> {
   bool _hasConnectedOnce = false;
   bool _recoverStateOnNextConnect = false;
   DateTime? _lastForcedReconnectAt;
+  DateTime? _lastRealtimeRefreshAt;
+  Future<void>? _realtimeRefreshInFlight;
+  static const Duration _realtimeRefreshThrottle = Duration(seconds: 60);
 
   @override
   ChatState build() {
@@ -489,18 +492,36 @@ class ChatNotifier extends Notifier<ChatState> {
   /// 재연결 후 소켓 의존 상태들만 새로고침한다.
   /// (fetchToday, fetchTodayMissions, fetchBadges 등은 home_screen.resumed에서 이미 호출됨)
   Future<void> _refreshRealtimeState() async {
+    if (_realtimeRefreshInFlight != null) {
+      return _realtimeRefreshInFlight;
+    }
+
+    final now = DateTime.now();
+    final last = _lastRealtimeRefreshAt;
+    if (last != null && now.difference(last) < _realtimeRefreshThrottle) {
+      debugPrint('[Chat] refreshRealtimeState skipped (recent)');
+      return;
+    }
+    _lastRealtimeRefreshAt = now;
+
     final month =
         '${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}';
 
-    try {
+    _realtimeRefreshInFlight = Future(() async {
       await Future.wait([
         ref.read(feedProvider.notifier).fetchFeeds(refresh: true),
         ref.read(missionProvider.notifier).fetchCalendarMissions(month),
         ref.read(calendarProvider.notifier).refreshCurrentMonth(),
         ref.read(wishlistProvider.notifier).fetchItems(),
       ]);
+    });
+
+    try {
+      await _realtimeRefreshInFlight;
     } catch (e) {
       debugPrint('[Chat] refreshRealtimeState error: $e');
+    } finally {
+      _realtimeRefreshInFlight = null;
     }
   }
 

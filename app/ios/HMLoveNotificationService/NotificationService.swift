@@ -204,7 +204,10 @@ class NotificationService: UNNotificationServiceExtension {
 
             // PNG도 캐시에 미리 다운로드 (위젯이 첫 update에서 바로 렌더)
             if let img = URL(string: imageUrl) {
-                URLSession.shared.dataTask(with: img) { imgData, _, _ in
+                var imageRequest = URLRequest(url: img)
+                imageRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                imageRequest.timeoutInterval = 12
+                URLSession.shared.dataTask(with: imageRequest) { imgData, _, _ in
                     if let imgData = imgData, !imgData.isEmpty {
                         Self.writeDoodleCache(imgData, for: imageUrl)
                     }
@@ -226,7 +229,7 @@ class NotificationService: UNNotificationServiceExtension {
     }
 
     /// HMLoveDoodleWidget.swift의 DoodleCache와 동일한 경로 규칙을 사용.
-    /// (App Group container/doodleCache/{hashValue}.png)
+    /// (App Group container/doodleCache/{stableHash}.png)
     private static func writeDoodleCache(_ data: Data, for urlString: String) {
         guard let container = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: appGroupId
@@ -235,8 +238,17 @@ class NotificationService: UNNotificationServiceExtension {
         try? FileManager.default.createDirectory(
             at: folder, withIntermediateDirectories: true
         )
-        let fileName = String(urlString.hashValue) + ".png"
+        let fileName = stableDoodleCacheFileName(for: urlString)
         let path = folder.appendingPathComponent(fileName)
         try? data.write(to: path)
+    }
+
+    private static func stableDoodleCacheFileName(for text: String) -> String {
+        var hash: UInt64 = 1469598103934665603
+        for byte in text.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 1099511628211
+        }
+        return String(hash, radix: 16) + ".png"
     }
 }
