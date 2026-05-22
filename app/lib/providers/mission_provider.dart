@@ -91,19 +91,39 @@ class MissionNotifier extends Notifier<MissionState> {
       final weekly = data['weekly'] != null
           ? Mission.fromJson(data['weekly'] as Map<String, dynamic>)
           : null;
-      state = MissionState(daily: daily, weekly: weekly, isLoading: false, completedDates: state.completedDates);
+      state = MissionState(
+        daily: daily,
+        weekly: weekly,
+        isLoading: false,
+        completedDates: state.completedDates,
+      );
     } catch (e) {
       debugPrint('[Mission] fetchTodayMissions error: $e');
       state = state.copyWith(isLoading: false);
     }
   }
 
+  void applyTodaySummary(Map<String, dynamic>? data) {
+    if (data == null) return;
+    final daily = data['daily'] != null
+        ? Mission.fromJson(data['daily'] as Map<String, dynamic>)
+        : null;
+    final weekly = data['weekly'] != null
+        ? Mission.fromJson(data['weekly'] as Map<String, dynamic>)
+        : null;
+    state = MissionState(
+      daily: daily,
+      weekly: weekly,
+      isLoading: false,
+      completedDates: state.completedDates,
+    );
+  }
+
   Future<bool> completeMission(String missionId) async {
     try {
       final response = await _dio.patch('/mission/$missionId/complete');
       final data = response.data as Map<String, dynamic>;
-      final updated =
-          Mission.fromJson(data['mission'] as Map<String, dynamic>);
+      final updated = Mission.fromJson(data['mission'] as Map<String, dynamic>);
       if (updated.type == 'DAILY') {
         state = state.copyWith(daily: updated);
       } else {
@@ -121,8 +141,7 @@ class MissionNotifier extends Notifier<MissionState> {
     try {
       final response = await _dio.patch('/mission/$missionId/cancel');
       final data = response.data as Map<String, dynamic>;
-      final updated =
-          Mission.fromJson(data['mission'] as Map<String, dynamic>);
+      final updated = Mission.fromJson(data['mission'] as Map<String, dynamic>);
       if (updated.type == 'DAILY') {
         state = state.copyWith(daily: updated);
       } else {
@@ -158,8 +177,10 @@ class MissionNotifier extends Notifier<MissionState> {
 
   Future<void> fetchCalendarMissions(String month) async {
     try {
-      final response = await _dio
-          .get('/mission/calendar', queryParameters: {'month': month});
+      final response = await _dio.get(
+        '/mission/calendar',
+        queryParameters: {'month': month},
+      );
       final data = response.data as Map<String, dynamic>;
       final rawDates = data['completedDates'] as Map<String, dynamic>? ?? {};
       debugPrint('[Mission] calendar raw: $rawDates');
@@ -171,7 +192,9 @@ class MissionNotifier extends Notifier<MissionState> {
               .toList(),
         ),
       );
-      debugPrint('[Mission] completedDates keys: ${completedDates.keys.toList()}');
+      debugPrint(
+        '[Mission] completedDates keys: ${completedDates.keys.toList()}',
+      );
       state = state.copyWith(completedDates: completedDates);
     } catch (e) {
       debugPrint('[Mission] fetchCalendarMissions error: $e');

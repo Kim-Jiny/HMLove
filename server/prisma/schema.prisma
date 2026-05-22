@@ -8,36 +8,38 @@ datasource db {
 }
 
 model User {
-  id             String    @id @default(uuid())
-  email          String    @unique
-  password       String?   // null이면 소셜 전용 가입자
-  nickname       String
-  profileImage   String?
-  birthDate      DateTime?
-  zodiacSign     String?   // 별자리
-  chineseZodiac  String?   // 띠
-  fcmToken       String?
-  notiPrefs      Json?     // 알림 설정 (sound, vibrate, 카테고리별 등)
-  coupleId       String?
-  couple         Couple?   @relation(fields: [coupleId], references: [id])
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String? // null이면 소셜 전용 가입자
+  nickname      String
+  profileImage  String?
+  birthDate     DateTime?
+  zodiacSign    String? // 별자리
+  chineseZodiac String? // 띠
+  fcmToken      String?
+  notiPrefs     Json? // 알림 설정 (sound, vibrate, 카테고리별 등)
+  coupleId      String?
+  couple        Couple?   @relation(fields: [coupleId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  sentMessages     Message[]       @relation("sender")
-  calendarEvents   CalendarEvent[] @relation("eventAuthor")
-  feeds            Feed[]          @relation("feedAuthor")
-  moods            Mood[]
-  fights           Fight[]         @relation("fightAuthor")
-  photos           Photo[]         @relation("photoAuthor")
-  lettersWritten   Letter[]        @relation("letterWriter")
-  lettersReceived  Letter[]        @relation("letterReceiver")
-  feedLikes        FeedLike[]
-  feedComments     FeedComment[]   @relation("commentAuthor")
-  inquiries        Inquiry[]
-  notifications    Notification[]
-  wishItems        WishItem[]      @relation("wishAuthor")
-  questionAnswers  QuestionAnswer[]
-  socialAccounts   SocialAccount[]
+  sentMessages    Message[]        @relation("sender")
+  calendarEvents  CalendarEvent[]  @relation("eventAuthor")
+  feeds           Feed[]           @relation("feedAuthor")
+  moods           Mood[]
+  fights          Fight[]          @relation("fightAuthor")
+  photos          Photo[]          @relation("photoAuthor")
+  lettersWritten  Letter[]         @relation("letterWriter")
+  lettersReceived Letter[]         @relation("letterReceiver")
+  feedLikes       FeedLike[]
+  feedComments    FeedComment[]    @relation("commentAuthor")
+  inquiries       Inquiry[]
+  notifications   Notification[]
+  wishItems       WishItem[]       @relation("wishAuthor")
+  questionAnswers QuestionAnswer[]
+  socialAccounts  SocialAccount[]
+  doodlesSent     Doodle[]         @relation("doodleSender")
+  doodlesReceived Doodle[]         @relation("doodleReceiver")
 
   @@index([coupleId])
 }
@@ -49,13 +51,13 @@ enum SocialProvider {
 }
 
 model SocialAccount {
-  id          String         @id @default(uuid())
-  userId      String
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  provider    SocialProvider
-  providerId  String         // 각 provider의 고유 식별자 (sub, id 등)
-  email       String?        // provider가 제공한 이메일 (있는 경우)
-  createdAt   DateTime       @default(now())
+  id         String         @id @default(uuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider   SocialProvider
+  providerId String // 각 provider의 고유 식별자 (sub, id 등)
+  email      String? // provider가 제공한 이메일 (있는 경우)
+  createdAt  DateTime       @default(now())
 
   @@unique([provider, providerId])
   @@unique([userId, provider])
@@ -63,24 +65,25 @@ model SocialAccount {
 }
 
 model Couple {
-  id          String    @id @default(uuid())
-  inviteCode  String    @unique
-  startDate   DateTime
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id         String   @id @default(uuid())
+  inviteCode String   @unique
+  startDate  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  users           User[]
-  calendarEvents  CalendarEvent[]
-  feeds           Feed[]
-  moods           Mood[]
-  fights          Fight[]
-  fortunes        Fortune[]
-  messages        Message[]
-  photos          Photo[]
-  letters         Letter[]
-  missions        CoupleMission[]
-  wishItems       WishItem[]
-  dailyQuestions  DailyQuestion[]
+  users          User[]
+  calendarEvents CalendarEvent[]
+  feeds          Feed[]
+  moods          Mood[]
+  fights         Fight[]
+  fortunes       Fortune[]
+  messages       Message[]
+  photos         Photo[]
+  letters        Letter[]
+  missions       CoupleMission[]
+  wishItems      WishItem[]
+  dailyQuestions DailyQuestion[]
+  doodles        Doodle[]
 }
 
 enum MissionType {
@@ -96,9 +99,9 @@ model CoupleMission {
   title       String
   description String
   emoji       String      @default("💝")
-  date        DateTime    @db.Date  // DAILY: that date, WEEKLY: Monday of the week
+  date        DateTime    @db.Date // DAILY: that date, WEEKLY: Monday of the week
   isCompleted Boolean     @default(false)
-  completedBy String?     // userId who marked it
+  completedBy String? // userId who marked it
   completedAt DateTime?
   createdAt   DateTime    @default(now())
 
@@ -107,19 +110,19 @@ model CoupleMission {
 }
 
 model CalendarEvent {
-  id          String   @id @default(uuid())
-  coupleId    String
-  couple      Couple   @relation(fields: [coupleId], references: [id], onDelete: Cascade)
-  authorId    String
-  author      User     @relation("eventAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
-  date        DateTime
-  isAnniversary Boolean @default(false)
-  repeatType  RepeatType @default(NONE)
-  color       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String     @id @default(uuid())
+  coupleId      String
+  couple        Couple     @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  authorId      String
+  author        User       @relation("eventAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  date          DateTime
+  isAnniversary Boolean    @default(false)
+  repeatType    RepeatType @default(NONE)
+  color         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   @@index([coupleId, date])
 }
@@ -137,13 +140,13 @@ model Feed {
   authorId  String
   author    User     @relation("feedAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   content   String
-  imageUrls String[]  @default([])
+  imageUrls String[] @default([])
   type      FeedType @default(DIARY)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  likes     FeedLike[]
-  comments  FeedComment[]
+  likes    FeedLike[]
+  comments FeedComment[]
 
   @@index([coupleId, createdAt])
 }
@@ -245,11 +248,11 @@ model Message {
 }
 
 model Photo {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   coupleId     String
-  couple       Couple   @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  couple       Couple    @relation(fields: [coupleId], references: [id], onDelete: Cascade)
   authorId     String
-  author       User     @relation("photoAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  author       User      @relation("photoAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   imageUrl     String
   thumbnailUrl String?
   caption      String?
@@ -257,9 +260,24 @@ model Photo {
   longitude    Float?
   address      String?
   takenAt      DateTime?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
 
   @@index([coupleId])
+}
+
+model Doodle {
+  id         String   @id @default(uuid())
+  coupleId   String
+  couple     Couple   @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User     @relation("doodleSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String
+  receiver   User     @relation("doodleReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  imageUrl   String
+  createdAt  DateTime @default(now())
+
+  @@index([coupleId, createdAt])
+  @@index([receiverId, createdAt])
 }
 
 model Letter {
@@ -292,7 +310,7 @@ model Inquiry {
   id          String        @id @default(uuid())
   userId      String
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category    String        // bug, feature, account, other
+  category    String // bug, feature, account, other
   title       String
   content     String
   // 디바이스 정보
@@ -326,10 +344,10 @@ model Notification {
   id        String   @id @default(uuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String   // feed, feed_like, feed_comment, letter, calendar, mood, fight, fortune, inquiry, couple_left
+  type      String // feed, feed_like, feed_comment, letter, calendar, mood, fight, fortune, inquiry, couple_left
   title     String
   body      String
-  data      Json?    // { feedId, letterId, etc. }
+  data      Json? // { feedId, letterId, etc. }
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 

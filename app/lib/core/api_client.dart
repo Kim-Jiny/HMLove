@@ -49,11 +49,13 @@ class ApiClient {
 
     dio.interceptors.add(_AuthInterceptor(dio));
     if (kDebugMode) {
-      dio.interceptors.add(LogInterceptor(
-        requestBody: true,
-        responseBody: true,
-        logPrint: (obj) => debugPrint('[API] $obj'),
-      ));
+      dio.interceptors.add(
+        LogInterceptor(
+          requestBody: true,
+          responseBody: true,
+          logPrint: (obj) => debugPrint('[API] $obj'),
+        ),
+      );
     }
 
     return dio;
@@ -80,7 +82,7 @@ class ApiClient {
     await box.put(AppConstants.accessTokenKey, accessToken);
     await box.put(AppConstants.refreshTokenKey, refreshToken);
     // Share token with widget extension for background fetching
-    WidgetService.saveAuthInfo(accessToken, AppConstants.apiBaseUrl);
+    await WidgetService.saveAuthInfo(accessToken, AppConstants.apiBaseUrl);
   }
 
   /// Clear all stored tokens.
@@ -91,7 +93,7 @@ class ApiClient {
     await box.delete(AppConstants.userIdKey);
     await box.delete(AppConstants.coupleIdKey);
     // 위젯 확장의 토큰도 정리
-    WidgetService.clearData();
+    await WidgetService.clearData();
   }
 
   /// Save user ID to Hive.
@@ -192,10 +194,12 @@ class _AuthInterceptor extends Interceptor {
       return handler.next(err);
     }
 
-    final refreshDio = Dio(BaseOptions(
-      baseUrl: AppConstants.apiBaseUrl,
-      headers: {'Content-Type': 'application/json'},
-    ));
+    final refreshDio = Dio(
+      BaseOptions(
+        baseUrl: AppConstants.apiBaseUrl,
+        headers: {'Content-Type': 'application/json'},
+      ),
+    );
 
     Response? refreshResponse;
     try {
@@ -223,7 +227,10 @@ class _AuthInterceptor extends Interceptor {
         final newAccessToken = refreshResponse.data['accessToken'] as String;
         final box = Hive.box(AppConstants.authBox);
         await box.put(AppConstants.accessTokenKey, newAccessToken);
-        WidgetService.saveAuthInfo(newAccessToken, AppConstants.apiBaseUrl);
+        await WidgetService.saveAuthInfo(
+          newAccessToken,
+          AppConstants.apiBaseUrl,
+        );
 
         // Unblock all waiting 401 handlers with the new token.
         _refreshCompleter!.complete(newAccessToken);

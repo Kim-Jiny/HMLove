@@ -7,7 +7,7 @@ router.use(authenticate);
 
 // ─── Mission Pools ───────────────────────────────────────────────
 
-const DAILY_MISSIONS = [
+export const DAILY_MISSIONS = [
   { emoji: '💬', title: '칭찬 릴레이', description: '상대방에게 칭찬 3가지를 채팅으로 보내보세요' },
   { emoji: '💕', title: '사랑 고백', description: '"사랑해"라고 진심을 담아 메시지를 보내보세요' },
   { emoji: '🙏', title: '감사 표현', description: '오늘 상대방에게 감사한 점을 공유해보세요' },
@@ -24,7 +24,7 @@ const DAILY_MISSIONS = [
   { emoji: '🎯', title: '내일 데이트 계획', description: '다음에 만나면 하고 싶은 것을 이야기해보세요' },
 ];
 
-const WEEKLY_MISSIONS = [
+export const WEEKLY_MISSIONS = [
   { emoji: '🚶', title: '함께 산책', description: '함께 산책하고 인증 사진을 남겨보세요' },
   { emoji: '🍳', title: '같이 요리', description: '함께 요리를 해서 먹어보세요' },
   { emoji: '☕', title: '새로운 카페 탐방', description: '안 가본 카페에 함께 가보세요' },
@@ -39,7 +39,7 @@ const WEEKLY_MISSIONS = [
 
 // ─── Helpers ─────────────────────────────────────────────────────
 
-function getMonday(d) {
+export function getMonday(d) {
   const date = new Date(d);
   date.setUTCHours(0, 0, 0, 0);
   const day = date.getUTCDay();
@@ -48,13 +48,13 @@ function getMonday(d) {
   return date;
 }
 
-function getToday() {
+export function getToday() {
   const d = new Date();
   d.setUTCHours(0, 0, 0, 0);
   return d;
 }
 
-function pickMission(pool, coupleId, dateStr) {
+export function pickMission(pool, coupleId, dateStr) {
   // Simple hash from coupleId + dateStr
   let hash = 0;
   const seed = coupleId + dateStr;
@@ -128,7 +128,10 @@ router.patch('/:id/complete', async (req, res) => {
     // Socket: 실시간 미션 완료 이벤트
     const io = req.app.get('io');
     if (io) {
-      io.to(`couple:${req.user.coupleId}`).emit('mission:complete', { mission: updated });
+      io.to(`couple:${req.user.coupleId}`).emit('mission:complete', {
+        mission: updated,
+        actorId: req.user.id,
+      });
     }
 
     res.json({ mission: updated });
@@ -154,7 +157,10 @@ router.patch('/:id/cancel', async (req, res) => {
     // Socket: 실시간 미션 취소 이벤트
     const io = req.app.get('io');
     if (io) {
-      io.to(`couple:${req.user.coupleId}`).emit('mission:cancel', { mission: updated });
+      io.to(`couple:${req.user.coupleId}`).emit('mission:cancel', {
+        mission: updated,
+        actorId: req.user.id,
+      });
     }
 
     res.json({ mission: updated });

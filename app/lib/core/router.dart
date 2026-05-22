@@ -27,6 +27,8 @@ import '../screens/home/anniversary_screen.dart';
 import '../screens/notification/notification_screen.dart';
 import '../screens/wishlist/wishlist_screen.dart';
 import '../screens/question/question_screen.dart';
+import '../screens/doodle/doodle_canvas_screen.dart';
+import '../screens/doodle/doodle_history_screen.dart';
 
 /// 푸시 알림 등에서 네비게이션 접근용 글로벌 키
 final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -75,6 +77,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         switch (target) {
           case 'calendar':
             return '/calendar';
+          case 'doodle':
+            return '/doodle';
           default:
             // 카카오 OAuth 콜백 등 알 수 없는 스킴. 진행 중인 소셜 가입이 있으면
             // 가입 화면으로, 아니면 splash 가 auth 상태 보고 분기.
@@ -222,6 +226,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/question',
         builder: (context, state) => const QuestionScreen(),
+      ),
+
+      // Doodle (그림 보내기)
+      GoRoute(
+        path: '/doodle',
+        builder: (context, state) => const DoodleHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/doodle/canvas',
+        builder: (context, state) => const DoodleCanvasScreen(),
       ),
 
       // Main Shell with bottom navigation

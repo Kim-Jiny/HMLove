@@ -32,14 +32,18 @@ class NotificationService: UNNotificationServiceExtension {
             return
         }
 
-        // 캘린더 type만 처리. 다른 type은 즉시 통과.
+        // 위젯 데이터를 갱신해야 하는 type만 처리. 그 외는 즉시 통과.
         let type = request.content.userInfo["type"] as? String
-        guard type == "calendar" else {
-            contentHandler(bestAttemptContent)
-            return
-        }
-
-        refreshCalendarWidget {
+        switch type {
+        case "calendar":
+            refreshCalendarWidget {
+                contentHandler(bestAttemptContent)
+            }
+        case "doodle":
+            refreshDoodleWidget {
+                contentHandler(bestAttemptContent)
+            }
+        default:
             contentHandler(bestAttemptContent)
         }
     }
@@ -149,5 +153,102 @@ class NotificationService: UNNotificationServiceExtension {
                 defaults.set(jsonString, forKey: "calendarEvents")
             }
         }.resume()
+    }
+
+    /// 그림 push 도착 시 서버에서 최신 그림 메타를 받아 App Group에 저장하고,
+    /// PNG 이미지도 캐시에 다운받아 위젯이 즉시 렌더할 수 있게 한다.
+    private func refreshDoodleWidget(completion: @escaping () -> Void) {
+        guard let defaults = UserDefaults(suiteName: Self.appGroupId),
+              let token = defaults.string(forKey: "authToken"),
+              let baseUrl = defaults.string(forKey: "apiBaseUrl"),
+              !token.isEmpty, !baseUrl.isEmpty else {
+            completion()
+            return
+        }
+        let trimmedBaseUrl = baseUrl.hasSuffix("/") ? String(baseUrl.dropLast()) : baseUrl
+        guard let url = URL(string: "\(trimmedBaseUrl)/doodle/latest") else {
+            completion()
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 8
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            guard let data = data, error == nil,
+                  let http = response as? HTTPURLResponse,
+                  (200..<300).contains(http.statusCode),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                completion()
+                return
+            }
+
+            guard let doodle = json["doodle"] as? [String: Any] else {
+                // 받은 그림이 없음 — 키 정리
+                defaults.removeObject(forKey: "doodleImageUrl")
+                defaults.removeObject(forKey: "doodleReceivedAt")
+                defaults.removeObject(forKey: "doodleSenderName")
+                self.reloadWidgetsAndComplete(completion: completion)
+                return
+            }
+
+            let imageUrl = doodle["imageUrl"] as? String ?? ""
+            let createdAt = doodle["createdAt"] as? String ?? ""
+            let senderName = ((doodle["sender"] as? [String: Any])?["nickname"] as? String) ?? ""
+
+            defaults.set(imageUrl, forKey: "doodleImageUrl")
+            defaults.set(createdAt, forKey: "doodleReceivedAt")
+            defaults.set(senderName, forKey: "doodleSenderName")
+
+            // PNG도 캐시에 미리 다운로드 (위젯이 첫 update에서 바로 렌더)
+            if let img = URL(string: imageUrl) {
+                var imageRequest = URLRequest(url: img)
+                imageRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                imageRequest.timeoutInterval = 12
+                URLSession.shared.dataTask(with: imageRequest) { imgData, _, _ in
+                    if let imgData = imgData, !imgData.isEmpty {
+                        Self.writeDoodleCache(imgData, for: imageUrl)
+                    }
+                    self.reloadWidgetsAndComplete(completion: completion)
+                }.resume()
+            } else {
+                self.reloadWidgetsAndComplete(completion: completion)
+            }
+        }.resume()
+    }
+
+    private func reloadWidgetsAndComplete(completion: @escaping () -> Void) {
+        DispatchQueue.main.async {
+            if #available(iOS 14.0, *) {
+                WidgetCenter.shared.reloadAllTimelines()
+            }
+            completion()
+        }
+    }
+
+    /// HMLoveDoodleWidget.swift의 DoodleCache와 동일한 경로 규칙을 사용.
+    /// (App Group container/doodleCache/{stableHash}.png)
+    private static func writeDoodleCache(_ data: Data, for urlString: String) {
+        guard let container = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroupId
+        ) else { return }
+        let folder = container.appendingPathComponent("doodleCache", isDirectory: true)
+        try? FileManager.default.createDirectory(
+            at: folder, withIntermediateDirectories: true
+        )
+        let fileName = stableDoodleCacheFileName(for: urlString)
+        let path = folder.appendingPathComponent(fileName)
+        try? data.write(to: path)
+    }
+
+    private static func stableDoodleCacheFileName(for text: String) -> String {
+        var hash: UInt64 = 1469598103934665603
+        for byte in text.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 1099511628211
+        }
+        return String(hash, radix: 16) + ".png"
     }
 }

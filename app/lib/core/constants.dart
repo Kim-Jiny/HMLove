@@ -9,10 +9,22 @@ class AppConstants {
   static const String appVersion = '1.0.0';
 
   // API
-  static const String _localBaseUrl = 'https://love.jiny.shop';
+  // Debug 빌드에서 --dart-define=API_BASE_URL=http://<host>:<port> 가 주어지면
+  // 그쪽을 쓰고, 아니면 prod 도메인. Release 빌드는 항상 prod (안전장치).
+  // debug_run.sh 가 자동으로 host LAN IP를 잡아서 dart-define 으로 넣어줌.
+  static const String _devBaseUrlOverride = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: '',
+  );
   static const String _prodBaseUrl = 'https://love.jiny.shop';
 
-  static String get _baseUrl => kReleaseMode ? _prodBaseUrl : _localBaseUrl;
+  static String get _baseUrl {
+    if (!kReleaseMode && _devBaseUrlOverride.isNotEmpty) {
+      return _devBaseUrlOverride;
+    }
+    return _prodBaseUrl;
+  }
+
   static String get apiBaseUrl => '$_baseUrl/api';
   static String get socketUrl => _baseUrl;
 

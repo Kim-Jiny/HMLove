@@ -49,6 +49,13 @@ class CoupleNotifier extends Notifier<CoupleState> {
     state = state.copyWith(generatedInviteCode: code);
   }
 
+  Future<void> applySummary(Map<String, dynamic>? data) async {
+    if (data == null) return;
+    final couple = Couple.fromJson(data);
+    await ApiClient.saveCoupleId(couple.id);
+    state = state.copyWith(couple: couple, isLoading: false, error: null);
+  }
+
   /// Fetch the current couple info.
   Future<void> fetchCouple() async {
     state = state.copyWith(isLoading: true, error: null);
@@ -60,13 +67,15 @@ class CoupleNotifier extends Notifier<CoupleState> {
       await ApiClient.saveCoupleId(couple.id);
       state = state.copyWith(couple: couple, isLoading: false);
     } on DioException catch (e) {
-      final message = ((e.response?.data is Map) ? (e.response?.data['error'] ?? e.response?.data['message']) : null) as String? ?? '커플 정보를 불러오지 못했습니다';
+      final message =
+          ((e.response?.data is Map)
+                  ? (e.response?.data['error'] ?? e.response?.data['message'])
+                  : null)
+              as String? ??
+          '커플 정보를 불러오지 못했습니다';
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: '알 수 없는 오류가 발생했습니다',
-      );
+      state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
     }
   }
 
@@ -75,9 +84,13 @@ class CoupleNotifier extends Notifier<CoupleState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final response = await _dio.post('/couple/create', data: {
-        'startDate': '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}T00:00:00.000Z',
-      });
+      final response = await _dio.post(
+        '/couple/create',
+        data: {
+          'startDate':
+              '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}T00:00:00.000Z',
+        },
+      );
 
       final data = response.data as Map<String, dynamic>;
       final coupleData = data['couple'] as Map<String, dynamic>;
@@ -93,14 +106,16 @@ class CoupleNotifier extends Notifier<CoupleState> {
       );
       return true;
     } on DioException catch (e) {
-      final message = ((e.response?.data is Map) ? (e.response?.data['error'] ?? e.response?.data['message']) : null) as String? ?? '커플 생성에 실패했습니다';
+      final message =
+          ((e.response?.data is Map)
+                  ? (e.response?.data['error'] ?? e.response?.data['message'])
+                  : null)
+              as String? ??
+          '커플 생성에 실패했습니다';
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: '알 수 없는 오류가 발생했습니다',
-      );
+      state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
       return false;
     }
   }
@@ -110,11 +125,14 @@ class CoupleNotifier extends Notifier<CoupleState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final response = await _dio.post('/couple/join', data: {
-        'inviteCode': inviteCode,
-      });
+      final response = await _dio.post(
+        '/couple/join',
+        data: {'inviteCode': inviteCode},
+      );
 
-      final coupleData = (response.data as Map<String, dynamic>)['couple'] as Map<String, dynamic>;
+      final coupleData =
+          (response.data as Map<String, dynamic>)['couple']
+              as Map<String, dynamic>;
       final couple = Couple.fromJson(coupleData);
       await ApiClient.saveCoupleId(couple.id);
 
@@ -122,20 +140,24 @@ class CoupleNotifier extends Notifier<CoupleState> {
       final authNotifier = ref.read(authProvider.notifier);
       final currentUser = ref.read(currentUserProvider);
       if (currentUser != null) {
-        authNotifier.updateUser(currentUser.copyWith(coupleId: couple.id, isCoupleComplete: true));
+        authNotifier.updateUser(
+          currentUser.copyWith(coupleId: couple.id, isCoupleComplete: true),
+        );
       }
 
       state = state.copyWith(couple: couple, isLoading: false);
       return true;
     } on DioException catch (e) {
-      final message = ((e.response?.data is Map) ? (e.response?.data['error'] ?? e.response?.data['message']) : null) as String? ?? '커플 연결에 실패했습니다';
+      final message =
+          ((e.response?.data is Map)
+                  ? (e.response?.data['error'] ?? e.response?.data['message'])
+                  : null)
+              as String? ??
+          '커플 연결에 실패했습니다';
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: '알 수 없는 오류가 발생했습니다',
-      );
+      state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
       return false;
     }
   }
@@ -145,25 +167,28 @@ class CoupleNotifier extends Notifier<CoupleState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      await _dio.patch('/couple/start-date', data: {
-        'startDate': '${newDate.year}-${newDate.month.toString().padLeft(2, '0')}-${newDate.day.toString().padLeft(2, '0')}T00:00:00.000Z',
-      });
+      await _dio.patch(
+        '/couple/start-date',
+        data: {
+          'startDate':
+              '${newDate.year}-${newDate.month.toString().padLeft(2, '0')}-${newDate.day.toString().padLeft(2, '0')}T00:00:00.000Z',
+        },
+      );
 
       // Refresh couple info to get updated data
       await fetchCouple();
       return true;
     } on DioException catch (e) {
-      final message = ((e.response?.data is Map)
-              ? (e.response?.data['error'] ?? e.response?.data['message'])
-              : null) as String? ??
+      final message =
+          ((e.response?.data is Map)
+                  ? (e.response?.data['error'] ?? e.response?.data['message'])
+                  : null)
+              as String? ??
           '날짜 수정에 실패했습니다';
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: '알 수 없는 오류가 발생했습니다',
-      );
+      state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
       return false;
     }
   }
@@ -194,17 +219,16 @@ class CoupleNotifier extends Notifier<CoupleState> {
 
       return true;
     } on DioException catch (e) {
-      final message = ((e.response?.data is Map)
-              ? (e.response?.data['error'] ?? e.response?.data['message'])
-              : null) as String? ??
+      final message =
+          ((e.response?.data is Map)
+                  ? (e.response?.data['error'] ?? e.response?.data['message'])
+                  : null)
+              as String? ??
           '커플 해제에 실패했습니다';
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: '알 수 없는 오류가 발생했습니다',
-      );
+      state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
       return false;
     }
   }

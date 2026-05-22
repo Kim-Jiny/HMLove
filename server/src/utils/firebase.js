@@ -255,7 +255,7 @@ export async function notifyPartner({ userId, coupleId, title, body, data, silen
       // iOS Notification Service Extension이 위젯 데이터를 갱신해야 하는 type 화이트리스트.
       // mutable-content:1을 설정하면 alert가 표시되기 전 NSE가 깨어나 백그라운드 작업을 수행한다.
       // (silent push는 OS가 throttle하지만 alert push는 즉시 전달됨)
-      const mutableContent = type === 'calendar';
+      const mutableContent = type === 'calendar' || type === 'doodle';
 
       await sendPushNotification({ token: partner.fcmToken, title, body, data, sound, mutableContent });
 
