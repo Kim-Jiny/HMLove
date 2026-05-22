@@ -7,6 +7,11 @@ import 'package:home_widget/home_widget.dart';
 import 'api_client.dart';
 import 'constants.dart';
 
+/// debugPrint 는 release 에서도 실행돼 콘솔 노이즈가 남으므로 dev-only 헬퍼로 감쌈.
+void _devLog(String msg) {
+  if (kDebugMode) debugPrint(msg);
+}
+
 /// App Group ID (iOS) - must match Widget Extension's App Group
 const _appGroupId = 'group.com.jiny.hmlove';
 
@@ -41,7 +46,7 @@ class WidgetService {
         await saveAuthInfo(token, AppConstants.apiBaseUrl);
       }
     } catch (e) {
-      debugPrint('[WidgetService] auth sync on init failed: $e');
+      _devLog('[WidgetService] auth sync on init failed: $e');
     }
   }
 
@@ -170,7 +175,7 @@ class WidgetService {
       await HomeWidget.setAppGroupId(_appGroupId);
       final token = await HomeWidget.getWidgetData<String>('authToken');
       final baseUrl = await HomeWidget.getWidgetData<String>('apiBaseUrl');
-      debugPrint(
+      _devLog(
         '[Doodle refresh] token=${token == null ? "null" : "(set)"} '
         'baseUrl=$baseUrl',
       );
@@ -184,7 +189,7 @@ class WidgetService {
           );
           request.headers.set('Authorization', 'Bearer $token');
           final response = await request.close();
-          debugPrint(
+          _devLog(
             '[Doodle refresh] /doodle/latest → ${response.statusCode}',
           );
           if (response.statusCode == 200) {
@@ -196,7 +201,7 @@ class WidgetService {
               final createdAt = doodle['createdAt'] as String?;
               final sender = doodle['sender'] as Map<String, dynamic>?;
               final senderName = sender?['nickname'] as String?;
-              debugPrint('[Doodle refresh] new url=$imageUrl @ $createdAt');
+              _devLog('[Doodle refresh] new url=$imageUrl @ $createdAt');
               await HomeWidget.saveWidgetData<String?>(
                 'doodleImageUrl',
                 imageUrl,
@@ -210,7 +215,7 @@ class WidgetService {
                 senderName,
               );
             } else {
-              debugPrint('[Doodle refresh] no doodle — clearing keys');
+              _devLog('[Doodle refresh] no doodle — clearing keys');
               await HomeWidget.saveWidgetData<String?>('doodleImageUrl', null);
               await HomeWidget.saveWidgetData<String?>(
                 'doodleReceivedAt',
@@ -226,13 +231,13 @@ class WidgetService {
           client.close();
         }
       } else {
-        debugPrint(
+        _devLog(
           '[Doodle refresh] no token in plugin prefs '
           '(BG isolate?) — native widget provider 가 직접 fetch 할 것',
         );
       }
     } catch (e) {
-      debugPrint('[Doodle refresh] error: $e');
+      _devLog('[Doodle refresh] error: $e');
     }
 
     // 어느 경우든 위젯 broadcast 시도. BG 에서는 fetch 못 했더라도
@@ -243,9 +248,9 @@ class WidgetService {
         androidName: _androidDoodleWidgetName,
         iOSName: _iosDoodleWidgetName,
       );
-      debugPrint('[Doodle refresh] HomeWidget.updateWidget broadcast sent');
+      _devLog('[Doodle refresh] HomeWidget.updateWidget broadcast sent');
     } catch (e) {
-      debugPrint('[Doodle refresh] updateWidget failed: $e');
+      _devLog('[Doodle refresh] updateWidget failed: $e');
     }
   }
 

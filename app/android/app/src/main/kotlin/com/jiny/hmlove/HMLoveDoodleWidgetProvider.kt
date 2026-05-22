@@ -15,6 +15,15 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.Executors
 
+/// 디버그 빌드에서만 출력. release 에서는 logcat 노이즈 / 정보 노출 둘 다 방지.
+private inline fun devLogW(tag: String, msg: String) {
+    if (BuildConfig.DEBUG) Log.w(tag, msg)
+}
+
+private inline fun devLogI(tag: String, msg: String) {
+    if (BuildConfig.DEBUG) Log.i(tag, msg)
+}
+
 /**
  * 2x2 그림 위젯 — 상대방이 보낸 마지막 그림을 표시.
  *
@@ -106,18 +115,18 @@ class HMLoveDoodleWidgetProvider : AppWidgetProvider() {
         val token = prefs.getString("authToken", "") ?: ""
         val baseUrl = prefs.getString("apiBaseUrl", "") ?: ""
         if (token.isEmpty() || baseUrl.isEmpty()) {
-            Log.w(TAG, "fetchLatest: missing token/baseUrl in prefs — skipping")
+            devLogW(TAG,"fetchLatest: missing token/baseUrl in prefs — skipping")
             return
         }
 
         val latest = fetchDoodleLatest("$baseUrl/doodle/latest", token)
         if (latest == null) {
-            Log.w(TAG, "fetchLatest: failed or no doodle")
+            devLogW(TAG,"fetchLatest: failed or no doodle")
             return
         }
 
         val (imageUrl, createdAt, senderName) = latest
-        Log.i(TAG, "fetchLatest: imageUrl=$imageUrl @ $createdAt")
+        devLogI(TAG,"fetchLatest: imageUrl=$imageUrl @ $createdAt")
 
         // prefs 갱신
         prefs.edit()
@@ -137,7 +146,7 @@ class HMLoveDoodleWidgetProvider : AppWidgetProvider() {
         if (!cached.exists() || cached.length() == 0L) {
             val ok = downloadToCache(imageUrl, cached, token)
             if (!ok) {
-                Log.w(TAG, "fetchLatest: image download failed for $imageUrl")
+                devLogW(TAG,"fetchLatest: image download failed for $imageUrl")
             }
         }
 
@@ -162,7 +171,7 @@ class HMLoveDoodleWidgetProvider : AppWidgetProvider() {
             }
             try {
                 if (conn.responseCode !in 200..299) {
-                    Log.w(TAG, "fetchDoodleLatest: HTTP ${conn.responseCode}")
+                    devLogW(TAG,"fetchDoodleLatest: HTTP ${conn.responseCode}")
                     return null
                 }
                 val body = conn.inputStream.bufferedReader().use { it.readText() }
@@ -181,7 +190,7 @@ class HMLoveDoodleWidgetProvider : AppWidgetProvider() {
                 conn.disconnect()
             }
         } catch (e: Throwable) {
-            Log.w(TAG, "fetchDoodleLatest error: ${e.message}")
+            devLogW(TAG,"fetchDoodleLatest error: ${e.message}")
             null
         }
     }

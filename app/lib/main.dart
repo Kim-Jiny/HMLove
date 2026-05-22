@@ -5,6 +5,7 @@ import 'dart:ui' show DartPluginRegistrant;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_naver_map/flutter_naver_map.dart';
@@ -43,8 +44,12 @@ String _defaultWidgetEventColor(String eventType, bool isAnniversary) {
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // BG 핸들러는 별도 isolate 라 [Push BG] 태그로 logcat 에서 구분 가능.
-  debugPrint('[Push BG] fired — type=${message.data['type']}, data=${message.data}');
+  // BG 핸들러는 별도 isolate 라 [Push BG] 태그로 logcat 에서 구분 가능 (debug only).
+  if (kDebugMode) {
+    debugPrint(
+      '[Push BG] fired — type=${message.data['type']}, data=${message.data}',
+    );
+  }
 
   // 이 isolate 에 pubspec 의 모든 플러그인 등록. 안 하면 home_widget /
   // HomeWidget.getWidgetData 같은 호출이 채널 미등록으로 null 만 돌려준다.
@@ -128,9 +133,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // 서버 latest 를 받아 prefs 갱신 + 위젯 broadcast. (iOS NSE 가 안 도는 경우에도 fallback.)
   final pushType = message.data['type'];
   if (pushType == 'doodle_widget_refresh' || pushType == 'doodle') {
-    debugPrint('[Push BG] doodle — refreshing widget…');
+    if (kDebugMode) debugPrint('[Push BG] doodle — refreshing widget…');
     await WidgetService.refreshDoodleFromServer();
-    debugPrint('[Push BG] doodle — widget refresh done');
+    if (kDebugMode) debugPrint('[Push BG] doodle — widget refresh done');
   }
 }
 
