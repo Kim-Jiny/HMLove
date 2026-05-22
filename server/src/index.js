@@ -32,6 +32,7 @@ import missionRoutes from './routes/mission.js';
 import mapRoutes from './routes/map.js';
 import wishlistRoutes from './routes/wishlist.js';
 import questionRoutes from './routes/question.js';
+import doodleRoutes from './routes/doodle.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -144,6 +145,7 @@ app.use('/api/mission', missionRoutes);
 app.use('/api/map', mapRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/question', questionRoutes);
+app.use('/api/doodle', doodleRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

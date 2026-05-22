@@ -13,6 +13,7 @@ struct HMLoveWidgetBundle: WidgetBundle {
     var body: some Widget {
         if #available(iOS 17.0, *) {
             HMLoveWidget()
+            HMLoveDoodleWidget()
         }
     }
 }

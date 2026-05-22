@@ -10,6 +10,7 @@ const _iosWidgetName = 'HMLoveWidget';
 const _androidWidgetName = 'HMLoveWidgetProvider';
 const _androidSmallWidgetName = 'HMLoveSmallWidgetProvider';
 const _androidCalendarWidgetName = 'HMLoveCalendarWidgetProvider';
+const _androidDoodleWidgetName = 'HMLoveDoodleWidgetProvider';
 const _calendarEventMonthsKey = 'widgetCalendarEventMonths';
 const _deviceCalendarEventMonthsKey = 'widgetDeviceCalendarEventMonths';
 const _holidayEventMonthsKey = 'widgetHolidayEventMonths';
@@ -79,6 +80,9 @@ class WidgetService {
       HomeWidget.saveWidgetData<String?>('myMoodEmoji', null),
       HomeWidget.saveWidgetData<String?>('partnerMoodEmoji', null),
       HomeWidget.saveWidgetData<String?>('todaySchedule', null),
+      HomeWidget.saveWidgetData<String?>('doodleImageUrl', null),
+      HomeWidget.saveWidgetData<String?>('doodleReceivedAt', null),
+      HomeWidget.saveWidgetData<String?>('doodleSenderName', null),
       HomeWidget.saveWidgetData<String?>('calendarYearMonth', null),
       HomeWidget.saveWidgetData<String?>('calendarEvents', null),
       HomeWidget.saveWidgetData<bool?>('deviceCalendarEnabled', null),
@@ -133,6 +137,26 @@ class WidgetService {
   /// Update today's schedule text for medium widget
   static Future<void> updateTodaySchedule(String? schedule) async {
     await HomeWidget.saveWidgetData('todaySchedule', schedule ?? '');
+    await _refresh();
+  }
+
+  /// Update the doodle (그림) shown on the 2x2 doodle widget.
+  /// [imageUrl] - 마지막으로 받은 그림의 PNG URL (null 이면 위젯이 빈 상태로 표시)
+  /// [receivedAt] - 받은 시각 (ISO8601). 위젯에서 상대 시간으로 표시.
+  /// [senderName] - 보낸 사람 닉네임.
+  static Future<void> updateDoodleData({
+    String? imageUrl,
+    DateTime? receivedAt,
+    String? senderName,
+  }) async {
+    await Future.wait([
+      HomeWidget.saveWidgetData<String?>('doodleImageUrl', imageUrl),
+      HomeWidget.saveWidgetData<String?>(
+        'doodleReceivedAt',
+        receivedAt?.toIso8601String(),
+      ),
+      HomeWidget.saveWidgetData<String?>('doodleSenderName', senderName),
+    ]);
     await _refresh();
   }
 
@@ -264,6 +288,10 @@ class WidgetService {
       HomeWidget.updateWidget(
         iOSName: _iosWidgetName,
         androidName: _androidCalendarWidgetName,
+      ),
+      HomeWidget.updateWidget(
+        iOSName: _iosWidgetName,
+        androidName: _androidDoodleWidgetName,
       ),
     ]);
   }

@@ -19,7 +19,9 @@ import '../../providers/mission_provider.dart';
 import '../../providers/calendar_provider.dart';
 import '../../providers/question_provider.dart';
 import '../../providers/wishlist_provider.dart';
+import '../../providers/doodle_provider.dart';
 import '../../models/daily_question.dart';
+import '../../models/doodle.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -70,6 +72,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       _syncWidgetCouple(ref.read(coupleProvider));
       _syncWidgetMood(ref.read(moodProvider));
       _syncWidgetSchedule();
+      _syncWidgetDoodle(ref.read(doodleProvider));
 
       ref.read(fortuneProvider.notifier).checkTodayFortune();
       ref.read(badgeProvider.notifier).fetchBadges();
@@ -77,6 +80,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ref.read(missionProvider.notifier).fetchTodayMissions();
       ref.read(questionProvider.notifier).fetchToday();
       ref.read(wishlistProvider.notifier).fetchItems();
+      ref.read(doodleProvider.notifier).fetchLatestReceived();
     });
   }
 
@@ -93,6 +97,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       _syncWidgetCouple(ref.read(coupleProvider));
       _syncWidgetMood(ref.read(moodProvider));
       _syncWidgetSchedule();
+      _syncWidgetDoodle(ref.read(doodleProvider));
     } else if (state == AppLifecycleState.resumed) {
       // App returning to foreground → refresh all data
       ref.read(coupleProvider.notifier).fetchCouple();
@@ -103,6 +108,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ref.read(missionProvider.notifier).fetchTodayMissions();
       ref.read(questionProvider.notifier).fetchToday();
       ref.read(wishlistProvider.notifier).fetchItems();
+      ref.read(doodleProvider.notifier).fetchLatestReceived();
     }
   }
 
@@ -130,6 +136,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     WidgetService.updateMoodData(
       myMoodKey: moodState.myMood?.emoji,
       partnerMoodKey: moodState.partnerMood?.emoji,
+    );
+  }
+
+  void _syncWidgetDoodle(DoodleState doodleState) {
+    final latest = doodleState.latestReceived;
+    WidgetService.updateDoodleData(
+      imageUrl: latest?.imageUrl,
+      receivedAt: latest?.createdAt,
+      senderName: latest?.senderNickname,
     );
   }
 
@@ -286,10 +301,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final missionState = ref.watch(missionProvider);
     final questionState = ref.watch(questionProvider);
     final wishlistState = ref.watch(wishlistProvider);
+    final doodleState = ref.watch(doodleProvider);
 
-    // Sync widget data when couple/mood changes
+    // Sync widget data when couple/mood/doodle changes
     ref.listen(coupleProvider, (_, next) => _syncWidgetCouple(next));
     ref.listen(moodProvider, (_, next) => _syncWidgetMood(next));
+    ref.listen(doodleProvider, (_, next) => _syncWidgetDoodle(next));
 
     return Scaffold(
       appBar: AppBar(
@@ -413,6 +430,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               _WishlistPreviewCard(
                 state: wishlistState,
                 onTap: () => context.push('/wishlist'),
+              ),
+              const SizedBox(height: 12),
+
+              // Doodle Card (그림 보내기)
+              _DoodleCard(
+                latest: doodleState.latestReceived,
+                onTap: () => context.push('/doodle'),
               ),
               const SizedBox(height: 12),
 
@@ -1435,6 +1459,104 @@ class _FortuneCard extends StatelessWidget {
                 ),
               ),
               const Icon(Icons.chevron_right, color: AppTheme.textHint),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Doodle Card — 받은 그림 미리보기 + 그림 보내기 진입
+class _DoodleCard extends StatelessWidget {
+  final Doodle? latest;
+  final VoidCallback onTap;
+
+  const _DoodleCard({required this.latest, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasLatest = latest != null;
+    final subtitle = hasLatest
+        ? '${latest!.senderNickname.isEmpty ? "상대방" : latest!.senderNickname}이(가) 보낸 그림이 도착했어요'
+        : '그림을 그려서 상대방 위젯으로 보내보세요';
+
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFFF1E6DF)),
+          ),
+          child: Row(
+            children: [
+              if (hasLatest)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 56,
+                    height: 56,
+                    child: Image.network(
+                      latest!.imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: const Color(0xFFFFF1EA),
+                        child: const Icon(
+                          Icons.brush_rounded,
+                          color: Color(0xFFE07A5F),
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF1EA),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.brush_rounded,
+                    color: Color(0xFFE07A5F),
+                  ),
+                ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '그림 보내기',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppTheme.textHint,
+              ),
             ],
           ),
         ),
