@@ -40,7 +40,7 @@ class NotificationService: UNNotificationServiceExtension {
                 contentHandler(bestAttemptContent)
             }
         case "doodle":
-            refreshDoodleWidget {
+            refreshDoodleWidget(userInfo: request.content.userInfo) {
                 contentHandler(bestAttemptContent)
             }
         default:
@@ -155,9 +155,39 @@ class NotificationService: UNNotificationServiceExtension {
         }.resume()
     }
 
-    /// 그림 push 도착 시 서버에서 최신 그림 메타를 받아 App Group에 저장하고,
-    /// PNG 이미지도 캐시에 다운받아 위젯이 즉시 렌더할 수 있게 한다.
-    private func refreshDoodleWidget(completion: @escaping () -> Void) {
+    /// 그림 push 도착 시 푸시 payload의 그림 메타를 우선 App Group에 저장한다.
+    /// 이 경로는 서버 재조회나 auth token 없이도 동작해서 TestFlight/백그라운드에서 더 안정적이다.
+    private func refreshDoodleWidget(
+        userInfo: [AnyHashable: Any],
+        completion: @escaping () -> Void
+    ) {
+        if applyDoodlePayload(userInfo: userInfo, completion: completion) {
+            return
+        }
+        refreshDoodleWidgetFromServer(completion: completion)
+    }
+
+    private func applyDoodlePayload(
+        userInfo: [AnyHashable: Any],
+        completion: @escaping () -> Void
+    ) -> Bool {
+        guard let defaults = UserDefaults(suiteName: Self.appGroupId),
+              let imageUrl = userInfo["doodleImageUrl"] as? String,
+              !imageUrl.isEmpty else {
+            return false
+        }
+
+        defaults.set(imageUrl, forKey: "doodleImageUrl")
+        defaults.set((userInfo["doodleCreatedAt"] as? String) ?? "", forKey: "doodleReceivedAt")
+        defaults.set((userInfo["doodleSenderName"] as? String) ?? "", forKey: "doodleSenderName")
+        defaults.synchronize()
+
+        cacheDoodleImageIfNeeded(imageUrl: imageUrl, defaults: defaults, completion: completion)
+        return true
+    }
+
+    /// Payload에 메타가 없는 오래된 서버/푸시를 위한 fallback.
+    private func refreshDoodleWidgetFromServer(completion: @escaping () -> Void) {
         guard let defaults = UserDefaults(suiteName: Self.appGroupId),
               let token = defaults.string(forKey: "authToken"),
               let baseUrl = defaults.string(forKey: "apiBaseUrl"),
@@ -201,21 +231,32 @@ class NotificationService: UNNotificationServiceExtension {
             defaults.set(imageUrl, forKey: "doodleImageUrl")
             defaults.set(createdAt, forKey: "doodleReceivedAt")
             defaults.set(senderName, forKey: "doodleSenderName")
+            defaults.synchronize()
 
-            // PNG도 캐시에 미리 다운로드 (위젯이 첫 update에서 바로 렌더)
-            if let img = URL(string: imageUrl) {
-                var imageRequest = URLRequest(url: img)
-                imageRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-                imageRequest.timeoutInterval = 12
-                URLSession.shared.dataTask(with: imageRequest) { imgData, _, _ in
-                    if let imgData = imgData, !imgData.isEmpty {
-                        Self.writeDoodleCache(imgData, for: imageUrl)
-                    }
-                    self.reloadWidgetsAndComplete(completion: completion)
-                }.resume()
-            } else {
-                self.reloadWidgetsAndComplete(completion: completion)
+            self.cacheDoodleImageIfNeeded(imageUrl: imageUrl, defaults: defaults, completion: completion)
+        }.resume()
+    }
+
+    private func cacheDoodleImageIfNeeded(
+        imageUrl: String,
+        defaults: UserDefaults,
+        completion: @escaping () -> Void
+    ) {
+        guard let img = URL(string: imageUrl) else {
+            reloadWidgetsAndComplete(completion: completion)
+            return
+        }
+
+        var imageRequest = URLRequest(url: img)
+        if let token = defaults.string(forKey: "authToken"), !token.isEmpty {
+            imageRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        imageRequest.timeoutInterval = 12
+        URLSession.shared.dataTask(with: imageRequest) { imgData, _, _ in
+            if let imgData = imgData, !imgData.isEmpty {
+                Self.writeDoodleCache(imgData, for: imageUrl)
             }
+            self.reloadWidgetsAndComplete(completion: completion)
         }.resume()
     }
 
