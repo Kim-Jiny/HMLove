@@ -90,11 +90,15 @@ export async function sendPushNotification({ token, title, body, data, sound = t
         },
       },
       apns: {
+        headers: {
+          'apns-push-type': 'alert',
+          'apns-priority': '10',
+        },
         payload: {
           aps: {
             badge: badgeCount,
             ...(sound ? { sound: 'default' } : {}),
-            ...(mutableContent ? { 'mutable-content': 1 } : {}),
+            ...(mutableContent ? { mutableContent: true } : {}),
           },
         },
       },
@@ -140,7 +144,7 @@ export async function sendSilentPush({ token, data }) {
           'apns-priority': '5',
         },
         payload: {
-          aps: { 'content-available': 1 },
+          aps: { contentAvailable: true },
         },
       },
     });
