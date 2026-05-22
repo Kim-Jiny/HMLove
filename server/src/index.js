@@ -1,4 +1,8 @@
-import 'dotenv/config';
+// 반드시 모든 다른 import 보다 위. @prisma/client 가 import 되는 순간
+// 자체적으로 .env 를 자동 로드하므로, 그 전에 .env.local 을 process.env 에
+// 박아두려면 별도 부트스트랩 모듈을 가장 먼저 import 해야 한다.
+import './env.js';
+
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
