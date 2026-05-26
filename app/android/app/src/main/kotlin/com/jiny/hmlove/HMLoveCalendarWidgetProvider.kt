@@ -62,6 +62,13 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
         private const val FETCH_FAIL_COOLDOWN_MS = 15 * 60 * 1000L  // 15 minutes
         private const val PREF_KEY_FETCH_FAIL_PREFIX = "widgetFetchFail_"
 
+        // 성공 직후에도 짧은 cooldown 으로 앱이 활발히 쓰일 때 onUpdate 가 broadcast
+        // 폭주(updateCoupleData/Mood/Schedule 등으로 _refresh 가 매번 fire) 하면서
+        // 같은 달을 반복 fetch 하지 않도록 막는다. 5분이면 push 즉시 갱신은 충분히
+        // 빠르고 활성 사용 중 thrashing 도 방지.
+        private const val FETCH_SUCCESS_COOLDOWN_MS = 5 * 60 * 1000L  // 5 minutes
+        private const val PREF_KEY_FETCH_SUCCESS_PREFIX = "widgetFetchSuccess_"
+
         // Standalone holiday text color (theme-independent, 0xFFD32F2F).
         private val HOLIDAY_RED: Int = 0xFFD32F2F.toInt()
     }
@@ -281,9 +288,12 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
      * background fetch to avoid hammering the server when auth/network is broken.
      */
     private fun isFetchOnCooldown(prefs: SharedPreferences, yearMonth: String): Boolean {
+        val now = System.currentTimeMillis()
         val lastFail = prefs.getLong(PREF_KEY_FETCH_FAIL_PREFIX + yearMonth, 0L)
-        if (lastFail == 0L) return false
-        return System.currentTimeMillis() - lastFail < FETCH_FAIL_COOLDOWN_MS
+        if (lastFail != 0L && now - lastFail < FETCH_FAIL_COOLDOWN_MS) return true
+        val lastSuccess = prefs.getLong(PREF_KEY_FETCH_SUCCESS_PREFIX + yearMonth, 0L)
+        if (lastSuccess != 0L && now - lastSuccess < FETCH_SUCCESS_COOLDOWN_MS) return true
+        return false
     }
 
     /**
@@ -375,6 +385,10 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                 prefs.edit()
                     .putString("calendarEvents_$yearMonth", filtered.toString())
                     .remove(PREF_KEY_FETCH_FAIL_PREFIX + yearMonth)
+                    .putLong(
+                        PREF_KEY_FETCH_SUCCESS_PREFIX + yearMonth,
+                        System.currentTimeMillis(),
+                    )
                     .apply()
                 trackCachedMonth(prefs, PREF_KEY_CALENDAR_EVENT_MONTHS, yearMonth)
                 succeeded = true
@@ -430,12 +444,13 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                         ACTION_NEXT_MONTH -> base.plusMonths(1)
                         else -> currentMonth
                     }
-                    // Explicit user navigation bypasses the fetch cooldown — the
-                    // user is asking for that month's data right now.
+                    // Explicit user navigation bypasses both fail and success cooldowns
+                    // — the user is asking for that month's data right now.
                     val newMonthKey = newMonth.format(MONTH_FORMATTER)
                     prefs.edit()
                         .putString("calendarYearMonth", newMonthKey)
                         .remove(PREF_KEY_FETCH_FAIL_PREFIX + newMonthKey)
+                        .remove(PREF_KEY_FETCH_SUCCESS_PREFIX + newMonthKey)
                         .apply()
                     markPendingHydration(prefs, newMonthKey)
 
@@ -561,11 +576,13 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                         "[]"
                     }
 
-                // Trigger a native server fetch in the background if this month
-                // has never been cached AND we aren't inside a post-failure cooldown.
-                // Widget renders immediately with whatever is available now, and
-                // re-renders once the fetch completes.
-                if (perMonthJson == null && !isFetchOnCooldown(prefs, displayMonthKey)) {
+                // 푸시(calendar_sync silent push) 가 도착해 broadcast 가 와도
+                // 캐시가 이미 있으면 stale 데이터가 그대로 표시되던 문제 방지:
+                // 캐시 유무와 무관하게 항상 서버 fetch 시도. fetchMonthFromServer
+                // 자체에 inFlightFetches 로 중복 호출 dedup + 실패 시 cooldown 이라
+                // 30분 주기 update 가 폭주하지 않음. 위젯은 일단 캐시로 즉시 렌더되고,
+                // fetch 완료 후 onUpdate 재호출로 갱신된 데이터로 재렌더됨.
+                if (!isFetchOnCooldown(prefs, displayMonthKey)) {
                     fetchMonthFromServer(context, displayMonthKey)
                 }
                 val eventDates = mutableMapOf<String, MutableList<WidgetEventInfo>>()
