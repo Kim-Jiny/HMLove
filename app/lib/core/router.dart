@@ -154,12 +154,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/couple-connect';
       }
 
-      // If authenticated with couple and on auth pages, redirect to home
+      // If authenticated with couple and on auth pages, redirect to home.
+      // splash 가 아닌 경로(/login → 로그인 성공 등)에서도 위젯 pending 이
+      // 남아있으면 우선 그쪽으로 — 안 그러면 다음 세션까지 누수.
       if (isLoggedIn &&
           hasCouple &&
           (currentPath == '/login' ||
               currentPath == '/register' ||
               currentPath == '/couple-connect')) {
+        final pending = consumePendingWidgetRoute();
+        if (pending != null) return pending;
         return '/home';
       }
 
