@@ -81,8 +81,12 @@ class ApiClient {
     final box = Hive.box(AppConstants.authBox);
     await box.put(AppConstants.accessTokenKey, accessToken);
     await box.put(AppConstants.refreshTokenKey, refreshToken);
-    // Share token with widget extension for background fetching
-    await WidgetService.saveAuthInfo(accessToken, AppConstants.apiBaseUrl);
+    // Share tokens with widget extension for background fetching + self-refresh
+    await WidgetService.saveAuthInfo(
+      accessToken,
+      AppConstants.apiBaseUrl,
+      refreshToken,
+    );
   }
 
   /// Clear all stored tokens.

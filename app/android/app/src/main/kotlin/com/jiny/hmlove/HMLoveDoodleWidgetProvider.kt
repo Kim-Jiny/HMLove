@@ -41,9 +41,28 @@ private inline fun devLogI(tag: String, msg: String) {
 class HMLoveDoodleWidgetProvider : AppWidgetProvider() {
     companion object {
         private const val TAG = "HMLoveDoodle"
+
+        // Fetch 실패 시 cooldown — 토큰 만료/네트워크 장애 같은 영구 실패에서
+        // 30분 주기 update 마다 폭주하지 않도록.
+        private const val FETCH_FAIL_COOLDOWN_MS = 15 * 60 * 1000L
+        private const val PREF_KEY_FETCH_FAIL = "doodleFetchFail"
+
+        // 성공 후 짧은 cooldown — 활성 사용 중 broadcast 가 여러 번 fire 돼도
+        // 같은 latest 를 반복 fetch 하지 않도록.
+        private const val FETCH_SUCCESS_COOLDOWN_MS = 5 * 60 * 1000L
+        private const val PREF_KEY_FETCH_SUCCESS = "doodleFetchSuccess"
     }
 
     private val ioExecutor by lazy { Executors.newSingleThreadExecutor() }
+
+    private fun isOnFetchCooldown(prefs: android.content.SharedPreferences): Boolean {
+        val now = System.currentTimeMillis()
+        val lastFail = prefs.getLong(PREF_KEY_FETCH_FAIL, 0L)
+        if (lastFail != 0L && now - lastFail < FETCH_FAIL_COOLDOWN_MS) return true
+        val lastSuccess = prefs.getLong(PREF_KEY_FETCH_SUCCESS, 0L)
+        if (lastSuccess != 0L && now - lastSuccess < FETCH_SUCCESS_COOLDOWN_MS) return true
+        return false
+    }
 
     /// 위젯 탭 → 앱의 /doodle 라우트로 이동. 단순 launcher intent 가 아니라
     /// HomeWidgetLaunchIntent 로 URI 를 같이 넘겨야 main.dart 의 widgetClicked
@@ -77,7 +96,8 @@ class HMLoveDoodleWidgetProvider : AppWidgetProvider() {
 
         if (!isConnected) return
 
-        // 2) 백그라운드에서 latest fetch → prefs 갱신 → 다시 렌더
+        // 2) 백그라운드에서 latest fetch (cooldown 적용)
+        if (isOnFetchCooldown(prefs)) return
         ioExecutor.execute {
             fetchLatestAndRefresh(context, appWidgetManager, appWidgetIds, prefs)
         }
@@ -115,27 +135,43 @@ class HMLoveDoodleWidgetProvider : AppWidgetProvider() {
         appWidgetIds: IntArray,
         prefs: android.content.SharedPreferences,
     ) {
-        val token = prefs.getString("authToken", "") ?: ""
-        val baseUrl = prefs.getString("apiBaseUrl", "") ?: ""
+        var token = prefs.getString("authToken", "") ?: ""
+        // 방어적으로 trailing slash 제거 — apiBaseUrl 이 / 로 끝나면 //doodle/latest 가 됨.
+        val baseUrl = (prefs.getString("apiBaseUrl", "") ?: "").trimEnd('/')
         if (token.isEmpty() || baseUrl.isEmpty()) {
             devLogW(TAG,"fetchLatest: missing token/baseUrl in prefs — skipping")
             return
         }
 
-        val latest = fetchDoodleLatest("$baseUrl/doodle/latest", token)
+        var latest = fetchDoodleLatest("$baseUrl/doodle/latest", token)
+        // 401 등으로 실패하면 한 번 refresh 시도 후 재시도. 앱 안 열어도 위젯이 stale
+        // 안 되도록 — Dart 측 Dio interceptor 와 동등한 self-refresh.
+        if (latest == null) {
+            val newToken = WidgetTokenRefresher.refresh(prefs)
+            if (newToken != null) {
+                token = newToken
+                latest = fetchDoodleLatest("$baseUrl/doodle/latest", token)
+            }
+        }
         if (latest == null) {
             devLogW(TAG,"fetchLatest: failed or no doodle")
+            // 실패 stamp → cooldown 발동
+            prefs.edit()
+                .putLong(PREF_KEY_FETCH_FAIL, System.currentTimeMillis())
+                .apply()
             return
         }
 
         val (imageUrl, createdAt, senderName) = latest
         devLogI(TAG,"fetchLatest: imageUrl=$imageUrl @ $createdAt")
 
-        // prefs 갱신
+        // prefs 갱신 + 성공 timestamp + fail stamp 해제
         prefs.edit()
             .putString("doodleImageUrl", imageUrl)
             .putString("doodleReceivedAt", createdAt)
             .putString("doodleSenderName", senderName)
+            .putLong(PREF_KEY_FETCH_SUCCESS, System.currentTimeMillis())
+            .remove(PREF_KEY_FETCH_FAIL)
             .apply()
 
         if (imageUrl.isNullOrEmpty()) {

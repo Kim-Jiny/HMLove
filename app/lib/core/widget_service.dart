@@ -42,20 +42,29 @@ class WidgetService {
     // (Android Kotlin Provider, iOS NSE) 가 토큰을 못 찾는 문제 방지.
     try {
       final token = ApiClient.getAccessToken();
+      final refresh = ApiClient.getRefreshToken();
       if (token != null && token.isNotEmpty) {
-        await saveAuthInfo(token, AppConstants.apiBaseUrl);
+        await saveAuthInfo(token, AppConstants.apiBaseUrl, refresh);
       }
     } catch (e) {
       _devLog('[WidgetService] auth sync on init failed: $e');
     }
   }
 
-  /// Save auth info so widget extension can fetch data independently
-  static Future<void> saveAuthInfo(String token, String apiBaseUrl) async {
+  /// Save auth info so widget extension can fetch data independently.
+  /// [refreshToken] 도 같이 저장하면 위젯/NSE 가 access token 만료 시 자체적으로
+  /// /auth/refresh 를 호출해 갱신할 수 있음 (app 안 열어도 stale 안 됨).
+  static Future<void> saveAuthInfo(
+    String token,
+    String apiBaseUrl, [
+    String? refreshToken,
+  ]) async {
     await HomeWidget.setAppGroupId(_appGroupId);
     await Future.wait([
       HomeWidget.saveWidgetData('authToken', token),
       HomeWidget.saveWidgetData('apiBaseUrl', apiBaseUrl),
+      if (refreshToken != null)
+        HomeWidget.saveWidgetData('refreshToken', refreshToken),
     ]);
   }
 
@@ -96,6 +105,7 @@ class WidgetService {
     final clears = <Future<bool?>>[
       HomeWidget.saveWidgetData('isConnected', false),
       HomeWidget.saveWidgetData<String?>('authToken', null),
+      HomeWidget.saveWidgetData<String?>('refreshToken', null),
       HomeWidget.saveWidgetData<String?>('apiBaseUrl', null),
       HomeWidget.saveWidgetData<String?>('myName', null),
       HomeWidget.saveWidgetData<String?>('partnerName', null),

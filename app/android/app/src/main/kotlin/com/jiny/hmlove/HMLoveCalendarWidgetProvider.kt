@@ -350,7 +350,7 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
             var succeeded = false
             try {
                 val prefs = HomeWidgetPlugin.getData(appContext)
-                val token = prefs.getString("authToken", "") ?: ""
+                var token = prefs.getString("authToken", "") ?: ""
                 val baseUrl = (prefs.getString("apiBaseUrl", "") ?: "").trimEnd('/')
                 if (token.isEmpty() || baseUrl.isEmpty()) {
                     // Not a server failure — user simply isn't logged in.
@@ -359,15 +359,30 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                     return@Thread
                 }
 
-                val url = URL("$baseUrl/calendar/$yearMonth")
-                conn = (url.openConnection() as HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    setRequestProperty("Authorization", "Bearer $token")
-                    setRequestProperty("Accept", "application/json")
-                    connectTimeout = 10000
-                    readTimeout = 10000
+                fun openConn(authToken: String): HttpURLConnection {
+                    val url = URL("$baseUrl/calendar/$yearMonth")
+                    return (url.openConnection() as HttpURLConnection).apply {
+                        requestMethod = "GET"
+                        setRequestProperty("Authorization", "Bearer $authToken")
+                        setRequestProperty("Accept", "application/json")
+                        connectTimeout = 10000
+                        readTimeout = 10000
+                    }
                 }
-                if (conn.responseCode !in 200..299) return@Thread
+
+                conn = openConn(token)
+                var code = conn.responseCode
+                // 401 등 인증 실패 시 한 번 refresh 후 재시도 — Dart Dio interceptor 와 동등.
+                if (code == 401 || code == 403) {
+                    try { conn.disconnect() } catch (_: Throwable) {}
+                    val newToken = WidgetTokenRefresher.refresh(prefs)
+                    if (newToken != null) {
+                        token = newToken
+                        conn = openConn(token)
+                        code = conn.responseCode
+                    }
+                }
+                if (code !in 200..299) return@Thread
 
                 val body = conn.inputStream.bufferedReader().use { it.readText() }
                 val json = JSONObject(body)
