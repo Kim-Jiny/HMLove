@@ -307,6 +307,8 @@ class _HMLoveAppState extends ConsumerState<HMLoveApp>
     switch (target) {
       case 'calendar':
         return '/calendar';
+      case 'doodle':
+        return '/doodle';
       default:
         return null;
     }

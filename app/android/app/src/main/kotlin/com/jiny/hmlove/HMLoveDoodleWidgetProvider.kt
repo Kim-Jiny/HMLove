@@ -5,9 +5,11 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
+import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetPlugin
 import org.json.JSONObject
 import java.io.File
@@ -43,13 +45,14 @@ class HMLoveDoodleWidgetProvider : AppWidgetProvider() {
 
     private val ioExecutor by lazy { Executors.newSingleThreadExecutor() }
 
+    /// 위젯 탭 → 앱의 /doodle 라우트로 이동. 단순 launcher intent 가 아니라
+    /// HomeWidgetLaunchIntent 로 URI 를 같이 넘겨야 main.dart 의 widgetClicked
+    /// 스트림이 받아서 _widgetUriToRoute → /doodle 로 보낸다.
     private fun launchAppIntent(context: Context): PendingIntent {
-        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-        return PendingIntent.getActivity(
+        return HomeWidgetLaunchIntent.getActivity(
             context,
-            42,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            MainActivity::class.java,
+            Uri.parse("hmlove://doodle"),
         )
     }
 
