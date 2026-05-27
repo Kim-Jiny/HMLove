@@ -245,7 +245,6 @@ class HMLoveApp extends ConsumerStatefulWidget {
 class _HMLoveAppState extends ConsumerState<HMLoveApp>
     with WidgetsBindingObserver {
   StreamSubscription<Uri?>? _widgetClickSub;
-  String? _pendingWidgetRoute;
 
   @override
   void initState() {
@@ -258,23 +257,13 @@ class _HMLoveAppState extends ConsumerState<HMLoveApp>
       await ref.read(authProvider.notifier).forceLogout(reason);
     };
 
-    // Route home-widget taps (e.g. calendar widget → /calendar).
+    // 위젯 탭 — warm/foreground (widgetClicked) 와 cold (initiallyLaunched) 양쪽.
+    // 인증 상태에 따라 즉시 go() 하거나 pending 으로 저장해 router redirect 가
+    // splash → 정확한 경로로 이어가게 한다.
     _widgetClickSub = HomeWidget.widgetClicked.listen(_handleWidgetClick);
     HomeWidget.initiallyLaunchedFromHomeWidget().then((uri) {
       if (!mounted) return;
       _handleWidgetClick(uri);
-    });
-
-    // Consume pending widget route once auth resolves (cold-launch case).
-    ref.listenManual<AuthState>(authProvider, (prev, next) {
-      if (_pendingWidgetRoute == null) return;
-      if (next.status == AuthStatus.authenticated) {
-        final target = _pendingWidgetRoute!;
-        _pendingWidgetRoute = null;
-        ref.read(routerProvider).go(target);
-      } else if (next.status == AuthStatus.unauthenticated) {
-        _pendingWidgetRoute = null;
-      }
     });
   }
 
@@ -295,7 +284,8 @@ class _HMLoveAppState extends ConsumerState<HMLoveApp>
     if (status == AuthStatus.authenticated) {
       ref.read(routerProvider).go(route);
     } else if (status == AuthStatus.initial) {
-      _pendingWidgetRoute = route;
+      // 인증 풀린 후 router redirect 의 splash → home 분기에서 consume 됨.
+      setPendingWidgetRoute(route);
     }
   }
 
@@ -307,6 +297,8 @@ class _HMLoveAppState extends ConsumerState<HMLoveApp>
     switch (target) {
       case 'calendar':
         return '/calendar';
+      case 'doodle':
+        return '/doodle';
       default:
         return null;
     }

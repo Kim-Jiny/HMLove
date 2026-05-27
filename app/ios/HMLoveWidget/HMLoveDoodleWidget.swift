@@ -123,6 +123,7 @@ struct DoodleTimelineProvider: TimelineProvider {
     }
 
     /// silent push가 timeline만 깨우는 경우에도 위젯 extension이 직접 최신 그림 메타를 받는다.
+    /// 401 받으면 한 번 refresh 후 재시도 (token 만료된 상태에서도 위젯 stale 안 되게).
     private func fetchLatestDoodle(completion: @escaping (Bool) -> Void) {
         guard let defaults = UserDefaults(suiteName: appGroupId),
               let token = defaults.string(forKey: "authToken"),
@@ -139,37 +140,56 @@ struct DoodleTimelineProvider: TimelineProvider {
             return
         }
 
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = 8
+        func attempt(authToken: String, allowRefresh: Bool) {
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.timeoutInterval = 8
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            guard let data = data,
-                  error == nil,
-                  let http = response as? HTTPURLResponse,
-                  (200..<300).contains(http.statusCode),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                completion(false)
-                return
-            }
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                if allowRefresh,
+                   let http = response as? HTTPURLResponse,
+                   http.statusCode == 401 || http.statusCode == 403 {
+                    DoodleWidgetTokenRefresher.refresh(
+                        defaults: defaults, baseUrl: trimmedBaseUrl
+                    ) { newToken in
+                        if let newToken = newToken {
+                            attempt(authToken: newToken, allowRefresh: false)
+                        } else {
+                            completion(false)
+                        }
+                    }
+                    return
+                }
 
-            guard let doodle = json["doodle"] as? [String: Any] else {
-                defaults.removeObject(forKey: "doodleImageUrl")
-                defaults.removeObject(forKey: "doodleReceivedAt")
-                defaults.removeObject(forKey: "doodleSenderName")
+                guard let data = data,
+                      error == nil,
+                      let http = response as? HTTPURLResponse,
+                      (200..<300).contains(http.statusCode),
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    completion(false)
+                    return
+                }
+
+                guard let doodle = json["doodle"] as? [String: Any] else {
+                    defaults.removeObject(forKey: "doodleImageUrl")
+                    defaults.removeObject(forKey: "doodleReceivedAt")
+                    defaults.removeObject(forKey: "doodleSenderName")
+                    defaults.synchronize()
+                    completion(true)
+                    return
+                }
+
+                defaults.set(doodle["imageUrl"] as? String ?? "", forKey: "doodleImageUrl")
+                defaults.set(doodle["createdAt"] as? String ?? "", forKey: "doodleReceivedAt")
+                let senderName = ((doodle["sender"] as? [String: Any])?["nickname"] as? String) ?? ""
+                defaults.set(senderName, forKey: "doodleSenderName")
                 defaults.synchronize()
                 completion(true)
-                return
-            }
+            }.resume()
+        }
 
-            defaults.set(doodle["imageUrl"] as? String ?? "", forKey: "doodleImageUrl")
-            defaults.set(doodle["createdAt"] as? String ?? "", forKey: "doodleReceivedAt")
-            let senderName = ((doodle["sender"] as? [String: Any])?["nickname"] as? String) ?? ""
-            defaults.set(senderName, forKey: "doodleSenderName")
-            defaults.synchronize()
-            completion(true)
-        }.resume()
+        attempt(authToken: token, allowRefresh: true)
     }
 
     /// 캐시에 없으면 imageUrl에서 PNG를 다운받아 캐시.
@@ -337,5 +357,51 @@ struct DoodleWidgetContainer: View {
             DoodleWidgetView(entry: entry)
                 .background(DoodlePalette.background)
         }
+    }
+}
+
+// MARK: - Token Refresh
+
+/// 위젯 extension 이 401 받으면 refresh token 으로 새 access token 받아 prefs 갱신.
+/// HMLoveWidget 타겟 (calendar / doodle 위젯) 공통으로 쓸 수 있게 enum 으로 정의.
+enum DoodleWidgetTokenRefresher {
+    static func refresh(
+        defaults: UserDefaults,
+        baseUrl: String,
+        completion: @escaping (String?) -> Void
+    ) {
+        guard let refreshToken = defaults.string(forKey: "refreshToken"),
+              !refreshToken.isEmpty else {
+            completion(nil)
+            return
+        }
+        let trimmed = baseUrl.hasSuffix("/") ? String(baseUrl.dropLast()) : baseUrl
+        guard let url = URL(string: "\(trimmed)/auth/refresh") else {
+            completion(nil)
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 8
+        request.httpBody = try? JSONSerialization.data(
+            withJSONObject: ["refreshToken": refreshToken]
+        )
+
+        URLSession.shared.dataTask(with: request) { data, response, _ in
+            guard let data = data,
+                  let http = response as? HTTPURLResponse,
+                  (200..<300).contains(http.statusCode),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let newToken = json["accessToken"] as? String,
+                  !newToken.isEmpty else {
+                completion(nil)
+                return
+            }
+            defaults.set(newToken, forKey: "authToken")
+            defaults.synchronize()
+            completion(newToken)
+        }.resume()
     }
 }

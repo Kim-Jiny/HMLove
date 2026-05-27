@@ -121,38 +121,52 @@ class NotificationService: UNNotificationServiceExtension {
             return
         }
 
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = 8 // NSE 실행시간 30초 한도, 두 달 fetch 대비 보수적으로
+        // 토큰 401 일 때 refresh 후 재시도하는 inline 함수
+        func attempt(authToken: String, allowRefresh: Bool) {
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.timeoutInterval = 8 // NSE 실행시간 30초 한도, 두 달 fetch 대비 보수적
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            defer { completion() }
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                if allowRefresh,
+                   let http = response as? HTTPURLResponse,
+                   http.statusCode == 401 || http.statusCode == 403 {
+                    self.tryRefreshToken(defaults: defaults, baseUrl: trimmedBaseUrl) { newToken in
+                        if let newToken = newToken {
+                            attempt(authToken: newToken, allowRefresh: false)
+                        } else {
+                            completion()
+                        }
+                    }
+                    return
+                }
 
-            guard let data = data, error == nil,
-                  let httpResponse = response as? HTTPURLResponse,
-                  (200..<300).contains(httpResponse.statusCode),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let events = json["events"] as? [[String: Any]] else {
-                return
-            }
+                defer { completion() }
+                guard let data = data, error == nil,
+                      let http = response as? HTTPURLResponse,
+                      (200..<300).contains(http.statusCode),
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let events = json["events"] as? [[String: Any]] else {
+                    return
+                }
+                // _auto 이벤트(자동 생성 기념일) 제외 — 위젯은 명시적 이벤트만 렌더.
+                let widgetEvents = events.filter { ev in
+                    let isAuto = ev["_auto"] as? Bool ?? false
+                    return !isAuto
+                }
+                guard let eventsJsonData = try? JSONSerialization.data(withJSONObject: widgetEvents),
+                      let jsonString = String(data: eventsJsonData, encoding: .utf8) else {
+                    return
+                }
+                defaults.set(jsonString, forKey: "calendarEvents_\(ym)")
+                if ym == currentYearMonth {
+                    defaults.set(jsonString, forKey: "calendarEvents")
+                }
+            }.resume()
+        }
 
-            // _auto 이벤트(자동 생성 기념일) 제외 — 위젯은 명시적 이벤트만 렌더.
-            let widgetEvents = events.filter { event in
-                let isAuto = event["_auto"] as? Bool ?? false
-                return !isAuto
-            }
-
-            guard let eventsJsonData = try? JSONSerialization.data(withJSONObject: widgetEvents),
-                  let jsonString = String(data: eventsJsonData, encoding: .utf8) else {
-                return
-            }
-
-            defaults.set(jsonString, forKey: "calendarEvents_\(ym)")
-            if ym == currentYearMonth {
-                defaults.set(jsonString, forKey: "calendarEvents")
-            }
-        }.resume()
+        attempt(authToken: token, allowRefresh: true)
     }
 
     /// 그림 push 도착 시 푸시 payload의 그림 메타를 우선 App Group에 저장한다.
@@ -187,6 +201,7 @@ class NotificationService: UNNotificationServiceExtension {
     }
 
     /// Payload에 메타가 없는 오래된 서버/푸시를 위한 fallback.
+    /// 401 받으면 한 번 refresh 후 재시도 — 토큰 만료된 상태에서도 위젯이 stale 안 되게.
     private func refreshDoodleWidgetFromServer(completion: @escaping () -> Void) {
         guard let defaults = UserDefaults(suiteName: Self.appGroupId),
               let token = defaults.string(forKey: "authToken"),
@@ -201,40 +216,55 @@ class NotificationService: UNNotificationServiceExtension {
             return
         }
 
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = 8
+        func attempt(authToken: String, allowRefresh: Bool) {
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.timeoutInterval = 8
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            guard let data = data, error == nil,
-                  let http = response as? HTTPURLResponse,
-                  (200..<300).contains(http.statusCode),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                completion()
-                return
-            }
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                if allowRefresh,
+                   let http = response as? HTTPURLResponse,
+                   http.statusCode == 401 || http.statusCode == 403 {
+                    self.tryRefreshToken(defaults: defaults, baseUrl: trimmedBaseUrl) { newToken in
+                        if let newToken = newToken {
+                            attempt(authToken: newToken, allowRefresh: false)
+                        } else {
+                            completion()
+                        }
+                    }
+                    return
+                }
 
-            guard let doodle = json["doodle"] as? [String: Any] else {
-                // 받은 그림이 없음 — 키 정리
-                defaults.removeObject(forKey: "doodleImageUrl")
-                defaults.removeObject(forKey: "doodleReceivedAt")
-                defaults.removeObject(forKey: "doodleSenderName")
-                self.reloadWidgetsAndComplete(completion: completion)
-                return
-            }
+                guard let data = data, error == nil,
+                      let http = response as? HTTPURLResponse,
+                      (200..<300).contains(http.statusCode),
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    completion()
+                    return
+                }
 
-            let imageUrl = doodle["imageUrl"] as? String ?? ""
-            let createdAt = doodle["createdAt"] as? String ?? ""
-            let senderName = ((doodle["sender"] as? [String: Any])?["nickname"] as? String) ?? ""
+                guard let doodle = json["doodle"] as? [String: Any] else {
+                    defaults.removeObject(forKey: "doodleImageUrl")
+                    defaults.removeObject(forKey: "doodleReceivedAt")
+                    defaults.removeObject(forKey: "doodleSenderName")
+                    self.reloadWidgetsAndComplete(completion: completion)
+                    return
+                }
 
-            defaults.set(imageUrl, forKey: "doodleImageUrl")
-            defaults.set(createdAt, forKey: "doodleReceivedAt")
-            defaults.set(senderName, forKey: "doodleSenderName")
-            defaults.synchronize()
+                let imageUrl = doodle["imageUrl"] as? String ?? ""
+                let createdAt = doodle["createdAt"] as? String ?? ""
+                let senderName = ((doodle["sender"] as? [String: Any])?["nickname"] as? String) ?? ""
+                defaults.set(imageUrl, forKey: "doodleImageUrl")
+                defaults.set(createdAt, forKey: "doodleReceivedAt")
+                defaults.set(senderName, forKey: "doodleSenderName")
+                defaults.synchronize()
 
-            self.cacheDoodleImageIfNeeded(imageUrl: imageUrl, defaults: defaults, completion: completion)
-        }.resume()
+                self.cacheDoodleImageIfNeeded(imageUrl: imageUrl, defaults: defaults, completion: completion)
+            }.resume()
+        }
+
+        attempt(authToken: token, allowRefresh: true)
     }
 
     private func cacheDoodleImageIfNeeded(
@@ -291,5 +321,48 @@ class NotificationService: UNNotificationServiceExtension {
             hash = hash &* 1099511628211
         }
         return String(hash, radix: 16) + ".png"
+    }
+
+    /// 만료된 access token 으로 401 받았을 때 refresh token 으로 갱신 시도.
+    /// 성공 시 새 token 을 prefs 에 저장하고 completion 으로 넘김.
+    /// 실패하면 nil — 호출 측이 그냥 포기 (위젯 stale 상태 유지, 다음 cycle 까지 대기).
+    private func tryRefreshToken(
+        defaults: UserDefaults,
+        baseUrl: String,
+        completion: @escaping (String?) -> Void
+    ) {
+        guard let refreshToken = defaults.string(forKey: "refreshToken"),
+              !refreshToken.isEmpty else {
+            completion(nil)
+            return
+        }
+        let trimmed = baseUrl.hasSuffix("/") ? String(baseUrl.dropLast()) : baseUrl
+        guard let url = URL(string: "\(trimmed)/auth/refresh") else {
+            completion(nil)
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 8
+        request.httpBody = try? JSONSerialization.data(
+            withJSONObject: ["refreshToken": refreshToken]
+        )
+
+        URLSession.shared.dataTask(with: request) { data, response, _ in
+            guard let data = data,
+                  let http = response as? HTTPURLResponse,
+                  (200..<300).contains(http.statusCode),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let newToken = json["accessToken"] as? String,
+                  !newToken.isEmpty else {
+                completion(nil)
+                return
+            }
+            defaults.set(newToken, forKey: "authToken")
+            defaults.synchronize()
+            completion(newToken)
+        }.resume()
     }
 }
