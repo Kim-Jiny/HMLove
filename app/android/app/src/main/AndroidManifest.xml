@@ -6,6 +6,9 @@
     <uses-permission android:name="android.permission.WRITE_CALENDAR"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- AdMob 광고 ID 접근 (Android 13+). play-services-ads SDK 가 자동
+         머지하지만, 명시적 선언으로 Play Console 데이터 안전 신고와 일관성 확보. -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
     <application
         android:label="우리연애"
         android:name="${applicationName}"
