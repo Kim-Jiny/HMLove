@@ -228,28 +228,29 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const QuestionScreen(),
       ),
 
-      // Doodle (그림 보내기)
-      GoRoute(
-        path: '/doodle',
-        builder: (context, state) => const DoodleHistoryScreen(),
-      ),
-      GoRoute(
-        path: '/doodle/canvas',
-        builder: (context, state) => const DoodleCanvasScreen(),
-      ),
-
       // Main Shell with bottom navigation
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return MainShell(navigationShell: navigationShell);
         },
         branches: [
+          // 홈 branch — /doodle 도 여기 안에 둬서 위젯으로 진입해도 탭바 유지 +
+          // 다른 탭으로 이동 가능 + 백버튼/홈 탭으로 자연스럽게 빠져나옴.
           StatefulShellBranch(
             navigatorKey: shellBranchKeys[0]!,
+            initialLocation: '/home',
             routes: [
               GoRoute(
                 path: '/home',
                 builder: (context, state) => const HomeScreen(),
+              ),
+              GoRoute(
+                path: '/doodle',
+                builder: (context, state) => const DoodleHistoryScreen(),
+              ),
+              GoRoute(
+                path: '/doodle/canvas',
+                builder: (context, state) => const DoodleCanvasScreen(),
               ),
             ],
           ),
