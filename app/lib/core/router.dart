@@ -33,6 +33,21 @@ import '../screens/doodle/doodle_history_screen.dart';
 /// 푸시 알림 등에서 네비게이션 접근용 글로벌 키
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
+/// 위젯 탭에서 들어온 진입 경로. 인증이 아직 안 풀린 cold-launch 에서 set 되고
+/// router redirect 가 splash → 홈 으로 보내기 직전에 consume 해서 위젯 의도대로
+/// 라우팅. 두 listener 가 경합하는 race 를 단일 진실 소스로 정리.
+String? _pendingWidgetRoute;
+
+void setPendingWidgetRoute(String? route) {
+  _pendingWidgetRoute = route;
+}
+
+String? consumePendingWidgetRoute() {
+  final r = _pendingWidgetRoute;
+  _pendingWidgetRoute = null;
+  return r;
+}
+
 /// 각 탭 브랜치 네비게이터 키 (탭 전환 시 Navigator.push 화면 pop 용)
 final shellBranchKeys = <int, GlobalKey<NavigatorState>>{
   0: GlobalKey<NavigatorState>(debugLabel: 'home'),
@@ -63,10 +78,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       final pendingSocialSignup = authState.pendingSocialSignup != null;
       final currentPath = state.matchedLocation;
 
-      // 위젯/소셜 로그인 등에서 들어오는 외부 스킴(hmlove://..., kakao{key}://oauth) 은
-      // 경로로 변환. Android의 HomeWidgetLaunchIntent나 iOS SceneDelegate가
-      // deep link를 Flutter 로 넘기면 GoRouter 초기 location 으로 들어오는데,
-      // 매칭 라우트가 없어 GoException 을 던지므로 여기서 미리 변환.
+      // 위젯/소셜 로그인 등에서 들어오는 외부 스킴(hmlove://..., kakao{key}://oauth).
+      // 매칭 라우트가 없으면 GoException 이 나므로 안전한 경로로 변환.
+      //
+      // 핵심: 인증이 아직 안 풀린 상태에서 target 경로로 바로 가버리면
+      //   1) /target 으로 navigate 후
+      //   2) redirect 가 다시 돌아 status=initial 로 인해 /splash 로 끌고감
+      //   3) auth 풀린 뒤 currentPath='/splash' → '/home' 으로 ff
+      // 이 race 를 피하려고 pending 으로 저장해두고 splash 에 머무름.
+      // 인증이 풀린 뒤 (아래 splash → home 분기) consumePendingWidgetRoute() 로
+      // pending 이 있으면 그 쪽으로 직접 보낸다.
       final scheme = state.uri.scheme;
       if (scheme.isNotEmpty && scheme != 'http' && scheme != 'https') {
         final target = state.uri.host.isNotEmpty
@@ -74,16 +95,22 @@ final routerProvider = Provider<GoRouter>((ref) {
             : (state.uri.pathSegments.isNotEmpty
                 ? state.uri.pathSegments.first
                 : '');
-        switch (target) {
-          case 'calendar':
-            return '/calendar';
-          case 'doodle':
-            return '/doodle';
-          default:
-            // 카카오 OAuth 콜백 등 알 수 없는 스킴. 진행 중인 소셜 가입이 있으면
-            // 가입 화면으로, 아니면 splash 가 auth 상태 보고 분기.
-            return pendingSocialSignup ? '/social-signup' : '/splash';
+        final widgetTarget = switch (target) {
+          'calendar' => '/calendar',
+          'doodle' => '/doodle',
+          _ => null,
+        };
+        if (widgetTarget != null) {
+          if (isLoggedIn && hasCouple) {
+            // 이미 인증된 warm/foreground 진입 → 바로 target 으로.
+            return widgetTarget;
+          }
+          // 인증 아직 안 풀림 → pending 으로 저장하고 splash 에 대기.
+          setPendingWidgetRoute(widgetTarget);
+          return '/splash';
         }
+        // 카카오 OAuth 콜백 등 알 수 없는 스킴.
+        return pendingSocialSignup ? '/social-signup' : '/splash';
       }
 
       // While still checking auth (initial), stay on splash
@@ -98,6 +125,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           return pendingSocialSignup ? '/social-signup' : '/login';
         }
         if (!hasCouple) return '/couple-connect';
+        // 위젯 진입에서 누적된 pending 이 있으면 그쪽 우선.
+        final pending = consumePendingWidgetRoute();
+        if (pending != null) return pending;
         return '/home';
       }
 
@@ -124,12 +154,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/couple-connect';
       }
 
-      // If authenticated with couple and on auth pages, redirect to home
+      // If authenticated with couple and on auth pages, redirect to home.
+      // splash 가 아닌 경로(/login → 로그인 성공 등)에서도 위젯 pending 이
+      // 남아있으면 우선 그쪽으로 — 안 그러면 다음 세션까지 누수.
       if (isLoggedIn &&
           hasCouple &&
           (currentPath == '/login' ||
               currentPath == '/register' ||
               currentPath == '/couple-connect')) {
+        final pending = consumePendingWidgetRoute();
+        if (pending != null) return pending;
         return '/home';
       }
 
