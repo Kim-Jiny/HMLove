@@ -78,10 +78,16 @@ router.post('/join', async (req, res) => {
         throw Object.assign(new Error('이미 커플이 완성되었습니다.'), { statusCode: 400 });
       }
 
-      await tx.user.update({
-        where: { id: req.user.id },
+      // 본인이 이미 다른 커플에 속해 있지 않은 경우에만 가입(조건부 업데이트).
+      // req.user.coupleId 스냅샷은 stale 할 수 있으므로 DB 조건으로 원자성 보장 →
+      // 동시 요청으로 커플을 갈아타며 이전 커플을 고아로 만드는 것을 방지.
+      const joinResult = await tx.user.updateMany({
+        where: { id: req.user.id, coupleId: null },
         data: { coupleId: couple.id },
       });
+      if (joinResult.count !== 1) {
+        throw Object.assign(new Error('이미 커플이 연결되어 있습니다.'), { statusCode: 400 });
+      }
 
       return tx.couple.findUnique({
         where: { id: couple.id },

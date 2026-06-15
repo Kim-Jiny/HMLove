@@ -174,6 +174,10 @@ class ChatNotifier extends Notifier<ChatState> {
   bool _hasConnectedOnce = false;
   bool _recoverStateOnNextConnect = false;
   DateTime? _lastForcedReconnectAt;
+  // temp 메시지별 재연결 재시도 횟수. ack 실패 → forceReconnect → 재전송 →
+  // 또 실패 가 무한 반복되며 소켓을 thrash 하지 않도록 상한을 둔다.
+  final Map<String, int> _reconnectAttempts = {};
+  static const int _maxReconnectAttempts = 2;
   DateTime? _lastRealtimeRefreshAt;
   DateTime? _lastReadEmitAt;
   Future<void>? _realtimeRefreshInFlight;
@@ -740,11 +744,15 @@ class ChatNotifier extends Notifier<ChatState> {
         .catchError((error) {
           debugPrint('[Chat] message:send ack error: $error');
 
-          if (allowReconnectRetry) {
+          final attempts = (_reconnectAttempts[tempId] ?? 0) + 1;
+          if (allowReconnectRetry && attempts <= _maxReconnectAttempts) {
+            _reconnectAttempts[tempId] = attempts;
             forceReconnect();
             return;
           }
 
+          // 상한 도달 → 더 이상 재연결 루프 돌지 않고 실패로 확정.
+          _reconnectAttempts.remove(tempId);
           _markMessageFailed(tempId);
         });
   }
@@ -775,6 +783,7 @@ class ChatNotifier extends Notifier<ChatState> {
     required String tempId,
     required String messageId,
   }) {
+    _reconnectAttempts.remove(tempId);
     final idx = state.messages.indexWhere((m) => m.id == tempId);
     if (idx == -1) return; // 이미 broadcast 로 교체됨
     final updated = [...state.messages];
@@ -826,11 +835,12 @@ class ChatNotifier extends Notifier<ChatState> {
 
     final msg = state.messages[idx];
     // 실패 메시지 제거
+    _reconnectAttempts.remove(tempId);
     final updated = [...state.messages];
     updated.removeAt(idx);
     state = state.copyWith(messages: updated);
 
-    // 재전송
+    // 재전송 (새 tempId 로 처음부터)
     sendMessage(content: msg.content, imageUrls: msg.imageUrls);
   }
 
