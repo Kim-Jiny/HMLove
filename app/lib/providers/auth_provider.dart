@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
+import '../core/pending_route.dart';
 import '../core/push_notification_service.dart';
 import '../core/social_auth_service.dart';
 import '../core/widget_service.dart';
@@ -312,6 +313,7 @@ class AuthNotifier extends Notifier<AuthState> {
   /// Logout.
   Future<void> logout() async {
     ref.read(chatProvider.notifier).disconnect();
+    clearPendingWidgetRoute();
     resetFeatureProviders(ref);
     await ApiClient.clearTokens();
     await WidgetService.clearData();
@@ -337,6 +339,7 @@ class AuthNotifier extends Notifier<AuthState> {
       return;
     }
     ref.read(chatProvider.notifier).disconnect();
+    clearPendingWidgetRoute();
     resetFeatureProviders(ref);
     await ApiClient.clearTokens();
     await WidgetService.clearData();

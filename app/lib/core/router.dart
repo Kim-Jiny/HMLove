@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/auth_provider.dart';
+import 'pending_route.dart';
 import '../screens/splash_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
@@ -33,20 +34,7 @@ import '../screens/doodle/doodle_history_screen.dart';
 /// 푸시 알림 등에서 네비게이션 접근용 글로벌 키
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
-/// 위젯 탭에서 들어온 진입 경로. 인증이 아직 안 풀린 cold-launch 에서 set 되고
-/// router redirect 가 splash → 홈 으로 보내기 직전에 consume 해서 위젯 의도대로
-/// 라우팅. 두 listener 가 경합하는 race 를 단일 진실 소스로 정리.
-String? _pendingWidgetRoute;
-
-void setPendingWidgetRoute(String? route) {
-  _pendingWidgetRoute = route;
-}
-
-String? consumePendingWidgetRoute() {
-  final r = _pendingWidgetRoute;
-  _pendingWidgetRoute = null;
-  return r;
-}
+/// 위젯 진입 경로 상태는 [pending_route.dart] 로 분리(로그아웃 시 누수 차단).
 
 /// 각 탭 브랜치 네비게이터 키 (탭 전환 시 Navigator.push 화면 pop 용)
 final shellBranchKeys = <int, GlobalKey<NavigatorState>>{

@@ -119,6 +119,15 @@ class _MainShellState extends ConsumerState<MainShell>
           return;
         }
 
+        // 홈 브랜치이지만 루트(/home)가 아니면(위젯으로 /doodle 직접 진입 등)
+        // 앱 종료가 아니라 홈으로 복귀시킨다. go('/doodle') 는 홈 브랜치 스택을
+        // [/doodle] 로 만들어 pop 할 게 없으므로 여기서 명시적으로 처리.
+        final loc = GoRouterState.of(context).uri.path;
+        if (loc != '/home') {
+          widget.navigationShell.goBranch(0, initialLocation: true);
+          return;
+        }
+
         // 홈 탭에서 2초 내 두 번 누르면 앱 종료
         final now = DateTime.now();
         if (_lastBackPressed != null &&
