@@ -337,72 +337,93 @@ struct CoupleTimelineProvider: AppIntentTimelineProvider {
             return
         }
 
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 10
+        // 토큰 만료 시 1회 refresh 후 재시도. 두들 위젯과 동일한 패턴을 재사용한다.
+        func attempt(authToken: String, allowRefresh: Bool) {
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+            request.timeoutInterval = 10
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            guard let data = data, error == nil,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let events = json["events"] as? [[String: Any]] else {
-                completion(nil)
-                return
-            }
-
-            // Find today's events (only meaningful when fetching the current month)
-            let dayFormatter = DateFormatter()
-            dayFormatter.dateFormat = "yyyy-MM-dd"
-            dayFormatter.locale = Locale(identifier: "en_US_POSIX")
-            dayFormatter.calendar = Calendar(identifier: .gregorian)
-            let todayStr = dayFormatter.string(from: now)
-
-            if yearMonth == currentYearMonth {
-                let todayEvents = events.filter { event in
-                    guard let dateStr = event["date"] as? String else { return false }
-                    return dateStr.hasPrefix(todayStr)
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                // 401/403 → refresh 토큰으로 갱신 후 재시도. 실패하면 stale 캐시로 폴백.
+                if allowRefresh,
+                   let http = response as? HTTPURLResponse,
+                   http.statusCode == 401 || http.statusCode == 403 {
+                    DoodleWidgetTokenRefresher.refresh(
+                        defaults: defaults, baseUrl: baseUrl
+                    ) { newToken in
+                        if let newToken = newToken {
+                            attempt(authToken: newToken, allowRefresh: false)
+                        } else {
+                            completion(nil)
+                        }
+                    }
+                    return
                 }
 
-                let titles = todayEvents.compactMap { $0["title"] as? String }
-                let schedule = Array(titles.prefix(3)).map { "• \($0)" }.joined(separator: "\n")
-                defaults.set(schedule, forKey: "todaySchedule")
-            }
+                guard let data = data, error == nil,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let events = json["events"] as? [[String: Any]] else {
+                    completion(nil)
+                    return
+                }
 
-            // Save calendar events for large widget (filter out auto events only).
-            // Cache per-month so navigation (prev/next) can render without re-fetching.
-            let widgetEvents = events.filter { event in
-                let isAuto = event["_auto"] as? Bool ?? false
-                return !isAuto
-            }
-            if let eventsJsonData = try? JSONSerialization.data(withJSONObject: widgetEvents),
-               let jsonString = String(data: eventsJsonData, encoding: .utf8) {
-                defaults.set(jsonString, forKey: "calendarEvents_\(yearMonth)")
-                trackCachedMonth(
-                    defaults: defaults,
-                    storageKey: calendarEventMonthsKey,
-                    yearMonth: yearMonth
-                )
+                // Find today's events (only meaningful when fetching the current month)
+                let dayFormatter = DateFormatter()
+                dayFormatter.dateFormat = "yyyy-MM-dd"
+                dayFormatter.locale = Locale(identifier: "en_US_POSIX")
+                dayFormatter.calendar = Calendar(identifier: .gregorian)
+                let todayStr = dayFormatter.string(from: now)
+
                 if yearMonth == currentYearMonth {
-                    // Preserve legacy key for backwards compat
-                    defaults.set(jsonString, forKey: "calendarEvents")
-                }
-            }
+                    let todayEvents = events.filter { event in
+                        guard let dateStr = event["date"] as? String else { return false }
+                        return dateStr.hasPrefix(todayStr)
+                    }
 
-            // Also update mood from server
-            if let moods = json["moods"] as? [String: Any],
-               let todayMoods = moods[todayStr] as? [[String: Any]] {
-                for mood in todayMoods {
-                    if let emoji = mood["emoji"] as? String {
-                        let moodEmoji = Self.moodToEmoji(emoji)
-                        // Just update first mood found (could be improved)
-                        if defaults.string(forKey: "myMoodEmoji") == "😶" || defaults.string(forKey: "myMoodEmoji") == nil {
-                            defaults.set(moodEmoji, forKey: "myMoodEmoji")
+                    let titles = todayEvents.compactMap { $0["title"] as? String }
+                    let schedule = Array(titles.prefix(3)).map { "• \($0)" }.joined(separator: "\n")
+                    defaults.set(schedule, forKey: "todaySchedule")
+                }
+
+                // Save calendar events for large widget (filter out auto events only).
+                // Cache per-month so navigation (prev/next) can render without re-fetching.
+                let widgetEvents = events.filter { event in
+                    let isAuto = event["_auto"] as? Bool ?? false
+                    return !isAuto
+                }
+                if let eventsJsonData = try? JSONSerialization.data(withJSONObject: widgetEvents),
+                   let jsonString = String(data: eventsJsonData, encoding: .utf8) {
+                    defaults.set(jsonString, forKey: "calendarEvents_\(yearMonth)")
+                    trackCachedMonth(
+                        defaults: defaults,
+                        storageKey: calendarEventMonthsKey,
+                        yearMonth: yearMonth
+                    )
+                    if yearMonth == currentYearMonth {
+                        // Preserve legacy key for backwards compat
+                        defaults.set(jsonString, forKey: "calendarEvents")
+                    }
+                }
+
+                // Also update mood from server
+                if let moods = json["moods"] as? [String: Any],
+                   let todayMoods = moods[todayStr] as? [[String: Any]] {
+                    for mood in todayMoods {
+                        if let emoji = mood["emoji"] as? String {
+                            let moodEmoji = Self.moodToEmoji(emoji)
+                            // Just update first mood found (could be improved)
+                            if defaults.string(forKey: "myMoodEmoji") == "😶" || defaults.string(forKey: "myMoodEmoji") == nil {
+                                defaults.set(moodEmoji, forKey: "myMoodEmoji")
+                            }
                         }
                     }
                 }
-            }
 
-            completion(self.loadData(configuration: configuration))
-        }.resume()
+                completion(self.loadData(configuration: configuration))
+            }.resume()
+        }
+
+        attempt(authToken: token, allowRefresh: true)
     }
 
     private static func moodToEmoji(_ key: String) -> String {

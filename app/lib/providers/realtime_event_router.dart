@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../core/api_client.dart';
 import '../models/wish_item.dart';
@@ -19,7 +19,7 @@ import 'wishlist_provider.dart';
 ///
 /// ChatNotifier 가 이 기능들의 모델/프로바이더에 직접 의존하지 않도록 분리한 것.
 void registerRealtimeFeatureHandlers(
-  IO.Socket socket,
+  io.Socket socket,
   Ref ref,
   bool Function() isCurrent,
 ) {

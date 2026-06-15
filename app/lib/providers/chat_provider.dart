@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../core/api_client.dart';
 import '../core/constants.dart';
@@ -166,7 +166,7 @@ class ChatState {
 // Chat Notifier
 class ChatNotifier extends Notifier<ChatState> {
   late final Dio _dio;
-  IO.Socket? _socket;
+  io.Socket? _socket;
   String? _socketToken;
   int _socketGeneration = 0;
   bool _chatScreenActive = false;
@@ -225,9 +225,9 @@ class ChatNotifier extends Notifier<ChatState> {
     _socketToken = token;
     final generation = ++_socketGeneration;
 
-    final socket = IO.io(
+    final socket = io.io(
       AppConstants.socketUrl,
-      IO.OptionBuilder()
+      io.OptionBuilder()
           .setTransports(['websocket', 'polling'])
           .setAuth({'token': token})
           .enableReconnection()
@@ -377,7 +377,7 @@ class ChatNotifier extends Notifier<ChatState> {
     socket.connect();
   }
 
-  bool _isCurrentSocket(IO.Socket socket, int generation) {
+  bool _isCurrentSocket(io.Socket socket, int generation) {
     return identical(_socket, socket) && _socketGeneration == generation;
   }
 
