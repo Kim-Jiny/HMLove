@@ -877,23 +877,17 @@ router.post('/push/send', async (req, res) => {
 // 토큰 원문은 내려주지 않고 보유 여부만 노출한다 (전체 유저 토큰 유출 방지).
 router.get('/push/tokens', async (req, res) => {
   try {
-    const { page = '1', limit = '50' } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const take = Math.min(parseInt(limit), 100);
-
-    const [rows, total] = await Promise.all([
-      prisma.user.findMany({
-        skip, take,
-        select: { id: true, nickname: true, email: true, fcmToken: true },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.user.count(),
-    ]);
+    // 토큰 원문은 내려주지 않고 보유 여부(hasPushToken)만 노출한다.
+    // 관리자 전용 화면이라 전체 목록을 반환(별도 페이저 없음).
+    const rows = await prisma.user.findMany({
+      select: { id: true, nickname: true, email: true, fcmToken: true },
+      orderBy: { createdAt: 'desc' },
+    });
     const users = rows.map(({ fcmToken, ...u }) => ({
       ...u,
       hasPushToken: !!fcmToken,
     }));
-    res.json({ users, total, page: parseInt(page), totalPages: Math.ceil(total / take) });
+    res.json({ users });
   } catch (err) {
     console.error('Admin push tokens error:', err);
     res.status(500).json({ error: '조회에 실패했습니다.' });
