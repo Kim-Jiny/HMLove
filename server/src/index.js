@@ -95,6 +95,7 @@ function debouncedChatPush({ senderId, partnerId, coupleId, token, senderNicknam
       : entry.lastBody;
     sendPushNotification({
       token,
+      userId: partnerId,
       title: senderNickname || '상대방',
       body: pushBody,
       data: { type: 'chat', coupleId: coupleId || '' },
@@ -469,21 +470,30 @@ async function deliverScheduledLetters() {
     });
 
     for (const letter of letters) {
-      await prisma.letter.update({
-        where: { id: letter.id },
-        data: { status: 'DELIVERED' },
-      });
+      // 한 통이 실패해도 나머지 배치가 멈추지 않도록 per-letter 로 격리.
+      try {
+        // 원자적 claim: SCHEDULED 인 동안에만 DELIVERED 로 전환.
+        // count===1 일 때만 이 인스턴스가 "선점"한 것이므로 푸시를 보낸다.
+        // (다중 인스턴스/중복 tick 으로 인한 이중 발송 방지)
+        const claimed = await prisma.letter.updateMany({
+          where: { id: letter.id, status: 'SCHEDULED' },
+          data: { status: 'DELIVERED' },
+        });
+        if (claimed.count !== 1) continue;
 
-      // 수신자에게 푸시 알림
-      notifyPartner({
-        userId: letter.writerId,
-        coupleId: letter.writer.coupleId,
-        title: letter.writer.nickname || '상대방',
-        body: '편지가 도착했어요 💌',
-        data: { type: 'letter', letterId: letter.id },
-      });
+        // 수신자에게 푸시 알림
+        notifyPartner({
+          userId: letter.writerId,
+          coupleId: letter.writer.coupleId,
+          title: letter.writer.nickname || '상대방',
+          body: '편지가 도착했어요 💌',
+          data: { type: 'letter', letterId: letter.id },
+        });
 
-      console.log(`[Scheduler] Letter ${letter.id} delivered`);
+        console.log(`[Scheduler] Letter ${letter.id} delivered`);
+      } catch (e) {
+        console.error(`[Scheduler] letter ${letter.id} deliver failed:`, e.message);
+      }
     }
   } catch (err) {
     console.error('[Scheduler] deliverScheduledLetters error:', err.message);
@@ -540,8 +550,10 @@ async function sendAnniversaryReminders() {
         for (const ann of upcoming) {
           if (!remindDays.includes(ann.daysLeft)) continue;
 
-          // 중복 방지: 오늘 같은 알림을 이미 보냈는지 확인
-          const dedupKey = `anniversary_remind:${ann.title}:d-${ann.daysLeft}`;
+          // 중복 방지: 같은 기념일은 KST 하루에 한 번만.
+          // daysLeft 를 키에 넣지 않는다 — daysLeft 는 UTC 기준이라 KST 00:00~09:00
+          // 사이엔 값이 1 커서, 키에 포함하면 같은 날 daysLeft 가 바뀌며 이중 발송된다.
+          const dedupKey = `anniversary_remind:${ann.title}`;
           // KST 자정 기준으로 중복 방지 (UTC 기준이 아닌 KST 00:00부터)
           const kstMidnightUtc = new Date(todayStr + 'T00:00:00+09:00');
           const existing = await prisma.notification.findFirst({

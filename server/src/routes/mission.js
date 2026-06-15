@@ -48,10 +48,12 @@ export function getMonday(d) {
   return date;
 }
 
+// "오늘"은 KST 기준. 앱의 mood/question/home(localDate)과 동일하게 KST 달력 날짜를
+// UTC 자정에 고정한 Date 를 반환한다. (UTC 기준으로 두면 00:00~09:00 KST 사이에
+// 미션·운세가 어제 것으로 보이고 다른 카드들과 날짜가 어긋난다.)
 export function getToday() {
-  const d = new Date();
-  d.setUTCHours(0, 0, 0, 0);
-  return d;
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  return new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate()));
 }
 
 export function pickMission(pool, coupleId, dateStr) {

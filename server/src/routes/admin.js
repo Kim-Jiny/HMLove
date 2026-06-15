@@ -765,7 +765,7 @@ router.patch('/inquiries/:id', async (req, res) => {
         pushResult = { sent: false, reason: '유저에게 FCM 토큰이 없습니다 (푸시 알림 미허용 또는 미등록)' };
       } else {
         try {
-          await sendPushNotification({ token: inquiry.user.fcmToken, title: nTitle, body: nBody, data: nData });
+          await sendPushNotification({ token: inquiry.user.fcmToken, userId: inquiry.user.id, title: nTitle, body: nBody, data: nData });
           pushResult = { sent: true, reason: `전송 성공 (토큰: ${inquiry.user.fcmToken.substring(0, 20)}...)` };
         } catch (pushErr) {
           pushResult = { sent: false, reason: `전송 실패: ${pushErr.message}` };
@@ -791,7 +791,7 @@ router.patch('/inquiries/:id', async (req, res) => {
         pushResult = { sent: false, reason: '유저에게 FCM 토큰이 없습니다' };
       } else {
         try {
-          await sendPushNotification({ token: inquiry.user.fcmToken, title: nTitle, body: nBody, data: nData });
+          await sendPushNotification({ token: inquiry.user.fcmToken, userId: inquiry.user.id, title: nTitle, body: nBody, data: nData });
           pushResult = { sent: true, reason: `전송 성공 (토큰: ${inquiry.user.fcmToken.substring(0, 20)}...)` };
         } catch (pushErr) {
           pushResult = { sent: false, reason: `전송 실패: ${pushErr.message}` };
@@ -855,6 +855,7 @@ router.post('/push/send', async (req, res) => {
       try {
         await sendPushNotification({
           token: user.fcmToken,
+          userId: user.id,
           title,
           body,
           data: { type: 'notice' },
