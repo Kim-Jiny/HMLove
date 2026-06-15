@@ -371,22 +371,43 @@ router.delete('/users/:id', async (req, res) => {
     });
     if (!user) return res.status(404).json({ error: '유저를 찾을 수 없습니다.' });
 
-    if (user.coupleId) {
-      await prisma.user.update({ where: { id }, data: { coupleId: null } });
-    }
+    const { coupleId } = user;
 
-    await prisma.$transaction([
-      prisma.feedLike.deleteMany({ where: { userId: id } }),
-      prisma.feedComment.deleteMany({ where: { authorId: id } }),
-      prisma.mood.deleteMany({ where: { userId: id } }),
-      prisma.letter.deleteMany({ where: { OR: [{ writerId: id }, { receiverId: id }] } }),
-      prisma.fight.deleteMany({ where: { authorId: id } }),
-      prisma.photo.deleteMany({ where: { authorId: id } }),
-      prisma.feed.deleteMany({ where: { authorId: id } }),
-      prisma.message.deleteMany({ where: { senderId: id } }),
-      prisma.calendarEvent.deleteMany({ where: { authorId: id } }),
-      prisma.user.delete({ where: { id } }),
-    ]);
+    await prisma.$transaction(async (tx) => {
+      if (coupleId) {
+        // 커플 소속 유저 삭제 → 커플을 해제하고 공유 데이터 전체를 삭제한다.
+        // (커플 데이터는 공동 소유라 한쪽만 지우면 파트너가 깨진 커플에 남는다.
+        //  /couple/leave 의 마지막-멤버 정책과 동일하게 처리.)
+        await tx.user.updateMany({ where: { coupleId }, data: { coupleId: null } });
+        await tx.feedLike.deleteMany({ where: { feed: { coupleId } } });
+        await tx.feedComment.deleteMany({ where: { feed: { coupleId } } });
+        await tx.feed.deleteMany({ where: { coupleId } });
+        await tx.message.deleteMany({ where: { coupleId } });
+        await tx.calendarEvent.deleteMany({ where: { coupleId } });
+        await tx.mood.deleteMany({ where: { coupleId } });
+        await tx.photo.deleteMany({ where: { coupleId } });
+        await tx.letter.deleteMany({ where: { coupleId } });
+        await tx.fight.deleteMany({ where: { coupleId } });
+        await tx.fortune.deleteMany({ where: { coupleId } });
+        await tx.coupleMission.deleteMany({ where: { coupleId } });
+        await tx.questionAnswer.deleteMany({ where: { question: { coupleId } } });
+        await tx.dailyQuestion.deleteMany({ where: { coupleId } });
+        await tx.wishItem.deleteMany({ where: { coupleId } });
+        await tx.couple.delete({ where: { id: coupleId } });
+      } else {
+        // 커플이 없는 유저: 본인이 만든 데이터만 정리.
+        await tx.feedLike.deleteMany({ where: { userId: id } });
+        await tx.feedComment.deleteMany({ where: { authorId: id } });
+        await tx.mood.deleteMany({ where: { userId: id } });
+        await tx.letter.deleteMany({ where: { OR: [{ writerId: id }, { receiverId: id }] } });
+        await tx.fight.deleteMany({ where: { authorId: id } });
+        await tx.photo.deleteMany({ where: { authorId: id } });
+        await tx.feed.deleteMany({ where: { authorId: id } });
+        await tx.message.deleteMany({ where: { senderId: id } });
+        await tx.calendarEvent.deleteMany({ where: { authorId: id } });
+      }
+      await tx.user.delete({ where: { id } });
+    });
 
     res.json({ message: `${user.nickname} 유저가 삭제되었습니다.` });
   } catch (err) {

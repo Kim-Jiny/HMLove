@@ -8,6 +8,7 @@ import '../core/widget_service.dart';
 import '../models/user.dart';
 import 'chat_provider.dart';
 import 'couple_provider.dart';
+import 'session_reset.dart';
 
 // Auth state enum
 enum AuthStatus { initial, authenticated, unauthenticated }
@@ -311,6 +312,7 @@ class AuthNotifier extends Notifier<AuthState> {
   /// Logout.
   Future<void> logout() async {
     ref.read(chatProvider.notifier).disconnect();
+    resetFeatureProviders(ref);
     await ApiClient.clearTokens();
     await WidgetService.clearData();
     PushNotificationService.reset();
@@ -335,6 +337,7 @@ class AuthNotifier extends Notifier<AuthState> {
       return;
     }
     ref.read(chatProvider.notifier).disconnect();
+    resetFeatureProviders(ref);
     await ApiClient.clearTokens();
     await WidgetService.clearData();
     PushNotificationService.reset();

@@ -85,6 +85,17 @@ function debouncedChatPush({ senderId, partnerId, coupleId, token, senderNicknam
   }, 3000);
 }
 
+// 메시지 전송 멱등성: 클라이언트가 ack 유실 후 재연결로 같은 _tempId 를 재전송해도
+// DB 에 중복 row 가 생기지 않도록 최근 처리한 (coupleId:_tempId) → messageId 를 캐시.
+// 60초 TTL. 서버 재시작 시 사라지지만 재시작은 클라이언트 full resync 를 유발하므로 무방.
+const _recentSendKeys = new Map(); // key: `${coupleId}:${tempId}` -> messageId
+function rememberSend(coupleId, tempId, messageId) {
+  if (!tempId) return;
+  const key = `${coupleId}:${tempId}`;
+  _recentSendKeys.set(key, messageId);
+  setTimeout(() => _recentSendKeys.delete(key), 60000);
+}
+
 function addUserSocket(userId, socketId) {
   if (!userId || !socketId) return 0;
   const sockets = connectedUserSockets.get(userId) ?? new Set();
@@ -237,6 +248,17 @@ io.on('connection', async (socket) => {
         return;
       }
 
+      // 재전송 멱등성: 같은 _tempId 가 최근에 처리됐으면 새 row 를 만들지 않고
+      // 동일한 결과를 ack 로 돌려준다.
+      const tempId = data._tempId || null;
+      if (tempId) {
+        const cachedId = _recentSendKeys.get(`${socket.coupleId}:${tempId}`);
+        if (cachedId) {
+          ack?.(null, { ok: true, messageId: cachedId });
+          return;
+        }
+      }
+
       const message = await prisma.message.create({
         data: {
           coupleId: socket.coupleId,
@@ -248,9 +270,10 @@ io.on('connection', async (socket) => {
           sender: { select: { id: true, nickname: true, profileImage: true } },
         },
       });
+      rememberSend(socket.coupleId, tempId, message.id);
 
       const room = `couple:${socket.coupleId}`;
-      const payload = { ...message, _tempId: data._tempId || null };
+      const payload = { ...message, _tempId: tempId };
       io.to(room).emit('message:new', payload);
       ack?.(null, { ok: true, messageId: message.id });
 

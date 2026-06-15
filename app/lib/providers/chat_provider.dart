@@ -275,11 +275,18 @@ class ChatNotifier extends Notifier<ChatState> {
         final myId = ApiClient.getUserId();
 
         if (tempId != null && message.senderId == myId) {
-          // 내가 보낸 메시지 → 임시 메시지를 서버 메시지로 교체
-          final updated = state.messages.map((msg) {
-            return msg.id == tempId ? message : msg;
-          }).toList();
-          state = state.copyWith(messages: updated);
+          // 내가 보낸 메시지 → 임시 메시지를 서버 메시지로 교체.
+          final hasTemp = state.messages.any((m) => m.id == tempId);
+          if (hasTemp) {
+            final updated = state.messages.map((msg) {
+              return msg.id == tempId ? message : msg;
+            }).toList();
+            state = state.copyWith(messages: updated);
+          } else if (!state.messages.any((m) => m.id == message.id)) {
+            // 임시 메시지가 이미 교체/제거된 경우(재전송 등) 유실 방지: id 중복이
+            // 아니면 추가한다.
+            state = state.copyWith(messages: [message, ...state.messages]);
+          }
         } else {
           // 상대방 메시지 (또는 tempId 없는 경우) → 앞에 추가
           // 중복 방지
@@ -299,8 +306,15 @@ class ChatNotifier extends Notifier<ChatState> {
 
     socket.on('message:read', (_) {
       if (!_isCurrentSocket(socket, generation)) return;
+      // 읽음 영수증은 "내가 보낸" 메시지에만 적용된다. 상대가 보낸 메시지까지
+      // isRead 로 뒤집으면 안읽음 상태가 깨진다.
+      final myId = ApiClient.getUserId();
+      // 바꿀 게 없으면 불필요한 리빌드 생략.
+      final hasUnreadMine =
+          state.messages.any((m) => m.senderId == myId && !m.isRead);
+      if (!hasUnreadMine) return;
       final updatedMessages = state.messages.map((msg) {
-        return msg.copyWith(isRead: true);
+        return msg.senderId == myId ? msg.copyWith(isRead: true) : msg;
       }).toList();
       state = state.copyWith(messages: updatedMessages);
     });
@@ -704,7 +718,17 @@ class ChatNotifier extends Notifier<ChatState> {
           if (imageUrls.isNotEmpty) 'imageUrls': imageUrls,
           '_tempId': tempId,
         })
-        .then((_) {
+        .then((ackData) {
+          // ack 성공: 서버가 돌려준 실제 messageId 로 즉시 reconcile 한다.
+          // broadcast(message:new) 누락에 의존하지 않으므로, 브로드캐스트가
+          // 유실돼도 메시지가 sending 에 묶여 실패 처리/중복 재전송되지 않는다.
+          final messageId =
+              ackData is Map ? ackData['messageId'] as String? : null;
+          if (messageId != null) {
+            _reconcileTempMessage(tempId: tempId, messageId: messageId);
+            return;
+          }
+          // messageId 가 없으면(구버전 서버) 기존 폴백: 잠시 후에도 sending 이면 동기화.
           Future.delayed(const Duration(milliseconds: 500), () {
             final idx = state.messages.indexWhere((m) => m.id == tempId);
             if (idx != -1 &&
@@ -741,6 +765,26 @@ class ChatNotifier extends Notifier<ChatState> {
 
     final updated = [...state.messages];
     updated[idx] = updated[idx].copyWith(status: MessageStatus.failed);
+    state = state.copyWith(messages: updated);
+  }
+
+  /// ack 로 받은 실제 messageId 로 임시 메시지를 확정한다.
+  /// 이미 broadcast 로 교체됐으면 no-op, broadcast 가 먼저 도착해 실제 메시지가
+  /// 들어와 있으면 임시 메시지만 제거해 중복을 막는다.
+  void _reconcileTempMessage({
+    required String tempId,
+    required String messageId,
+  }) {
+    final idx = state.messages.indexWhere((m) => m.id == tempId);
+    if (idx == -1) return; // 이미 broadcast 로 교체됨
+    final updated = [...state.messages];
+    final alreadyHasReal = state.messages.any((m) => m.id == messageId);
+    if (alreadyHasReal) {
+      updated.removeAt(idx);
+    } else {
+      updated[idx] =
+          updated[idx].copyWith(id: messageId, status: MessageStatus.sent);
+    }
     state = state.copyWith(messages: updated);
   }
 

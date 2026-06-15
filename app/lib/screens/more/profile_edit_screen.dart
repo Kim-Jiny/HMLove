@@ -105,7 +105,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         showTopSnackBar(context, '이미지 업로드에 실패했습니다.', isError: true);
       }
     } finally {
-      setState(() => _isUploadingImage = false);
+      if (mounted) setState(() => _isUploadingImage = false);
     }
   }
 
@@ -166,7 +166,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         showTopSnackBar(context, '프로필 수정에 실패했습니다.', isError: true);
       }
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
