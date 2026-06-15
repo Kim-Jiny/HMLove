@@ -55,6 +55,7 @@ class _ChatMediaGalleryScreenState extends State<ChatMediaGalleryScreen> {
       };
 
       final response = await _dio.get('/chat/media', queryParameters: params);
+      if (!mounted) return;
       final data = response.data as Map<String, dynamic>;
       final messages = <_MediaItem>[];
       for (final e in data['messages'] as List) {
@@ -87,6 +88,7 @@ class _ChatMediaGalleryScreenState extends State<ChatMediaGalleryScreen> {
         _isLoading = false;
       });
     } on DioException {
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }

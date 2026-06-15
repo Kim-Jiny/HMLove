@@ -462,7 +462,11 @@ class CalendarNotifier extends Notifier<CalendarState> {
         final list = await _fetchHolidayEventsForMonth(ym, calendarIds);
         all.addAll(list);
       }
-      state = state.copyWith(holidayEvents: all);
+      // 스와이프로 현재 월이 바뀐 사이 끝난 stale 결과는 덮어쓰지 않는다.
+      if (anchorYearMonth != _currentYearMonth) return;
+      // 월 경계에 걸친 이벤트가 인접 월 쿼리에 중복 반환되므로 id 로 dedup.
+      final deduped = {for (final e in all) e.id: e}.values.toList();
+      state = state.copyWith(holidayEvents: deduped);
     } catch (e) {
       debugPrint('[Holidays] range fetch error: $e');
     }
@@ -562,7 +566,11 @@ class CalendarNotifier extends Notifier<CalendarState> {
       for (final ym in months) {
         all.addAll(await _fetchDeviceEventsForMonth(ym, calendarIds));
       }
-      state = state.copyWith(deviceEvents: all);
+      // 스와이프로 현재 월이 바뀐 사이 끝난 stale 결과는 덮어쓰지 않는다.
+      if (anchorYearMonth != _currentYearMonth) return;
+      // 월 경계에 걸친 이벤트가 인접 월 쿼리에 중복 반환되므로 id 로 dedup.
+      final deduped = {for (final e in all) e.id: e}.values.toList();
+      state = state.copyWith(deviceEvents: deduped);
     } catch (e) {
       debugPrint('[DeviceCalendar] range fetch error: $e');
     }

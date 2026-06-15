@@ -83,8 +83,10 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
+    _currentIndex = widget.imageUrls.isEmpty
+        ? 0
+        : widget.initialIndex.clamp(0, widget.imageUrls.length - 1);
+    _pageController = PageController(initialPage: _currentIndex);
   }
 
   @override

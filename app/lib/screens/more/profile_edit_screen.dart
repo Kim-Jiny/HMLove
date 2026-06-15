@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../core/server_date.dart';
 import '../../core/top_snackbar.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user.dart';
@@ -145,7 +146,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       final response = await dio.patch('/auth/profile', data: {
         'nickname': nickname,
         if (_birthDate != null)
-          'birthDate': _birthDate!.toIso8601String(),
+          'birthDate': toServerDateOnly(_birthDate!),
       });
 
       final userData = response.data['user'] as Map<String, dynamic>;

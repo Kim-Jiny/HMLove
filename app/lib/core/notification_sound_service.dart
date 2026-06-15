@@ -127,20 +127,25 @@ class NotificationSoundService {
   /// 녹음 시작
   static Future<bool> startRecording(String recordId) async {
     final recorder = AudioRecorder();
-    if (!await recorder.hasPermission()) {
+    if (_soundDir == null || !await recorder.hasPermission()) {
       await recorder.dispose();
       return false;
     }
 
-    final path = '${_soundDir!}/$recordId.m4a';
-    await recorder.start(
-      const RecordConfig(
-        encoder: AudioEncoder.aacLc,
-        bitRate: 128000,
-        sampleRate: 44100,
-      ),
-      path: path,
-    );
+    try {
+      final path = '${_soundDir!}/$recordId.m4a';
+      await recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          sampleRate: 44100,
+        ),
+        path: path,
+      );
+    } catch (_) {
+      await recorder.dispose();
+      return false;
+    }
     _activeRecorder = recorder;
     return true;
   }
@@ -184,6 +189,7 @@ class NotificationSoundService {
     await box.put('custom_sounds', list);
 
     // 파일 삭제
+    if (_soundDir == null) return;
     final file = File('${_soundDir!}/$soundId.m4a');
     if (file.existsSync()) await file.delete();
   }

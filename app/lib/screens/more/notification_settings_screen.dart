@@ -762,6 +762,9 @@ class _SoundPickerSheetState extends State<_SoundPickerSheet> {
   bool _isRecording = false;
   int _recordSeconds = 0;
   Timer? _recordTimer;
+  // 녹음 시작 시점의 id. 파일명이 이 id 로 저장되므로 정지 시에도 반드시 이 id 를
+  // 써야 한다. (수동 정지 버튼이 새 id 를 만들어 파일명과 어긋나던 버그 방지)
+  String? _recordingId;
   final _nameController = TextEditingController();
 
   @override
@@ -785,6 +788,7 @@ class _SoundPickerSheetState extends State<_SoundPickerSheet> {
 
   Future<void> _startRecording() async {
     final id = 'custom_${DateTime.now().millisecondsSinceEpoch}';
+    _recordingId = id;
     final ok = await NotificationSoundService.startRecording(id);
     if (!ok) {
       if (mounted) {
@@ -975,9 +979,9 @@ class _SoundPickerSheetState extends State<_SoundPickerSheet> {
                       ? _RecordingIndicator(
                           seconds: _recordSeconds,
                           onStop: () {
-                            final id =
-                                'custom_${DateTime.now().millisecondsSinceEpoch}';
-                            _stopRecording(id);
+                            // 녹음 시작 시점의 id 를 그대로 사용해야 파일명과 일치한다.
+                            final id = _recordingId;
+                            if (id != null) _stopRecording(id);
                           },
                         )
                       : OutlinedButton.icon(

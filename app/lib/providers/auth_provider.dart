@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
 import '../core/pending_route.dart';
+import '../core/server_date.dart';
 import '../core/push_notification_service.dart';
 import '../core/social_auth_service.dart';
 import '../core/widget_service.dart';
@@ -278,7 +279,7 @@ class AuthNotifier extends Notifier<AuthState> {
           'email': email,
           'password': password,
           'nickname': nickname,
-          if (birthDate != null) 'birthDate': birthDate.toIso8601String(),
+          if (birthDate != null) 'birthDate': toServerDateOnly(birthDate),
         },
       );
 
@@ -493,7 +494,7 @@ class AuthNotifier extends Notifier<AuthState> {
         data: {
           'signupToken': signupToken,
           'nickname': nickname,
-          if (birthDate != null) 'birthDate': birthDate.toIso8601String(),
+          if (birthDate != null) 'birthDate': toServerDateOnly(birthDate),
         },
       );
       final data = response.data as Map<String, dynamic>;

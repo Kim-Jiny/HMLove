@@ -61,6 +61,7 @@ class _ChatLinksScreenState extends State<ChatLinksScreen> {
 
       final response =
           await _dio.get('/chat/links', queryParameters: params);
+      if (!mounted) return;
       final data = response.data as Map<String, dynamic>;
       final messages = data['messages'] as List;
       final cursor = data['nextCursor'] as String?;
@@ -93,6 +94,7 @@ class _ChatLinksScreenState extends State<ChatLinksScreen> {
         _isLoading = false;
       });
     } on DioException {
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
