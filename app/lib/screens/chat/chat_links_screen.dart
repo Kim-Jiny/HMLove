@@ -139,7 +139,7 @@ class _ChatLinksScreenState extends State<ChatLinksScreen> {
               controller: _scrollController,
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: _items.length + (_isLoading ? 1 : 0),
-              separatorBuilder: (_, __) =>
+              separatorBuilder: (_, _) =>
                   const Divider(height: 1, indent: 16, endIndent: 16),
               itemBuilder: (context, index) {
                 if (index == _items.length) {

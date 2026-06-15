@@ -294,7 +294,7 @@ class _FightWriteScreenState extends ConsumerState<FightWriteScreen> {
                         onChanged: (value) {
                           setState(() => _isResolved = value);
                         },
-                        activeColor: AppTheme.successColor,
+                        activeThumbColor: AppTheme.successColor,
                       ),
                     ],
                   ),

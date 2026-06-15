@@ -57,7 +57,7 @@ class BadgeNotifier extends Notifier<BadgeState> {
     try {
       final box = Hive.box(AppConstants.settingsBox);
       final since = box.get('lastSeenFeedAt') as String?;
-      final queryParams = <String, dynamic>{if (since != null) 'since': since};
+      final queryParams = <String, dynamic>{'since': ?since};
       final response = await _dio.get(
         '/feed/unread-count',
         queryParameters: queryParams,

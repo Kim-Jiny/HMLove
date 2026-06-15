@@ -135,7 +135,7 @@ class _ChatMediaGalleryScreenState extends State<ChatMediaGalleryScreen> {
                   child: CachedNetworkImage(
                     imageUrl: item.imageUrl,
                     fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => Container(
+                    errorWidget: (_, _, _) => Container(
                       color: Colors.grey.shade200,
                       child: const Icon(Icons.broken_image,
                           color: AppTheme.textHint),

@@ -306,7 +306,7 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
                             );
                     if (success) {
                       _fetchAnniversaries();
-                      if (mounted) {
+                      if (screenContext.mounted) {
                         showTopSnackBar(screenContext, '기념일이 추가되었습니다.');
                       }
                     }
@@ -339,26 +339,28 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
     final id = anniversary['id'] as String?;
     if (id == null) return; // auto anniversaries can't be deleted
 
+    // 다이얼로그 pop 후에도 유효한 화면 레벨 context (snackbar 용)
+    final screenContext = context;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('기념일 삭제'),
         content: Text("'${anniversary['title']}'를 삭제하시겠습니까?"),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('취소'),
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               final success =
                   await ref.read(calendarProvider.notifier).deleteEvent(id);
               if (success) {
                 _fetchAnniversaries();
-                if (mounted) {
-                  showTopSnackBar(context, '기념일이 삭제되었습니다.');
+                if (screenContext.mounted) {
+                  showTopSnackBar(screenContext, '기념일이 삭제되었습니다.');
                 }
               }
             },
@@ -434,7 +436,7 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: upcoming.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 return _AnniversaryTile(
                   anniversary: upcoming[index],
@@ -480,7 +482,7 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: past.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 return _AnniversaryTile(
                   anniversary: past[index],

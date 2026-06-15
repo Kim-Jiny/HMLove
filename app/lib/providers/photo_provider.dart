@@ -183,10 +183,10 @@ class PhotoNotifier extends Notifier<PhotoState> {
           imageFile.path,
           filename: fileName,
         ),
-        if (caption != null) 'caption': caption,
-        if (latitude != null) 'latitude': latitude,
-        if (longitude != null) 'longitude': longitude,
-        if (location != null) 'location': location,
+        'caption': ?caption,
+        'latitude': ?latitude,
+        'longitude': ?longitude,
+        'location': ?location,
       });
 
       final response = await _dio.post(

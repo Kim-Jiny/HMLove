@@ -36,7 +36,7 @@ class _ImageCarouselState extends State<ImageCarousel> {
           imageUrl: widget.imageUrls.first,
           width: double.infinity,
           fit: BoxFit.cover,
-          errorWidget: (_, __, ___) => Container(
+          errorWidget: (_, _, _) => Container(
             height: 300,
             color: Colors.grey.shade100,
             child: const Center(
@@ -69,7 +69,7 @@ class _ImageCarouselState extends State<ImageCarousel> {
                     imageUrl: widget.imageUrls[index],
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => Container(
+                    errorWidget: (_, _, _) => Container(
                       color: Colors.grey.shade100,
                       child: const Center(
                         child: Icon(Icons.image_not_supported_outlined,

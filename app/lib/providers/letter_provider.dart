@@ -196,8 +196,8 @@ class LetterNotifier extends Notifier<LetterState> {
 
     try {
       final response = await _dio.put('/letter/$id', data: {
-        if (title != null) 'title': title,
-        if (content != null) 'content': content,
+        'title': ?title,
+        'content': ?content,
         if (deliveryDate != null)
           'deliveryDate': deliveryDate.toIso8601String(),
       });

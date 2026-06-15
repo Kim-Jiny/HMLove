@@ -183,7 +183,7 @@ class _DeviceCalendarSettingsSheetState
                     ? const Color(0xFFD32F2F)
                     : AppTheme.textHint,
               ),
-              activeColor: const Color(0xFFD32F2F),
+              activeThumbColor: const Color(0xFFD32F2F),
               contentPadding: EdgeInsets.zero,
             ),
             // 공휴일이 안 보일 때 원인을 사용자가 직접 확인할 수 있는 진단.
@@ -248,7 +248,7 @@ class _DeviceCalendarSettingsSheetState
                 Icons.calendar_month,
                 color: _isEnabled ? AppTheme.primaryColor : AppTheme.textHint,
               ),
-              activeColor: AppTheme.primaryColor,
+              activeThumbColor: AppTheme.primaryColor,
               contentPadding: EdgeInsets.zero,
             ),
 
@@ -360,7 +360,7 @@ class _DeviceCalendarSettingsSheetState
                       ? AppTheme.primaryColor
                       : AppTheme.textHint,
                 ),
-                activeColor: AppTheme.primaryColor,
+                activeThumbColor: AppTheme.primaryColor,
                 contentPadding: EdgeInsets.zero,
               ),
               const Divider(),

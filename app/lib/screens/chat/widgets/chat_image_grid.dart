@@ -41,7 +41,7 @@ class ChatImageGrid extends StatelessWidget {
               width: width,
               height: height,
               fit: BoxFit.cover,
-              placeholder: (_, __) => Container(
+              placeholder: (_, _) => Container(
                 color: isMe
                     ? Colors.pink.shade200.withValues(alpha: 0.3)
                     : const Color(0xFFF0F0F0),
@@ -56,7 +56,7 @@ class ChatImageGrid extends StatelessWidget {
                   ),
                 ),
               ),
-              errorWidget: (_, __, ___) => Container(
+              errorWidget: (_, _, _) => Container(
                 color: const Color(0xFFF0F0F0),
                 child: const Center(
                   child: Icon(Icons.broken_image, color: AppTheme.textHint),

@@ -93,7 +93,7 @@ class FightNotifier extends Notifier<FightState> {
 
     try {
       final queryParams = <String, dynamic>{
-        if (isResolved != null) 'isResolved': isResolved,
+        'isResolved': ?isResolved,
       };
 
       final response =
@@ -129,9 +129,9 @@ class FightNotifier extends Notifier<FightState> {
       final response = await _dio.post('/fight', data: {
         'date': date.toIso8601String(),
         'reason': reason,
-        if (resolution != null) 'resolution': resolution,
-        if (reflection != null) 'reflection': reflection,
-        if (isResolved != null) 'isResolved': isResolved,
+        'resolution': ?resolution,
+        'reflection': ?reflection,
+        'isResolved': ?isResolved,
       });
 
       final data = response.data as Map<String, dynamic>;
@@ -169,10 +169,10 @@ class FightNotifier extends Notifier<FightState> {
     try {
       final response = await _dio.put('/fight/$id', data: {
         if (date != null) 'date': date.toIso8601String(),
-        if (reason != null) 'reason': reason,
-        if (resolution != null) 'resolution': resolution,
-        if (reflection != null) 'reflection': reflection,
-        if (isResolved != null) 'isResolved': isResolved,
+        'reason': ?reason,
+        'resolution': ?resolution,
+        'reflection': ?reflection,
+        'isResolved': ?isResolved,
       });
 
       final data = response.data as Map<String, dynamic>;

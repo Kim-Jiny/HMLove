@@ -41,7 +41,7 @@ class DoodleCard extends StatelessWidget {
                     child: Image.network(
                       latest!.imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      errorBuilder: (_, _, _) => Container(
                         color: const Color(0xFFFFF1EA),
                         child: const Icon(
                           Icons.brush_rounded,

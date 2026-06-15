@@ -838,7 +838,7 @@ class ChatNotifier extends Notifier<ChatState> {
     try {
       final queryParams = <String, dynamic>{
         'limit': 30,
-        if (cursor != null) 'cursor': cursor,
+        'cursor': ?cursor,
       };
 
       final response = await _dio.get(

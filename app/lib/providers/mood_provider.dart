@@ -166,7 +166,7 @@ class MoodNotifier extends Notifier<MoodState> {
         data: {
           'emoji': emoji,
           'date': localToday,
-          if (message != null) 'message': message,
+          'message': ?message,
         },
       );
 

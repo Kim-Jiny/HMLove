@@ -414,7 +414,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
                     DropdownButtonFormField<String>(
-                      value: repeatType,
+                      initialValue: repeatType,
                       decoration: const InputDecoration(
                         labelText: '반복',
                         border: OutlineInputBorder(),
@@ -590,7 +590,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
                     DropdownButtonFormField<String>(
-                      value: repeatType,
+                      initialValue: repeatType,
                       decoration: const InputDecoration(
                         labelText: '반복',
                         border: OutlineInputBorder(),

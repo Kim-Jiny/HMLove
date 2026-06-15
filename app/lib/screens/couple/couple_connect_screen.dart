@@ -245,9 +245,10 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
         title: const Text('커플 연결'),
         actions: [
           TextButton(
-            onPressed: () => ref.read(authProvider.notifier).logout().then(
-                  (_) => context.go('/login'),
-                ),
+            onPressed: () async {
+              await ref.read(authProvider.notifier).logout();
+              if (context.mounted) context.go('/login');
+            },
             child: const Text(
               '로그아웃',
               style: TextStyle(color: AppTheme.textSecondary),

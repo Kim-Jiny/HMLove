@@ -665,10 +665,10 @@ class CalendarNotifier extends Notifier<CalendarState> {
       final response = await _dio.post('/calendar', data: {
         'title': title,
         'date': DateFormat('yyyy-MM-dd').format(date),
-        if (description != null) 'description': description,
-        if (isAnniversary != null) 'isAnniversary': isAnniversary,
-        if (repeatType != null) 'repeatType': repeatType,
-        if (color != null) 'color': color,
+        'description': ?description,
+        'isAnniversary': ?isAnniversary,
+        'repeatType': ?repeatType,
+        'color': ?color,
       });
 
       final data = response.data as Map<String, dynamic>;
@@ -716,12 +716,12 @@ class CalendarNotifier extends Notifier<CalendarState> {
 
     try {
       final response = await _dio.put('/calendar/$id', data: {
-        if (title != null) 'title': title,
+        'title': ?title,
         if (date != null) 'date': DateFormat('yyyy-MM-dd').format(date),
-        if (description != null) 'description': description,
-        if (isAnniversary != null) 'isAnniversary': isAnniversary,
-        if (repeatType != null) 'repeatType': repeatType,
-        if (color != null) 'color': color,
+        'description': ?description,
+        'isAnniversary': ?isAnniversary,
+        'repeatType': ?repeatType,
+        'color': ?color,
       });
 
       final data = response.data as Map<String, dynamic>;

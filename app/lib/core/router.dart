@@ -323,7 +323,7 @@ class _AuthChangeNotifier extends ChangeNotifier {
   late final ProviderSubscription<AuthState> _sub;
 
   _AuthChangeNotifier(Ref ref) {
-    _sub = ref.listen(authProvider, (_, __) {
+    _sub = ref.listen(authProvider, (_, _) {
       notifyListeners();
     });
   }
