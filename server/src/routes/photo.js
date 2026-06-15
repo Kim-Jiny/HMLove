@@ -4,6 +4,7 @@ import sharp from 'sharp';
 import ExifParser from 'exif-parser';
 import { authenticate, requireCouple } from '../middleware/auth.js';
 import prisma from '../utils/prisma.js';
+import { loadCoupleOwned } from '../utils/coupleScope.js';
 import { uploadFile, deleteFile } from '../utils/storage.js';
 
 const router = Router();
@@ -179,8 +180,8 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const photo = await prisma.photo.findUnique({ where: { id } });
-    if (!photo || photo.coupleId !== req.user.coupleId) {
+    const photo = await loadCoupleOwned(prisma.photo, id, req.user.coupleId);
+    if (!photo) {
       return res.status(404).json({ error: '사진을 찾을 수 없습니다.' });
     }
     if (photo.authorId !== req.user.id) {
