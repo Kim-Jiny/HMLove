@@ -127,7 +127,10 @@ class NotificationSoundService {
   /// 녹음 시작
   static Future<bool> startRecording(String recordId) async {
     final recorder = AudioRecorder();
-    if (!await recorder.hasPermission()) return false;
+    if (!await recorder.hasPermission()) {
+      await recorder.dispose();
+      return false;
+    }
 
     final path = '${_soundDir!}/$recordId.m4a';
     await recorder.start(

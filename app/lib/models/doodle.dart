@@ -23,15 +23,15 @@ class Doodle {
     final sender = json['sender'] as Map<String, dynamic>?;
     final receiver = json['receiver'] as Map<String, dynamic>?;
     return Doodle(
-      id: json['id'] as String,
+      id: json['id'] as String? ?? '',
       coupleId: json['coupleId'] as String? ?? '',
       senderId: json['senderId'] as String? ?? sender?['id'] as String? ?? '',
       senderNickname: sender?['nickname'] as String? ?? '',
       receiverId:
           json['receiverId'] as String? ?? receiver?['id'] as String? ?? '',
       receiverNickname: receiver?['nickname'] as String? ?? '',
-      imageUrl: json['imageUrl'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      imageUrl: json['imageUrl'] as String? ?? '',
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
     );
   }
 }

@@ -267,8 +267,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             const SizedBox(height: 16),
 
             // Email (read-only)
-            TextField(
-              controller: TextEditingController(text: user?.email ?? ''),
+            TextFormField(
+              initialValue: user?.email ?? '',
               readOnly: true,
               decoration: InputDecoration(
                 labelText: '이메일',

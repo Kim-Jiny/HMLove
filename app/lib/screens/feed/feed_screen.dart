@@ -133,12 +133,13 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
 
   bool _isUploadingImages = false;
 
-  void _showCreatePostSheet() {
+  Future<void> _showCreatePostSheet() async {
     final contentController = TextEditingController();
     final imageUrls = <String>[];
     _isUploadingImages = false;
 
-    showModalBottomSheet(
+    try {
+      await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -314,6 +315,9 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
         ),
       ),
     );
+    } finally {
+      contentController.dispose();
+    }
   }
 
   void _showDeleteConfirm(Feed feed) {
@@ -347,7 +351,6 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
       MaterialPageRoute(
         builder: (_) => _FeedDetailScreen(
           initialIndex: initialIndex,
-          ref: ref,
           onComment: _openComments,
           onDelete: _showDeleteConfirm,
         ),
@@ -1271,23 +1274,39 @@ class _GridTile extends StatelessWidget {
 
 // ─── Feed Detail Screen (scroll through posts from grid) ───
 
-class _FeedDetailScreen extends ConsumerWidget {
+class _FeedDetailScreen extends ConsumerStatefulWidget {
   final int initialIndex;
-  final WidgetRef ref;
   final void Function(Feed feed) onComment;
   final void Function(Feed feed) onDelete;
 
   const _FeedDetailScreen({
     required this.initialIndex,
-    required this.ref,
     required this.onComment,
     required this.onDelete,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_FeedDetailScreen> createState() => _FeedDetailScreenState();
+}
+
+class _FeedDetailScreenState extends ConsumerState<_FeedDetailScreen> {
+  late final PageController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final feeds = ref.watch(feedProvider).feeds;
-    final controller = PageController(initialPage: initialIndex);
 
     return Scaffold(
       appBar: AppBar(

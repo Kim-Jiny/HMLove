@@ -13,10 +13,10 @@ class QuestionAnswer {
 
   factory QuestionAnswer.fromJson(Map<String, dynamic> json) {
     return QuestionAnswer(
-      id: json['id'] as String,
-      userId: json['userId'] as String,
-      answer: json['answer'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      id: json['id'] as String? ?? '',
+      userId: json['userId'] as String? ?? '',
+      answer: json['answer'] as String? ?? '',
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
     );
   }
 }
@@ -58,11 +58,11 @@ class DailyQuestion {
     }
 
     return DailyQuestion(
-      id: json['id'] as String,
-      questionIdx: json['questionIdx'] as int,
-      questionText: json['questionText'] as String,
-      date: json['date'] as String,
-      myAnswer: json['myAnswer'] != null
+      id: json['id'] as String? ?? '',
+      questionIdx: (json['questionIdx'] as num?)?.toInt() ?? 0,
+      questionText: json['questionText'] as String? ?? '',
+      date: json['date'] as String? ?? '',
+      myAnswer: json['myAnswer'] is Map<String, dynamic>
           ? QuestionAnswer.fromJson(json['myAnswer'] as Map<String, dynamic>)
           : null,
       partnerAnswer: partnerAnswer,
@@ -107,11 +107,11 @@ class QuestionHistoryItem {
     }
 
     return QuestionHistoryItem(
-      id: json['id'] as String,
-      questionIdx: json['questionIdx'] as int,
-      questionText: json['questionText'] as String,
-      date: json['date'] as String,
-      myAnswer: json['myAnswer'] != null
+      id: json['id'] as String? ?? '',
+      questionIdx: (json['questionIdx'] as num?)?.toInt() ?? 0,
+      questionText: json['questionText'] as String? ?? '',
+      date: json['date'] as String? ?? '',
+      myAnswer: json['myAnswer'] is Map<String, dynamic>
           ? QuestionAnswer.fromJson(json['myAnswer'] as Map<String, dynamic>)
           : null,
       partnerAnswer: partnerAnswer,

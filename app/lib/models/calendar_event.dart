@@ -13,10 +13,10 @@ class CalendarEvent {
   const CalendarEvent({required this.id, required this.coupleId, required this.authorId, required this.title, this.description, required this.date, this.isAnniversary = false, this.repeatType = 'NONE', this.color, required this.createdAt});
 
   factory CalendarEvent.fromJson(Map<String, dynamic> json) => CalendarEvent(
-    id: json['id'], coupleId: json['coupleId'], authorId: json['authorId'],
-    title: json['title'], description: json['description'],
-    date: DateTime.parse(json['date']), isAnniversary: json['isAnniversary'] ?? false,
+    id: json['id'] as String? ?? '', coupleId: json['coupleId'] as String? ?? '', authorId: json['authorId'] as String? ?? '',
+    title: json['title'] as String? ?? '', description: json['description'],
+    date: DateTime.tryParse(json['date'] as String? ?? '') ?? DateTime.now(), isAnniversary: json['isAnniversary'] ?? false,
     repeatType: json['repeatType'] ?? 'NONE', color: json['color'],
-    createdAt: DateTime.parse(json['createdAt']),
+    createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
   );
 }

@@ -74,8 +74,8 @@ class Feed {
               ?.map((e) => FeedComment.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ?? DateTime.now(),
     );
   }
 
@@ -343,8 +343,8 @@ class FeedNotifier extends Notifier<FeedState> {
       if (currentIdx == -1) return;
       final currentFeeds = [...state.feeds];
       currentFeeds[currentIdx] = state.feeds[currentIdx].copyWith(
-        isLiked: data['isLiked'] as bool,
-        likeCount: data['likeCount'] as int,
+        isLiked: data['isLiked'] as bool? ?? newLiked,
+        likeCount: (data['likeCount'] as num?)?.toInt() ?? newCount,
       );
       state = state.copyWith(feeds: currentFeeds);
     } catch (_) {

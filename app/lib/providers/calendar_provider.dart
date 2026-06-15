@@ -45,9 +45,9 @@ class CalendarEvent {
 
   factory CalendarEvent.fromJson(Map<String, dynamic> json) {
     return CalendarEvent(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      date: DateTime.parse(json['date'] as String).toLocal(),
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      date: (DateTime.tryParse(json['date'] as String? ?? '') ?? DateTime.now()).toLocal(),
       description: json['description'] as String?,
       isAnniversary: json['isAnniversary'] as bool? ?? false,
       repeatType: json['repeatType'] as String?,

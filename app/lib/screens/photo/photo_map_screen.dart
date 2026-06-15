@@ -196,7 +196,9 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
 
     // Show caption dialog
     final captionController = TextEditingController();
-    final caption = await showDialog<String>(
+    final String? caption;
+    try {
+      caption = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('사진 설명'),
@@ -228,6 +230,9 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
         ],
       ),
     );
+    } finally {
+      captionController.dispose();
+    }
 
     if (caption == null) return;
 

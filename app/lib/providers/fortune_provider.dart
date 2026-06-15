@@ -35,18 +35,18 @@ class Fortune {
 
   factory Fortune.fromJson(Map<String, dynamic> json) {
     return Fortune(
-      id: json['id'] as String,
-      generalLuck: json['generalLuck'] as String,
-      coupleLuck: json['coupleLuck'] as String,
-      dateTip: json['dateTip'] as String,
-      caution: json['caution'] as String,
-      luckyScore: json['luckyScore'] as int,
+      id: json['id'] as String? ?? '',
+      generalLuck: json['generalLuck'] as String? ?? '',
+      coupleLuck: json['coupleLuck'] as String? ?? '',
+      dateTip: json['dateTip'] as String? ?? '',
+      caution: json['caution'] as String? ?? '',
+      luckyScore: (json['luckyScore'] as num?)?.toInt() ?? 0,
       user1Id: json['user1Id'] as String?,
       user1Luck: json['user1Luck'] as String?,
       user2Id: json['user2Id'] as String?,
       user2Luck: json['user2Luck'] as String?,
-      date: DateTime.parse(json['date'] as String),
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      date: DateTime.tryParse(json['date'] as String? ?? '') ?? DateTime.now(),
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
     );
   }
 

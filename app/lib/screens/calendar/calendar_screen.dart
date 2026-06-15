@@ -357,7 +357,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     );
   }
 
-  void _showEditEventDialog(CalendarEvent event) {
+  Future<void> _showEditEventDialog(CalendarEvent event) async {
     final titleController = TextEditingController(text: event.title);
     final descriptionController = TextEditingController(
       text: event.description ?? '',
@@ -367,7 +367,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     bool isSubmitting = false;
     final outerContext = context;
 
-    showDialog(
+    try {
+      await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
@@ -502,6 +503,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         },
       ),
     );
+    } finally {
+      titleController.dispose();
+      descriptionController.dispose();
+    }
   }
 
   Future<void> _showCreateEventDialog() async {
@@ -516,7 +521,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       setState(() => _suppressBackgroundResize = true);
     }
 
-    await showModalBottomSheet(
+    try {
+      await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -707,6 +713,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         },
       ),
     );
+    } finally {
+      titleController.dispose();
+      descriptionController.dispose();
+    }
 
     if (mounted) {
       setState(() => _suppressBackgroundResize = false);

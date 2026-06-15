@@ -13,11 +13,11 @@ class Letter {
   const Letter({required this.id, required this.coupleId, required this.writerId, required this.receiverId, required this.title, required this.content, required this.deliveryDate, this.status = 'DRAFT', this.isRead = false, required this.createdAt});
 
   factory Letter.fromJson(Map<String, dynamic> json) => Letter(
-    id: json['id'], coupleId: json['coupleId'], writerId: json['writerId'],
-    receiverId: json['receiverId'], title: json['title'], content: json['content'] ?? '',
-    deliveryDate: DateTime.parse(json['deliveryDate']),
+    id: json['id'] as String? ?? '', coupleId: json['coupleId'] as String? ?? '', writerId: json['writerId'] as String? ?? '',
+    receiverId: json['receiverId'] as String? ?? '', title: json['title'] as String? ?? '', content: json['content'] ?? '',
+    deliveryDate: DateTime.tryParse(json['deliveryDate'] as String? ?? '') ?? DateTime.now(),
     status: json['status'] ?? 'DRAFT', isRead: json['isRead'] ?? false,
-    createdAt: DateTime.parse(json['createdAt']),
+    createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
   );
 
   bool get isDelivered => status == 'DELIVERED';

@@ -34,17 +34,17 @@ class Fight {
   factory Fight.fromJson(Map<String, dynamic> json) {
     final author = json['author'] as Map<String, dynamic>?;
     return Fight(
-      id: json['id'] as String,
-      date: DateTime.parse(json['date'] as String),
-      reason: json['reason'] as String,
+      id: json['id'] as String? ?? '',
+      date: DateTime.tryParse(json['date'] as String? ?? '') ?? DateTime.now(),
+      reason: json['reason'] as String? ?? '',
       resolution: json['resolution'] as String?,
       reflection: json['reflection'] as String?,
       isResolved: json['isResolved'] as bool? ?? false,
-      coupleId: json['coupleId'] as String,
-      authorId: json['authorId'] as String,
+      coupleId: json['coupleId'] as String? ?? '',
+      authorId: json['authorId'] as String? ?? '',
       authorNickname: author?['nickname'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ?? DateTime.now(),
     );
   }
 }

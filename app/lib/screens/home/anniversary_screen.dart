@@ -154,13 +154,14 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
     return all;
   }
 
-  void _showAddAnniversary() {
+  Future<void> _showAddAnniversary() async {
     final titleController = TextEditingController();
     final descController = TextEditingController();
     DateTime selectedDate = DateTime.now();
     String repeatType = 'YEARLY';
 
-    showModalBottomSheet(
+    try {
+      await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -326,6 +327,10 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
         ),
       ),
     );
+    } finally {
+      titleController.dispose();
+      descController.dispose();
+    }
   }
 
   void _showDeleteConfirm(Map<String, dynamic> anniversary) {

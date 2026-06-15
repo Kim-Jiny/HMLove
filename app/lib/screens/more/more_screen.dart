@@ -212,10 +212,12 @@ class MoreScreen extends ConsumerWidget {
     if (step1 != true || !context.mounted) return;
 
     // 2단계: "탈퇴" 입력 확인
-    final step2 = await showDialog<bool>(
+    final controller = TextEditingController();
+    final bool? step2;
+    try {
+      step2 = await showDialog<bool>(
       context: context,
       builder: (ctx) {
-        final controller = TextEditingController();
         return StatefulBuilder(
           builder: (ctx, setState) => AlertDialog(
             shape: RoundedRectangleBorder(
@@ -263,6 +265,9 @@ class MoreScreen extends ConsumerWidget {
         );
       },
     );
+    } finally {
+      controller.dispose();
+    }
 
     if (step2 != true || !context.mounted) return;
 
@@ -395,10 +400,12 @@ class MoreScreen extends ConsumerWidget {
       if (step2 != true || !context.mounted) return;
 
       // 3단계: 최종 확인 - "해제" 입력
-      final step3 = await showDialog<bool>(
+      final controller = TextEditingController();
+      final bool? step3;
+      try {
+        step3 = await showDialog<bool>(
         context: context,
         builder: (ctx) {
-          final controller = TextEditingController();
           return StatefulBuilder(
             builder: (ctx, setState) => AlertDialog(
               shape: RoundedRectangleBorder(
@@ -449,6 +456,9 @@ class MoreScreen extends ConsumerWidget {
           );
         },
       );
+      } finally {
+        controller.dispose();
+      }
 
       if (step3 != true || !context.mounted) return;
     }
