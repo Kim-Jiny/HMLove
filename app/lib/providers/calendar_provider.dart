@@ -84,6 +84,8 @@ class CalendarMood {
 
 // Calendar state class
 class CalendarState {
+  static const _sentinel = Object();
+
   final List<CalendarEvent> events;
   final List<CalendarEvent> deviceEvents;
   final List<CalendarEvent> holidayEvents;
@@ -113,7 +115,7 @@ class CalendarState {
     Map<String, List<CalendarMood>>? moodMap,
     DateTime? selectedDay,
     bool? isLoading,
-    String? error,
+    Object? error = _sentinel,
     bool? deviceCalendarEnabled,
     bool? holidayOverlayEnabled,
   }) {
@@ -124,7 +126,7 @@ class CalendarState {
       moodMap: moodMap ?? this.moodMap,
       selectedDay: selectedDay ?? this.selectedDay,
       isLoading: isLoading ?? this.isLoading,
-      error: error,
+      error: identical(error, _sentinel) ? this.error : error as String?,
       deviceCalendarEnabled: deviceCalendarEnabled ?? this.deviceCalendarEnabled,
       holidayOverlayEnabled:
           holidayOverlayEnabled ?? this.holidayOverlayEnabled,

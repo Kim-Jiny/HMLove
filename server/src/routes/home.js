@@ -134,11 +134,32 @@ router.get('/summary', async (req, res) => {
       prisma.calendarEvent.findMany({
         where: {
           coupleId,
-          date: { gte: start, lt: end },
+          OR: [
+            // 오늘 날짜의 단발 일정
+            { date: { gte: start, lt: end }, repeatType: 'NONE' },
+            // 반복 일정은 전부 가져와 아래에서 오늘 해당분만 필터
+            { repeatType: 'YEARLY' },
+            { repeatType: 'MONTHLY' },
+          ],
         },
         orderBy: { date: 'asc' },
       }),
     ]);
+
+    // 반복 일정(매년/매월)이 오늘에 해당하면 "오늘의 일정"에 포함.
+    // (캘린더 화면은 반복을 펼쳐 보여주는데 홈 위젯은 누락하던 문제)
+    const todayMonth = start.getUTCMonth();
+    const todayDay = start.getUTCDate();
+    const todayScheduleEvents = todayEvents.filter((ev) => {
+      if (ev.repeatType === 'YEARLY') {
+        return ev.date.getUTCMonth() === todayMonth &&
+          ev.date.getUTCDate() === todayDay;
+      }
+      if (ev.repeatType === 'MONTHLY') {
+        return ev.date.getUTCDate() === todayDay;
+      }
+      return true; // NONE: 이미 오늘 윈도우로 필터됨
+    });
 
     // 멱등 upsert/cleanup 쓰기 — 트랜잭션 격리 없이 병렬 실행
     const [daily, weekly, , dailyQuestion] = await Promise.all([
@@ -217,7 +238,7 @@ router.get('/summary', async (req, res) => {
       notifications: { unreadCount: notificationUnreadCount },
       widgets: {
         month,
-        todaySchedule: formatSchedule(todayEvents),
+        todaySchedule: formatSchedule(todayScheduleEvents),
       },
     });
   } catch (err) {

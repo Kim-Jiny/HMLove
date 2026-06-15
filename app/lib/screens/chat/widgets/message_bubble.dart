@@ -107,7 +107,11 @@ class MessageBubble extends StatelessWidget {
             if (locData != null)
               LocationBubble(data: locData, isMe: isMe, interactive: interactive)
             else if (GameResultBubble.isGameMessage(message.content))
-              GameResultBubble(content: message.content, isMe: isMe)
+              GameResultBubble(
+                content: message.content,
+                isMe: isMe,
+                senderName: isMe ? '나' : (message.senderNickname ?? '상대방'),
+              )
             else
             Container(
               constraints: BoxConstraints(

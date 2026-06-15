@@ -36,6 +36,10 @@ if (serviceAccountEnv) {
 export async function sendPushNotification({ token, title, body, data, sound = true, mutableContent = false, userId = null }) {
   if (!token) return;
 
+  // userId 가 주어지면 그 유저의 최신 토큰을 우선 사용한다. debounce 등으로 호출 시점에
+  // 토큰이 회전(rotate)했을 수 있어, 닫아둔 stale 토큰으로 보내 유실되는 것을 막는다.
+  let effectiveToken = token;
+
   try {
     // 실제 미읽음 알림 개수 조회
     let badgeCount = 1;
@@ -46,12 +50,15 @@ export async function sendPushNotification({ token, title, body, data, sound = t
       const user = userId
         ? await prisma.user.findUnique({
             where: { id: userId },
-            select: { id: true, coupleId: true },
+            select: { id: true, coupleId: true, fcmToken: true },
           })
         : await prisma.user.findFirst({
             where: { fcmToken: token },
             select: { id: true, coupleId: true },
           });
+      if (userId && user?.fcmToken) {
+        effectiveToken = user.fcmToken;
+      }
       if (user) {
         const [unreadMessages, unreadNotifications] = await Promise.all([
           prisma.message.count({
@@ -86,7 +93,7 @@ export async function sendPushNotification({ token, title, body, data, sound = t
     }
 
     await admin.messaging().send({
-      token,
+      token: effectiveToken,
       notification: { title, body },
       data: mergedData,
       android: {
@@ -114,15 +121,15 @@ export async function sendPushNotification({ token, title, body, data, sound = t
         },
       },
     });
-    console.log(`[Push] Sent to token: ${token.substring(0, 20)}... (sound: ${sound}, mutable: ${mutableContent})`);
+    console.log(`[Push] Sent to token: ${effectiveToken.substring(0, 20)}... (sound: ${sound}, mutable: ${mutableContent})`);
   } catch (err) {
-    // 토큰이 유효하지 않으면 DB에서 삭제
+    // 토큰이 유효하지 않으면 DB에서 삭제 (실제로 보낸 토큰 기준)
     if (err.code === 'messaging/registration-token-not-registered' ||
         err.code === 'messaging/invalid-registration-token') {
       console.log('[Push] Invalid token, removing from DB');
       const prisma = (await import('./prisma.js')).default;
       await prisma.user.updateMany({
-        where: { fcmToken: token },
+        where: { fcmToken: effectiveToken },
         data: { fcmToken: null },
       });
     } else {

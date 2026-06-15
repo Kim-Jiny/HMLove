@@ -8,10 +8,15 @@ class GameResultBubble extends StatelessWidget {
   final String content;
   final bool isMe;
 
+  /// 실제 발신자 표시 이름. payload 안의 senderName 은 발신자 클라이언트가 임의로
+  /// 넣은 값이라 위조 가능하므로, 메시지 메타데이터의 신뢰 가능한 이름을 쓴다.
+  final String? senderName;
+
   const GameResultBubble({
     super.key,
     required this.content,
     required this.isMe,
+    this.senderName,
   });
 
   @override
@@ -20,7 +25,7 @@ class GameResultBubble extends StatelessWidget {
       final json = content.substring('__GAME_ROULETTE__:'.length);
       try {
         final data = jsonDecode(json) as Map<String, dynamic>;
-        return _RouletteBubble(data: data, isMe: isMe);
+        return _RouletteBubble(data: data, isMe: isMe, senderName: senderName);
       } catch (_) {
         return const SizedBox.shrink();
       }
@@ -29,7 +34,7 @@ class GameResultBubble extends StatelessWidget {
       final json = content.substring('__GAME_LADDER__:'.length);
       try {
         final data = jsonDecode(json) as Map<String, dynamic>;
-        return _LadderBubble(data: data, isMe: isMe);
+        return _LadderBubble(data: data, isMe: isMe, senderName: senderName);
       } catch (_) {
         return const SizedBox.shrink();
       }
@@ -59,8 +64,9 @@ class GameResultBubble extends StatelessWidget {
 class _RouletteBubble extends StatelessWidget {
   final Map<String, dynamic> data;
   final bool isMe;
+  final String? senderName;
 
-  const _RouletteBubble({required this.data, required this.isMe});
+  const _RouletteBubble({required this.data, required this.isMe, this.senderName});
 
   @override
   Widget build(BuildContext context) {
@@ -70,8 +76,9 @@ class _RouletteBubble extends StatelessWidget {
     final options =
         rawOptions is List ? rawOptions.whereType<String>().toList() : <String>[];
     final result = data['result'] is String ? data['result'] as String : '';
-    final senderName =
-        data['senderName'] is String ? data['senderName'] as String : '';
+    // 신뢰 가능한 발신자명 우선, 없으면 payload 값 폴백.
+    final senderName = this.senderName ??
+        (data['senderName'] is String ? data['senderName'] as String : '');
 
     return Container(
       constraints: BoxConstraints(
@@ -195,8 +202,9 @@ class _RouletteBubble extends StatelessWidget {
 class _LadderBubble extends StatelessWidget {
   final Map<String, dynamic> data;
   final bool isMe;
+  final String? senderName;
 
-  const _LadderBubble({required this.data, required this.isMe});
+  const _LadderBubble({required this.data, required this.isMe, this.senderName});
 
   @override
   Widget build(BuildContext context) {
@@ -209,8 +217,8 @@ class _LadderBubble extends StatelessWidget {
       if (rawResult is Map)
         for (final e in rawResult.entries) '${e.key}': '${e.value}',
     };
-    final senderName =
-        data['senderName'] is String ? data['senderName'] as String : '';
+    final senderName = this.senderName ??
+        (data['senderName'] is String ? data['senderName'] as String : '');
 
     return Container(
       constraints: BoxConstraints(
