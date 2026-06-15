@@ -8,6 +8,8 @@ import '../core/api_error.dart';
 import '../models/doodle.dart';
 
 class DoodleState {
+  static const _sentinel = Object();
+
   final List<Doodle> doodles;
   final Doodle? latestReceived;
   final bool isLoading;
@@ -28,7 +30,7 @@ class DoodleState {
     bool clearLatest = false,
     bool? isLoading,
     bool? isSending,
-    String? error,
+    Object? error = _sentinel,
   }) {
     return DoodleState(
       doodles: doodles ?? this.doodles,
@@ -37,7 +39,7 @@ class DoodleState {
           : (latestReceived ?? this.latestReceived),
       isLoading: isLoading ?? this.isLoading,
       isSending: isSending ?? this.isSending,
-      error: error,
+      error: identical(error, _sentinel) ? this.error : error as String?,
     );
   }
 }
@@ -139,6 +141,7 @@ class DoodleNotifier extends Notifier<DoodleState> {
       await _dio.delete('/doodle/$id');
       state = state.copyWith(
         doodles: state.doodles.where((d) => d.id != id).toList(),
+        error: null,
       );
       return true;
     } catch (_) {

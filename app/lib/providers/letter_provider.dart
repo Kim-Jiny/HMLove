@@ -64,6 +64,8 @@ class Letter {
 
 // Letter state class
 class LetterState {
+  static const _sentinel = Object();
+
   final List<Letter> letters;
   final Letter? selectedLetter;
   final bool isLoading;
@@ -80,13 +82,13 @@ class LetterState {
     List<Letter>? letters,
     Letter? selectedLetter,
     bool? isLoading,
-    String? error,
+    Object? error = _sentinel,
   }) {
     return LetterState(
       letters: letters ?? this.letters,
       selectedLetter: selectedLetter ?? this.selectedLetter,
       isLoading: isLoading ?? this.isLoading,
-      error: error,
+      error: identical(error, _sentinel) ? this.error : error as String?,
     );
   }
 }
@@ -272,6 +274,7 @@ class LetterNotifier extends Notifier<LetterState> {
         letters: updatedLetters,
         selectedLetter:
             state.selectedLetter?.id == id ? updatedLetter : null,
+        error: null,
       );
       return true;
     } on DioException catch (e) {

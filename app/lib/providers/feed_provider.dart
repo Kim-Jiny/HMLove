@@ -140,6 +140,8 @@ class FeedComment {
 
 // Feed state class
 class FeedState {
+  static const _sentinel = Object();
+
   final List<Feed> feeds;
   final bool isLoading;
   final String? nextCursor;
@@ -159,14 +161,14 @@ class FeedState {
     bool? isLoading,
     String? nextCursor,
     bool? hasMore,
-    String? error,
+    Object? error = _sentinel,
   }) {
     return FeedState(
       feeds: feeds ?? this.feeds,
       isLoading: isLoading ?? this.isLoading,
       nextCursor: nextCursor ?? this.nextCursor,
       hasMore: hasMore ?? this.hasMore,
-      error: error,
+      error: identical(error, _sentinel) ? this.error : error as String?,
     );
   }
 }

@@ -48,6 +48,8 @@ class Mood {
 
 // Mood state class
 class MoodState {
+  static const _sentinel = Object();
+
   final Mood? myMood;
   final Mood? partnerMood;
   final bool isLoading;
@@ -64,13 +66,13 @@ class MoodState {
     Mood? myMood,
     Mood? partnerMood,
     bool? isLoading,
-    String? error,
+    Object? error = _sentinel,
   }) {
     return MoodState(
       myMood: myMood ?? this.myMood,
       partnerMood: partnerMood ?? this.partnerMood,
       isLoading: isLoading ?? this.isLoading,
-      error: error,
+      error: identical(error, _sentinel) ? this.error : error as String?,
     );
   }
 }

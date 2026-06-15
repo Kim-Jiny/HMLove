@@ -8,6 +8,8 @@ import 'auth_provider.dart';
 
 // Couple state class
 class CoupleState {
+  static const _sentinel = Object();
+
   final Couple? couple;
   final bool isLoading;
   final String? error;
@@ -23,13 +25,13 @@ class CoupleState {
   CoupleState copyWith({
     Couple? couple,
     bool? isLoading,
-    String? error,
+    Object? error = _sentinel,
     String? generatedInviteCode,
   }) {
     return CoupleState(
       couple: couple ?? this.couple,
       isLoading: isLoading ?? this.isLoading,
-      error: error,
+      error: identical(error, _sentinel) ? this.error : error as String?,
       generatedInviteCode: generatedInviteCode ?? this.generatedInviteCode,
     );
   }

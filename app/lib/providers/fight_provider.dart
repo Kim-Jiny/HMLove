@@ -52,6 +52,8 @@ class Fight {
 
 // Fight state class
 class FightState {
+  static const _sentinel = Object();
+
   final List<Fight> fights;
   final bool isLoading;
   final String? error;
@@ -65,12 +67,12 @@ class FightState {
   FightState copyWith({
     List<Fight>? fights,
     bool? isLoading,
-    String? error,
+    Object? error = _sentinel,
   }) {
     return FightState(
       fights: fights ?? this.fights,
       isLoading: isLoading ?? this.isLoading,
-      error: error,
+      error: identical(error, _sentinel) ? this.error : error as String?,
     );
   }
 }

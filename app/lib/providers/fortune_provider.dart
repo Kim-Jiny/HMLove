@@ -67,6 +67,8 @@ class Fortune {
 
 // Fortune state class
 class FortuneState {
+  static const _sentinel = Object();
+
   final Fortune? fortune;
   final bool isLoading;
   final String? error;
@@ -82,13 +84,13 @@ class FortuneState {
   FortuneState copyWith({
     Fortune? fortune,
     bool? isLoading,
-    String? error,
+    Object? error = _sentinel,
     bool? exists,
   }) {
     return FortuneState(
       fortune: fortune ?? this.fortune,
       isLoading: isLoading ?? this.isLoading,
-      error: error,
+      error: identical(error, _sentinel) ? this.error : error as String?,
       exists: exists ?? this.exists,
     );
   }

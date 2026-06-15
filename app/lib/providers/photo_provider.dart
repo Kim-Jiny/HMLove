@@ -77,6 +77,8 @@ class Photo {
 
 // Photo state class
 class PhotoState {
+  static const _sentinel = Object();
+
   final List<Photo> photos;
   final List<Photo> mapPhotos;
   final bool isLoading;
@@ -93,13 +95,13 @@ class PhotoState {
     List<Photo>? photos,
     List<Photo>? mapPhotos,
     bool? isLoading,
-    String? error,
+    Object? error = _sentinel,
   }) {
     return PhotoState(
       photos: photos ?? this.photos,
       mapPhotos: mapPhotos ?? this.mapPhotos,
       isLoading: isLoading ?? this.isLoading,
-      error: error,
+      error: identical(error, _sentinel) ? this.error : error as String?,
     );
   }
 }
