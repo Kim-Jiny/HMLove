@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -31,12 +33,24 @@ class PushNotificationService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   static bool _initialized = false;
 
+  // FCM 스트림 구독. 재로그인마다 initialize 가 다시 불리므로 구독을 보관해
+  // reset 에서 취소하지 않으면 핸들러가 중첩 등록돼 푸시가 N 번 처리된다.
+  static StreamSubscription<String>? _tokenRefreshSub;
+  static StreamSubscription<RemoteMessage>? _onMessageSub;
+  static StreamSubscription<RemoteMessage>? _onMessageOpenedSub;
+
   /// 커�� 해제 알림 수신 시 콜백 (MainShell에서 등록)
   static void Function()? onCoupleLeft;
 
-  /// 로그아웃 시 호출 — 다음 로그인에서 토큰 재동기화
+  /// 로그아웃 시 호출 — 구독 해제 + 다음 로그인에서 토큰 재동기화
   static void reset() {
     _initialized = false;
+    _tokenRefreshSub?.cancel();
+    _onMessageSub?.cancel();
+    _onMessageOpenedSub?.cancel();
+    _tokenRefreshSub = null;
+    _onMessageSub = null;
+    _onMessageOpenedSub = null;
   }
 
   /// 앱 시작 시 즉시 호출 — 포그라운드 시스템 푸시 억제 (iOS)
@@ -78,13 +92,19 @@ class PushNotificationService {
 
     await _syncToken();
 
+    // 재진입(재로그인) 대비: 기존 구독이 남아있으면 먼저 취소.
+    _tokenRefreshSub?.cancel();
+    _onMessageSub?.cancel();
+    _onMessageOpenedSub?.cancel();
+
     // 토큰 갱신 시 서버에 재등록
-    _messaging.onTokenRefresh.listen((newToken) {
+    _tokenRefreshSub = _messaging.onTokenRefresh.listen((newToken) {
       _updateTokenIfChanged(newToken);
     });
 
     // 포그라운드 메시지 처리 → 인앱 배너
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+    _onMessageSub =
+        FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       debugPrint('[Push] Foreground message received');
       debugPrint(
         '[Push]   notification: ${message.notification?.title} / ${message.notification?.body}',
@@ -115,7 +135,8 @@ class PushNotificationService {
     });
 
     // 백그라운드에서 알림 탭하여 앱 열었을 때
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+    _onMessageOpenedSub =
+        FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       debugPrint('[Push] Opened from background: ${message.data}');
       _handleNotificationTap(message.data);
     });

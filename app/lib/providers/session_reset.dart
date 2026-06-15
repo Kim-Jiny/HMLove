@@ -1,5 +1,3 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'badge_provider.dart';
 import 'calendar_provider.dart';
 import 'couple_provider.dart';
@@ -23,7 +21,10 @@ import 'wishlist_provider.dart';
 /// 막을 수 있다. auth/chat 은 호출부에서 별도로 처리한다.
 ///
 /// 새 feature provider 를 추가하면 여기에도 등록할 것. (단일 소스)
-void resetFeatureProviders(Ref ref) {
+///
+/// [ref] 는 Notifier 의 `Ref` 또는 위젯의 `WidgetRef` 둘 다 받는다. 둘은 공통
+/// 상위 타입이 없지만 모두 `invalidate` 를 제공하므로 dynamic 으로 받는다.
+void resetFeatureProviders(dynamic ref) {
   ref.invalidate(badgeProvider);
   ref.invalidate(calendarProvider);
   ref.invalidate(coupleProvider);

@@ -10,6 +10,7 @@ import '../../core/top_snackbar.dart';
 import '../../widgets/banner_ad_widget.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
+import '../../providers/session_reset.dart';
 import '../../providers/inquiry_provider.dart';
 import '../../providers/letter_provider.dart';
 import 'inquiry_screen.dart';
@@ -456,6 +457,8 @@ class MoreScreen extends ConsumerWidget {
     final success = await ref.read(coupleProvider.notifier).leaveCouple();
     if (context.mounted) {
       if (success) {
+        // 커플 해제 시 이전 커플의 피드·사진·캘린더 등 잔존 데이터 초기화
+        resetFeatureProviders(ref);
         context.go('/couple-connect');
       } else {
         showTopSnackBar(context, '커플 해제에 실패했습니다', isError: true);
