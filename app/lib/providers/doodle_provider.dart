@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
+import '../core/api_error.dart';
 import '../models/doodle.dart';
 
 class DoodleState {
@@ -62,7 +63,7 @@ class DoodleNotifier extends Notifier<DoodleState> {
     } on DioException catch (e) {
       state = state.copyWith(
         isLoading: false,
-        error: e.response?.data?['error'] as String? ?? '그림 기록을 불러오지 못했습니다',
+        error: extractDioErrorMessage(e, fallback: '그림 기록을 불러오지 못했습니다'),
       );
     } catch (_) {
       state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
@@ -124,7 +125,7 @@ class DoodleNotifier extends Notifier<DoodleState> {
     } on DioException catch (e) {
       state = state.copyWith(
         isSending: false,
-        error: e.response?.data?['error'] as String? ?? '그림 전송에 실패했습니다',
+        error: extractDioErrorMessage(e, fallback: '그림 전송에 실패했습니다'),
       );
       return null;
     } catch (_) {

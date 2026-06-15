@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../core/api_client.dart';
+import '../core/api_error.dart';
 
 // Mood model
 class Mood {
@@ -145,7 +146,7 @@ class MoodNotifier extends Notifier<MoodState> {
       );
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '기분 정보를 불러오지 못했습니다';
+          extractDioErrorMessage(e, fallback: '기분 정보를 불러오지 못했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
@@ -179,7 +180,7 @@ class MoodNotifier extends Notifier<MoodState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '기분 설정에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '기분 설정에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {

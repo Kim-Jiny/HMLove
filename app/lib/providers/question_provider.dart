@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api_client.dart';
+import '../core/api_error.dart';
 import '../models/daily_question.dart';
 
 class QuestionState {
@@ -91,11 +92,7 @@ class QuestionNotifier extends Notifier<QuestionState> {
       return true;
     } on DioException catch (e) {
       final message =
-          ((e.response?.data is Map)
-                  ? (e.response?.data['error'] ?? e.response?.data['message'])
-                  : null)
-              as String? ??
-          '답변 제출에 실패했습니다.';
+          extractDioErrorMessage(e, fallback: '답변 제출에 실패했습니다.');
       state = state.copyWith(error: message);
       return false;
     } catch (e) {

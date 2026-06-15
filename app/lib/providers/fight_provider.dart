@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
+import '../core/api_error.dart';
 
 // Fight model
 class Fight {
@@ -102,7 +103,7 @@ class FightNotifier extends Notifier<FightState> {
       state = state.copyWith(fights: fights, isLoading: false);
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '다툼 기록을 불러오지 못했습니다';
+          extractDioErrorMessage(e, fallback: '다툼 기록을 불러오지 못했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(
@@ -140,7 +141,7 @@ class FightNotifier extends Notifier<FightState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '다툼 기록 생성에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '다툼 기록 생성에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -183,7 +184,7 @@ class FightNotifier extends Notifier<FightState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '다툼 기록 수정에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '다툼 기록 수정에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -212,7 +213,7 @@ class FightNotifier extends Notifier<FightState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '다툼 해결 처리에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '다툼 해결 처리에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -236,7 +237,7 @@ class FightNotifier extends Notifier<FightState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '다툼 기록 삭제에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '다툼 기록 삭제에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {

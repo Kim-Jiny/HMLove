@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api_client.dart';
+import '../core/api_error.dart';
 
 class Mission {
   final String id;
@@ -139,11 +140,7 @@ class MissionNotifier extends Notifier<MissionState> {
       return true;
     } on DioException catch (e) {
       final message =
-          ((e.response?.data is Map)
-                  ? (e.response?.data['error'] ?? e.response?.data['message'])
-                  : null)
-              as String? ??
-          '미션 완료에 실패했습니다.';
+          extractDioErrorMessage(e, fallback: '미션 완료에 실패했습니다.');
       state = state.copyWith(error: message);
       return false;
     } catch (e) {
@@ -167,11 +164,7 @@ class MissionNotifier extends Notifier<MissionState> {
       return true;
     } on DioException catch (e) {
       final message =
-          ((e.response?.data is Map)
-                  ? (e.response?.data['error'] ?? e.response?.data['message'])
-                  : null)
-              as String? ??
-          '미션 취소에 실패했습니다.';
+          extractDioErrorMessage(e, fallback: '미션 취소에 실패했습니다.');
       state = state.copyWith(error: message);
       return false;
     } catch (e) {

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
+import '../../core/mood_emojis.dart';
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
 import '../../providers/calendar_provider.dart';
@@ -38,22 +39,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     });
   }
 
-  static const _moodEmojiMap = {
-    'happy': '😊',
-    'love': '🥰',
-    'excited': '🤩',
-    'grateful': '🙏',
-    'peaceful': '😌',
-    'proud': '😎',
-    'missing': '🥺',
-    'bored': '😐',
-    'sad': '😢',
-    'angry': '😤',
-    'tired': '😴',
-    'stressed': '😩',
-  };
-
-  String _moodKeyToEmoji(String key) => _moodEmojiMap[key] ?? key;
+  String _moodKeyToEmoji(String key) => moodEmojis[key] ?? key;
 
   List<CalendarEvent> _getEventsForDay(DateTime day) {
     final calendarState = ref.read(calendarProvider);

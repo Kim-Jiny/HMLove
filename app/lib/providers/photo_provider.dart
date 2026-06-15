@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
+import '../core/api_error.dart';
 
 // Photo model
 class Photo {
@@ -131,7 +132,7 @@ class PhotoNotifier extends Notifier<PhotoState> {
       state = state.copyWith(photos: photos, isLoading: false);
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '사진을 불러오지 못했습니다';
+          extractDioErrorMessage(e, fallback: '사진을 불러오지 못했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(
@@ -153,7 +154,7 @@ class PhotoNotifier extends Notifier<PhotoState> {
       state = state.copyWith(mapPhotos: mapPhotos, isLoading: false);
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '지도 사진을 불러오지 못했습니다';
+          extractDioErrorMessage(e, fallback: '지도 사진을 불러오지 못했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(
@@ -207,7 +208,7 @@ class PhotoNotifier extends Notifier<PhotoState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '사진 업로드에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '사진 업로드에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -237,7 +238,7 @@ class PhotoNotifier extends Notifier<PhotoState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '사진 삭제에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '사진 삭제에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {

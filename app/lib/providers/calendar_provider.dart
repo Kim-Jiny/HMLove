@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../core/api_client.dart';
+import '../core/api_error.dart';
 import '../core/device_calendar_service.dart';
 import '../core/widget_service.dart';
 import 'auth_provider.dart';
@@ -251,7 +252,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
       }
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '일정을 불러오지 못했습니다';
+          extractDioErrorMessage(e, fallback: '일정을 불러오지 못했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(
@@ -679,7 +680,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '일정 생성에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '일정 생성에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -746,7 +747,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
         return false;
       }
       final message =
-          e.response?.data?['message'] as String? ?? '일정 수정에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '일정 수정에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -787,7 +788,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
         return true;
       }
       final message =
-          e.response?.data?['message'] as String? ?? '일정 삭제에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '일정 삭제에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {

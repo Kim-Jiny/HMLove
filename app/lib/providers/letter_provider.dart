@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
+import '../core/api_error.dart';
 
 // Letter model
 class Letter {
@@ -114,7 +115,7 @@ class LetterNotifier extends Notifier<LetterState> {
       state = state.copyWith(letters: letters, isLoading: false);
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '편지를 불러오지 못했습니다';
+          extractDioErrorMessage(e, fallback: '편지를 불러오지 못했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(
@@ -135,7 +136,7 @@ class LetterNotifier extends Notifier<LetterState> {
       state = state.copyWith(selectedLetter: letter, isLoading: false);
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '편지를 불러오지 못했습니다';
+          extractDioErrorMessage(e, fallback: '편지를 불러오지 못했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(
@@ -170,7 +171,7 @@ class LetterNotifier extends Notifier<LetterState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '편지 작성에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '편지 작성에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -215,7 +216,7 @@ class LetterNotifier extends Notifier<LetterState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '편지 수정에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '편지 수정에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -244,7 +245,7 @@ class LetterNotifier extends Notifier<LetterState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '편지 삭제에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '편지 삭제에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -275,7 +276,7 @@ class LetterNotifier extends Notifier<LetterState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '읽음 처리에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '읽음 처리에 실패했습니다');
       state = state.copyWith(error: message);
       return false;
     } catch (e) {

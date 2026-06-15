@@ -6,6 +6,7 @@ import 'package:home_widget/home_widget.dart';
 
 import 'api_client.dart';
 import 'constants.dart';
+import 'mood_emojis.dart';
 
 /// debugPrint 는 release 에서도 실행돼 콘솔 노이즈가 남으므로 dev-only 헬퍼로 감쌈.
 void _devLog(String msg) {
@@ -420,20 +421,6 @@ class WidgetService {
   }
 
   static String _moodEmoji(String? key) {
-    const map = {
-      'happy': '😊',
-      'love': '🥰',
-      'excited': '🤩',
-      'grateful': '🙏',
-      'peaceful': '😌',
-      'proud': '😎',
-      'missing': '🥺',
-      'bored': '😐',
-      'sad': '😢',
-      'angry': '😤',
-      'tired': '😴',
-      'stressed': '😩',
-    };
-    return map[key] ?? '😶';
+    return moodEmojis[key] ?? '😶';
   }
 }

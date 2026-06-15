@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
+import '../core/api_error.dart';
 
 // Fortune model
 class Fortune {
@@ -143,7 +144,7 @@ class FortuneNotifier extends Notifier<FortuneState> {
       }
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '오늘의 운세를 불러오지 못했습니다';
+          extractDioErrorMessage(e, fallback: '오늘의 운세를 불러오지 못했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
@@ -161,7 +162,7 @@ class FortuneNotifier extends Notifier<FortuneState> {
       state = FortuneState(fortune: fortune, isLoading: false, exists: true);
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '운세 생성에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '운세 생성에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
