@@ -127,8 +127,18 @@ class WishlistNotifier extends Notifier<WishlistState> {
         state = state.copyWith(items: _sortItems([item, ...state.items]));
       }
       return true;
+    } on DioException catch (e) {
+      final message =
+          ((e.response?.data is Map)
+                  ? (e.response?.data['error'] ?? e.response?.data['message'])
+                  : null)
+              as String? ??
+          '위시리스트 추가에 실패했습니다.';
+      state = state.copyWith(error: message);
+      return false;
     } catch (e) {
       debugPrint('[Wishlist] addItem error: $e');
+      state = state.copyWith(error: '알 수 없는 오류가 발생했습니다.');
       return false;
     }
   }
@@ -154,8 +164,18 @@ class WishlistNotifier extends Notifier<WishlistState> {
         ),
       );
       return true;
+    } on DioException catch (e) {
+      final message =
+          ((e.response?.data is Map)
+                  ? (e.response?.data['error'] ?? e.response?.data['message'])
+                  : null)
+              as String? ??
+          '위시리스트 수정에 실패했습니다.';
+      state = state.copyWith(error: message);
+      return false;
     } catch (e) {
       debugPrint('[Wishlist] updateItem error: $e');
+      state = state.copyWith(error: '알 수 없는 오류가 발생했습니다.');
       return false;
     }
   }
@@ -172,8 +192,18 @@ class WishlistNotifier extends Notifier<WishlistState> {
         ),
       );
       return true;
+    } on DioException catch (e) {
+      final message =
+          ((e.response?.data is Map)
+                  ? (e.response?.data['error'] ?? e.response?.data['message'])
+                  : null)
+              as String? ??
+          '즐겨찾기 변경에 실패했습니다.';
+      state = state.copyWith(error: message);
+      return false;
     } catch (e) {
       debugPrint('[Wishlist] toggleFavorite error: $e');
+      state = state.copyWith(error: '알 수 없는 오류가 발생했습니다.');
       return false;
     }
   }
@@ -190,8 +220,18 @@ class WishlistNotifier extends Notifier<WishlistState> {
         ),
       );
       return true;
+    } on DioException catch (e) {
+      final message =
+          ((e.response?.data is Map)
+                  ? (e.response?.data['error'] ?? e.response?.data['message'])
+                  : null)
+              as String? ??
+          '완료 상태 변경에 실패했습니다.';
+      state = state.copyWith(error: message);
+      return false;
     } catch (e) {
       debugPrint('[Wishlist] toggleItem error: $e');
+      state = state.copyWith(error: '알 수 없는 오류가 발생했습니다.');
       return false;
     }
   }
@@ -203,8 +243,18 @@ class WishlistNotifier extends Notifier<WishlistState> {
         items: state.items.where((i) => i.id != id).toList(),
       );
       return true;
+    } on DioException catch (e) {
+      final message =
+          ((e.response?.data is Map)
+                  ? (e.response?.data['error'] ?? e.response?.data['message'])
+                  : null)
+              as String? ??
+          '위시리스트 삭제에 실패했습니다.';
+      state = state.copyWith(error: message);
+      return false;
     } catch (e) {
       debugPrint('[Wishlist] deleteItem error: $e');
+      state = state.copyWith(error: '알 수 없는 오류가 발생했습니다.');
       return false;
     }
   }

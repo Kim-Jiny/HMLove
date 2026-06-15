@@ -15,6 +15,7 @@ class NotificationScreen extends ConsumerStatefulWidget {
 
 class _NotificationScreenState extends ConsumerState<NotificationScreen> {
   final _scrollController = ScrollController();
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
@@ -35,9 +36,18 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
       final nState = ref.read(notificationProvider);
-      if (nState.hasMore && !nState.isLoading) {
-        ref.read(notificationProvider.notifier).fetchNotifications();
+      if (nState.hasMore && !nState.isLoading && !_isLoadingMore) {
+        _loadMore();
       }
+    }
+  }
+
+  Future<void> _loadMore() async {
+    setState(() => _isLoadingMore = true);
+    try {
+      await ref.read(notificationProvider.notifier).fetchNotifications();
+    } finally {
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -182,7 +192,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
               },
               child: ListView.builder(
                 controller: _scrollController,
-                itemCount: nState.notifications.length + (nState.isLoading ? 1 : 0),
+                itemCount:
+                    nState.notifications.length + (_isLoadingMore ? 1 : 0),
                 itemBuilder: (context, index) {
                   if (index == nState.notifications.length) {
                     return const Padding(

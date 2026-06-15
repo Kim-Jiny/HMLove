@@ -102,7 +102,8 @@ router.get('/map', async (req, res) => {
         takenAt: true,
         createdAt: true,
       },
-      orderBy: { takenAt: 'desc' },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
     });
 
     res.json({ photos });

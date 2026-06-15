@@ -51,7 +51,7 @@ router.post('/', async (req, res) => {
           date: today,
         },
       },
-      update: { emoji, message },
+      update: { emoji, message, coupleId: req.user.coupleId },
       create: {
         userId: req.user.id,
         coupleId: req.user.coupleId,

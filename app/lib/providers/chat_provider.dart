@@ -174,6 +174,8 @@ class ChatNotifier extends Notifier<ChatState> {
   bool _hasConnectedOnce = false;
   bool _recoverStateOnNextConnect = false;
   DateTime? _lastForcedReconnectAt;
+  // 같은 밀리초에 여러 메시지를 보낼 때(다중 이미지 루프/연타) temp id 충돌 방지용
+  int _tempSeq = 0;
   // temp 메시지별 재연결 재시도 횟수. ack 실패 → forceReconnect → 재전송 →
   // 또 실패 가 무한 반복되며 소켓을 thrash 하지 않도록 상한을 둔다.
   final Map<String, int> _reconnectAttempts = {};
@@ -669,7 +671,7 @@ class ChatNotifier extends Notifier<ChatState> {
     List<String> imageUrls = const [],
   }) {
     final myId = ApiClient.getUserId() ?? '';
-    final tempId = 'temp-${DateTime.now().millisecondsSinceEpoch}';
+    final tempId = 'temp-${DateTime.now().millisecondsSinceEpoch}-${_tempSeq++}';
 
     // 즉시 UI에 표시 (sending 상태)
     final optimistic = ChatMessage(

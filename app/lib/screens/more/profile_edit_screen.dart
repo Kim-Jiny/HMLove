@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -212,7 +213,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                       backgroundColor:
                           AppTheme.primaryLight.withValues(alpha: 0.3),
                       backgroundImage: user?.profileImage != null
-                          ? NetworkImage(user!.profileImage!)
+                          ? CachedNetworkImageProvider(user!.profileImage!)
                           : null,
                       child: _isUploadingImage
                           ? const CircularProgressIndicator(

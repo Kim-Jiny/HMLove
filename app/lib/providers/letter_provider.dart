@@ -209,7 +209,7 @@ class LetterNotifier extends Notifier<LetterState> {
       state = state.copyWith(
         letters: updatedLetters,
         selectedLetter:
-            state.selectedLetter?.id == id ? updatedLetter : null,
+            state.selectedLetter?.id == id ? updatedLetter : state.selectedLetter,
         isLoading: false,
       );
       return true;

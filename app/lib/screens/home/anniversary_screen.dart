@@ -155,6 +155,8 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
   }
 
   Future<void> _showAddAnniversary() async {
+    // Capture the screen-level context before the sheet's context can be popped.
+    final screenContext = context;
     final titleController = TextEditingController();
     final descController = TextEditingController();
     DateTime selectedDate = DateTime.now();
@@ -305,7 +307,7 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
                     if (success) {
                       _fetchAnniversaries();
                       if (mounted) {
-                        showTopSnackBar(context, '기념일이 추가되었습니다.');
+                        showTopSnackBar(screenContext, '기념일이 추가되었습니다.');
                       }
                     }
                   },

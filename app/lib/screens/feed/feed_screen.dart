@@ -542,7 +542,7 @@ class _FeedCard extends StatelessWidget {
                 backgroundColor:
                     AppTheme.primaryLight.withValues(alpha: 0.3),
                 backgroundImage: authorImage != null
-                    ? NetworkImage(authorImage)
+                    ? CachedNetworkImageProvider(authorImage)
                     : null,
                 child: authorImage == null
                     ? Text(
@@ -1035,7 +1035,7 @@ class _CommentsScreenState extends ConsumerState<_CommentsScreen> {
                                   backgroundColor: AppTheme.primaryLight
                                       .withValues(alpha: 0.3),
                                   backgroundImage: avatar != null
-                                      ? NetworkImage(avatar)
+                                      ? CachedNetworkImageProvider(avatar)
                                       : null,
                                   child: avatar == null
                                       ? Text(
