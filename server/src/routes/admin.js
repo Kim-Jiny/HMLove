@@ -3,11 +3,12 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../utils/prisma.js';
 import { sendPushNotification } from '../utils/firebase.js';
+import { authLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 
-// POST /admin/login
-router.post('/login', async (req, res) => {
+// POST /admin/login (브루트포스 방지: 15분 10회 제한)
+router.post('/login', authLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {
@@ -354,7 +355,9 @@ router.get('/users/:id', async (req, res) => {
       },
     });
     if (!user) return res.status(404).json({ error: '유저를 찾을 수 없습니다.' });
-    res.json({ user });
+    // FCM 토큰 원문은 노출하지 않고 보유 여부만 내려준다 (푸시 스푸핑 방지).
+    const { fcmToken, ...safeUser } = user;
+    res.json({ user: { ...safeUser, hasPushToken: !!fcmToken } });
   } catch (err) {
     console.error('Admin user detail error:', err);
     res.status(500).json({ error: '유저 조회에 실패했습니다.' });
@@ -871,12 +874,17 @@ router.post('/push/send', async (req, res) => {
 });
 
 // GET /admin/push/tokens - FCM 토큰 보유 유저 목록
+// 토큰 원문은 내려주지 않고 보유 여부만 노출한다 (전체 유저 토큰 유출 방지).
 router.get('/push/tokens', async (req, res) => {
   try {
-    const users = await prisma.user.findMany({
+    const rows = await prisma.user.findMany({
       select: { id: true, nickname: true, email: true, fcmToken: true },
       orderBy: { createdAt: 'desc' },
     });
+    const users = rows.map(({ fcmToken, ...u }) => ({
+      ...u,
+      hasPushToken: !!fcmToken,
+    }));
     res.json({ users });
   } catch (err) {
     console.error('Admin push tokens error:', err);

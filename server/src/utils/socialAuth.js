@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import appleSignin from 'apple-signin-auth';
 
@@ -48,7 +49,7 @@ export async function verifyGoogleIdToken(idToken) {
  *   - iOS native: 앱의 Bundle ID (예: com.example.hmlove)
  *   - Android/web: Apple Developer 에서 만든 Service ID
  */
-export async function verifyAppleIdentityToken(identityToken) {
+export async function verifyAppleIdentityToken(identityToken, rawNonce) {
   const audiences = (process.env.APPLE_CLIENT_IDS || '')
     .split(',')
     .map((s) => s.trim())
@@ -58,8 +59,19 @@ export async function verifyAppleIdentityToken(identityToken) {
     throw new Error('APPLE_CLIENT_IDS 환경변수가 설정되지 않았습니다.');
   }
 
+  // 리플레이 방지: 클라이언트가 보낸 rawNonce 의 sha256(hex)이 토큰의 nonce 클레임과
+  // 일치해야 한다. 클라이언트(social_auth_service)는 sha256(rawNonce).toString() =
+  // hex 를 Apple 에 nonce 로 전달하고, rawNonce 원문을 서버로 보낸다.
+  if (!rawNonce || typeof rawNonce !== 'string') {
+    throw new Error('Apple nonce 가 필요합니다.');
+  }
+  const hashedNonce = crypto.createHash('sha256').update(rawNonce).digest('hex');
+
+  // verifyIdToken 은 옵션을 jsonwebtoken.verify 로 그대로 전달한다.
+  // jsonwebtoken 의 nonce 옵션이 payload.nonce 와 정확히 일치하는지 검사한다.
   const payload = await appleSignin.verifyIdToken(identityToken, {
     audience: audiences,
+    nonce: hashedNonce,
     ignoreExpiration: false,
   });
 
@@ -92,6 +104,23 @@ export async function verifyKakaoAccessToken(accessToken) {
     throw new Error(`Kakao 토큰 검증 실패: ${res.status} ${text}`);
   }
 
+  // 토큰 혼동 방지: 토큰이 우리 카카오 앱으로 발급된 것인지 app_id 로 확인.
+  // KAKAO_APP_ID(네이티브 앱 키의 앱 ID, 숫자)가 설정된 경우에만 강제한다.
+  const expectedAppId = process.env.KAKAO_APP_ID;
+  if (expectedAppId) {
+    const infoRes = await fetch('https://kapi.kakao.com/v1/user/access_token_info', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!infoRes.ok) {
+      throw new Error(`Kakao 토큰 정보 조회 실패: ${infoRes.status}`);
+    }
+    const info = await infoRes.json();
+    if (String(info.app_id) !== String(expectedAppId)) {
+      throw new Error('Kakao 토큰의 app_id 가 일치하지 않습니다.');
+    }
+  }
+
   const data = await res.json();
   const kakaoAccount = data.kakao_account || {};
   const profile = kakaoAccount.profile || {};
@@ -116,7 +145,7 @@ export async function verifySocialToken(provider, payload) {
       return verifyGoogleIdToken(payload.idToken);
     case 'APPLE':
       if (!payload.identityToken) throw new Error('identityToken 이 필요합니다.');
-      return verifyAppleIdentityToken(payload.identityToken);
+      return verifyAppleIdentityToken(payload.identityToken, payload.rawNonce);
     case 'KAKAO':
       if (!payload.accessToken) throw new Error('accessToken 이 필요합니다.');
       return verifyKakaoAccessToken(payload.accessToken);

@@ -39,6 +39,24 @@ import questionRoutes from './routes/question.js';
 import doodleRoutes from './routes/doodle.js';
 import homeRoutes from './routes/home.js';
 
+// 부팅 시 필수 시크릿 검증 — 미설정/약한 값이면 즉시 종료한다.
+// (미설정 시 jwt.sign 이 런타임에 터지거나, 약한 시크릿은 토큰 위조로 이어진다.)
+for (const name of ['JWT_SECRET', 'JWT_REFRESH_SECRET']) {
+  const val = process.env[name];
+  if (!val || val.length < 16) {
+    console.error(`[BOOT] ${name} 가 설정되지 않았거나 너무 짧습니다(최소 16자). 서버를 종료합니다.`);
+    process.exit(1);
+  }
+}
+
+// 처리되지 않은 비동기 에러로 프로세스가 조용히 죽지 않도록 로깅.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+});
+
 const app = express();
 app.set('trust proxy', 1);
 const server = createServer(app);
@@ -167,6 +185,30 @@ app.use('/api/home', homeRoutes);
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// 404 핸들러 (등록되지 않은 API 경로)
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: '요청하신 경로를 찾을 수 없습니다.' });
+});
+
+// 전역 에러 핸들러 — 라우트의 try/catch 밖에서 던져지는 에러(multer 파일 크기/형식,
+// 동기 throw 등)를 일관된 JSON 으로 변환하고 스택트레이스 노출을 막는다.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  // multer 에러는 4xx 로 매핑
+  if (err && (err.code === 'LIMIT_FILE_SIZE')) {
+    return res.status(413).json({ error: '파일 크기가 너무 큽니다.' });
+  }
+  if (err && typeof err.code === 'string' && err.code.startsWith('LIMIT_')) {
+    return res.status(400).json({ error: '파일 업로드 요청이 올바르지 않습니다.' });
+  }
+  if (err && typeof err.message === 'string' && err.message.includes('이미지 파일만')) {
+    return res.status(400).json({ error: err.message });
+  }
+  console.error('[errorHandler]', err);
+  res.status(500).json({ error: '서버 오류가 발생했습니다.' });
 });
 
 // Socket.io - 채팅
