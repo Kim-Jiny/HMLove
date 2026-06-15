@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../core/api_client.dart';
+import '../core/api_error.dart';
 import '../core/device_calendar_service.dart';
 import '../core/widget_service.dart';
 import 'auth_provider.dart';
@@ -45,9 +46,9 @@ class CalendarEvent {
 
   factory CalendarEvent.fromJson(Map<String, dynamic> json) {
     return CalendarEvent(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      date: DateTime.parse(json['date'] as String).toLocal(),
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      date: (DateTime.tryParse(json['date'] as String? ?? '') ?? DateTime.now()).toLocal(),
       description: json['description'] as String?,
       isAnniversary: json['isAnniversary'] as bool? ?? false,
       repeatType: json['repeatType'] as String?,
@@ -83,6 +84,8 @@ class CalendarMood {
 
 // Calendar state class
 class CalendarState {
+  static const _sentinel = Object();
+
   final List<CalendarEvent> events;
   final List<CalendarEvent> deviceEvents;
   final List<CalendarEvent> holidayEvents;
@@ -112,7 +115,7 @@ class CalendarState {
     Map<String, List<CalendarMood>>? moodMap,
     DateTime? selectedDay,
     bool? isLoading,
-    String? error,
+    Object? error = _sentinel,
     bool? deviceCalendarEnabled,
     bool? holidayOverlayEnabled,
   }) {
@@ -123,7 +126,7 @@ class CalendarState {
       moodMap: moodMap ?? this.moodMap,
       selectedDay: selectedDay ?? this.selectedDay,
       isLoading: isLoading ?? this.isLoading,
-      error: error,
+      error: identical(error, _sentinel) ? this.error : error as String?,
       deviceCalendarEnabled: deviceCalendarEnabled ?? this.deviceCalendarEnabled,
       holidayOverlayEnabled:
           holidayOverlayEnabled ?? this.holidayOverlayEnabled,
@@ -251,7 +254,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
       }
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '일정을 불러오지 못했습니다';
+          extractDioErrorMessage(e, fallback: '일정을 불러오지 못했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(
@@ -461,7 +464,11 @@ class CalendarNotifier extends Notifier<CalendarState> {
         final list = await _fetchHolidayEventsForMonth(ym, calendarIds);
         all.addAll(list);
       }
-      state = state.copyWith(holidayEvents: all);
+      // 스와이프로 현재 월이 바뀐 사이 끝난 stale 결과는 덮어쓰지 않는다.
+      if (anchorYearMonth != _currentYearMonth) return;
+      // 월 경계에 걸친 이벤트가 인접 월 쿼리에 중복 반환되므로 id 로 dedup.
+      final deduped = {for (final e in all) e.id: e}.values.toList();
+      state = state.copyWith(holidayEvents: deduped);
     } catch (e) {
       debugPrint('[Holidays] range fetch error: $e');
     }
@@ -561,7 +568,11 @@ class CalendarNotifier extends Notifier<CalendarState> {
       for (final ym in months) {
         all.addAll(await _fetchDeviceEventsForMonth(ym, calendarIds));
       }
-      state = state.copyWith(deviceEvents: all);
+      // 스와이프로 현재 월이 바뀐 사이 끝난 stale 결과는 덮어쓰지 않는다.
+      if (anchorYearMonth != _currentYearMonth) return;
+      // 월 경계에 걸친 이벤트가 인접 월 쿼리에 중복 반환되므로 id 로 dedup.
+      final deduped = {for (final e in all) e.id: e}.values.toList();
+      state = state.copyWith(deviceEvents: deduped);
     } catch (e) {
       debugPrint('[DeviceCalendar] range fetch error: $e');
     }
@@ -654,10 +665,10 @@ class CalendarNotifier extends Notifier<CalendarState> {
       final response = await _dio.post('/calendar', data: {
         'title': title,
         'date': DateFormat('yyyy-MM-dd').format(date),
-        if (description != null) 'description': description,
-        if (isAnniversary != null) 'isAnniversary': isAnniversary,
-        if (repeatType != null) 'repeatType': repeatType,
-        if (color != null) 'color': color,
+        'description': ?description,
+        'isAnniversary': ?isAnniversary,
+        'repeatType': ?repeatType,
+        'color': ?color,
       });
 
       final data = response.data as Map<String, dynamic>;
@@ -679,7 +690,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '일정 생성에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '일정 생성에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -705,12 +716,12 @@ class CalendarNotifier extends Notifier<CalendarState> {
 
     try {
       final response = await _dio.put('/calendar/$id', data: {
-        if (title != null) 'title': title,
+        'title': ?title,
         if (date != null) 'date': DateFormat('yyyy-MM-dd').format(date),
-        if (description != null) 'description': description,
-        if (isAnniversary != null) 'isAnniversary': isAnniversary,
-        if (repeatType != null) 'repeatType': repeatType,
-        if (color != null) 'color': color,
+        'description': ?description,
+        'isAnniversary': ?isAnniversary,
+        'repeatType': ?repeatType,
+        'color': ?color,
       });
 
       final data = response.data as Map<String, dynamic>;
@@ -746,7 +757,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
         return false;
       }
       final message =
-          e.response?.data?['message'] as String? ?? '일정 수정에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '일정 수정에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -787,7 +798,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
         return true;
       }
       final message =
-          e.response?.data?['message'] as String? ?? '일정 삭제에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '일정 삭제에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {

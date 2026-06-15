@@ -3,6 +3,7 @@ import multer from 'multer';
 import sharp from 'sharp';
 import { authenticate, requireCouple } from '../middleware/auth.js';
 import prisma from '../utils/prisma.js';
+import { loadCoupleOwned } from '../utils/coupleScope.js';
 import { uploadFile } from '../utils/storage.js';
 import { notifyPartner } from '../utils/firebase.js';
 
@@ -124,12 +125,11 @@ router.post('/upload', upload.fields([{ name: 'images', maxCount: 5 }, { name: '
 // GET /feed/:id — 단일 피드 조회
 router.get('/:id', async (req, res) => {
   try {
-    const feed = await prisma.feed.findUnique({
-      where: { id: req.params.id },
+    const feed = await loadCoupleOwned(prisma.feed, req.params.id, req.user.coupleId, {
       include: feedInclude(req.user.id),
     });
 
-    if (!feed || feed.coupleId !== req.user.coupleId) {
+    if (!feed) {
       return res.status(404).json({ error: '피드를 찾을 수 없습니다.' });
     }
 
@@ -208,8 +208,8 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const feed = await prisma.feed.findUnique({ where: { id } });
-    if (!feed || feed.coupleId !== req.user.coupleId) {
+    const feed = await loadCoupleOwned(prisma.feed, id, req.user.coupleId);
+    if (!feed) {
       return res.status(404).json({ error: '피드를 찾을 수 없습니다.' });
     }
 
@@ -361,8 +361,17 @@ router.delete('/:id/comments/:commentId', async (req, res) => {
 
     const comment = await prisma.feedComment.findUnique({
       where: { id: commentId },
+      include: { feed: { select: { coupleId: true } } },
     });
-    if (!comment || comment.authorId !== req.user.id) {
+    // 다른 커플의 댓글이거나 URL의 피드와 불일치하면 404
+    if (
+      !comment ||
+      comment.feedId !== req.params.id ||
+      comment.feed.coupleId !== req.user.coupleId
+    ) {
+      return res.status(404).json({ error: '댓글을 찾을 수 없습니다.' });
+    }
+    if (comment.authorId !== req.user.id) {
       return res.status(403).json({ error: '본인이 작성한 댓글만 삭제할 수 있습니다.' });
     }
 
@@ -372,7 +381,7 @@ router.delete('/:id/comments/:commentId', async (req, res) => {
     const io = req.app.get('io');
     if (io) {
       io.to(`couple:${req.user.coupleId}`).emit('feed:comment:deleted', {
-        feedId: req.params.id,
+        feedId: comment.feedId,
         commentId,
       });
     }

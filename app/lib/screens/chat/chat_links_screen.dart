@@ -61,6 +61,7 @@ class _ChatLinksScreenState extends State<ChatLinksScreen> {
 
       final response =
           await _dio.get('/chat/links', queryParameters: params);
+      if (!mounted) return;
       final data = response.data as Map<String, dynamic>;
       final messages = data['messages'] as List;
       final cursor = data['nextCursor'] as String?;
@@ -93,6 +94,7 @@ class _ChatLinksScreenState extends State<ChatLinksScreen> {
         _isLoading = false;
       });
     } on DioException {
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
@@ -137,7 +139,7 @@ class _ChatLinksScreenState extends State<ChatLinksScreen> {
               controller: _scrollController,
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: _items.length + (_isLoading ? 1 : 0),
-              separatorBuilder: (_, __) =>
+              separatorBuilder: (_, _) =>
                   const Divider(height: 1, indent: 16, endIndent: 16),
               itemBuilder: (context, index) {
                 if (index == _items.length) {

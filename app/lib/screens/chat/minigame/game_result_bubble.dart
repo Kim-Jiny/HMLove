@@ -8,10 +8,15 @@ class GameResultBubble extends StatelessWidget {
   final String content;
   final bool isMe;
 
+  /// 실제 발신자 표시 이름. payload 안의 senderName 은 발신자 클라이언트가 임의로
+  /// 넣은 값이라 위조 가능하므로, 메시지 메타데이터의 신뢰 가능한 이름을 쓴다.
+  final String? senderName;
+
   const GameResultBubble({
     super.key,
     required this.content,
     required this.isMe,
+    this.senderName,
   });
 
   @override
@@ -20,7 +25,7 @@ class GameResultBubble extends StatelessWidget {
       final json = content.substring('__GAME_ROULETTE__:'.length);
       try {
         final data = jsonDecode(json) as Map<String, dynamic>;
-        return _RouletteBubble(data: data, isMe: isMe);
+        return _RouletteBubble(data: data, isMe: isMe, senderName: senderName);
       } catch (_) {
         return const SizedBox.shrink();
       }
@@ -29,7 +34,7 @@ class GameResultBubble extends StatelessWidget {
       final json = content.substring('__GAME_LADDER__:'.length);
       try {
         final data = jsonDecode(json) as Map<String, dynamic>;
-        return _LadderBubble(data: data, isMe: isMe);
+        return _LadderBubble(data: data, isMe: isMe, senderName: senderName);
       } catch (_) {
         return const SizedBox.shrink();
       }
@@ -37,23 +42,43 @@ class GameResultBubble extends StatelessWidget {
     return const SizedBox.shrink();
   }
 
+  /// 게임 메시지로 렌더할지 판단. prefix 뿐 아니라 payload 가 실제로 유효한 JSON
+  /// object 여야 한다. 그래야 사용자가 `__GAME_..:잘못된내용` 을 입력해도 빈 위젯으로
+  /// 사라지지 않고 일반 텍스트로 렌더된다.
   static bool isGameMessage(String content) {
-    return content.startsWith('__GAME_ROULETTE__:') ||
-        content.startsWith('__GAME_LADDER__:');
+    String? json;
+    if (content.startsWith('__GAME_ROULETTE__:')) {
+      json = content.substring('__GAME_ROULETTE__:'.length);
+    } else if (content.startsWith('__GAME_LADDER__:')) {
+      json = content.substring('__GAME_LADDER__:'.length);
+    }
+    if (json == null) return false;
+    try {
+      return jsonDecode(json) is Map;
+    } catch (_) {
+      return false;
+    }
   }
 }
 
 class _RouletteBubble extends StatelessWidget {
   final Map<String, dynamic> data;
   final bool isMe;
+  final String? senderName;
 
-  const _RouletteBubble({required this.data, required this.isMe});
+  const _RouletteBubble({required this.data, required this.isMe, this.senderName});
 
   @override
   Widget build(BuildContext context) {
-    final options = (data['options'] as List<dynamic>?)?.cast<String>() ?? [];
-    final result = data['result'] as String? ?? '';
-    final senderName = data['senderName'] as String? ?? '';
+    // 타입이 어긋난 payload(예: options 가 String)에서도 캐스트 throw 로 메시지
+    // 목록 전체가 크래시하지 않도록 방어적으로 읽는다.
+    final rawOptions = data['options'];
+    final options =
+        rawOptions is List ? rawOptions.whereType<String>().toList() : <String>[];
+    final result = data['result'] is String ? data['result'] as String : '';
+    // 신뢰 가능한 발신자명 우선, 없으면 payload 값 폴백.
+    final senderName = this.senderName ??
+        (data['senderName'] is String ? data['senderName'] as String : '');
 
     return Container(
       constraints: BoxConstraints(
@@ -177,17 +202,23 @@ class _RouletteBubble extends StatelessWidget {
 class _LadderBubble extends StatelessWidget {
   final Map<String, dynamic> data;
   final bool isMe;
+  final String? senderName;
 
-  const _LadderBubble({required this.data, required this.isMe});
+  const _LadderBubble({required this.data, required this.isMe, this.senderName});
 
   @override
   Widget build(BuildContext context) {
+    // 방어적 읽기 — 타입 어긋난 payload 에서도 크래시하지 않도록.
+    final rawPlayers = data['players'];
     final players =
-        (data['players'] as List<dynamic>?)?.cast<String>() ?? [];
-    final resultMap =
-        (data['result'] as Map<String, dynamic>?)?.cast<String, String>() ??
-            {};
-    final senderName = data['senderName'] as String? ?? '';
+        rawPlayers is List ? rawPlayers.whereType<String>().toList() : <String>[];
+    final rawResult = data['result'];
+    final resultMap = <String, String>{
+      if (rawResult is Map)
+        for (final e in rawResult.entries) '${e.key}': '${e.value}',
+    };
+    final senderName = this.senderName ??
+        (data['senderName'] is String ? data['senderName'] as String : '');
 
     return Container(
       constraints: BoxConstraints(

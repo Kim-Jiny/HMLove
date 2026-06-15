@@ -39,6 +39,24 @@ import questionRoutes from './routes/question.js';
 import doodleRoutes from './routes/doodle.js';
 import homeRoutes from './routes/home.js';
 
+// 부팅 시 필수 시크릿 검증 — 미설정/약한 값이면 즉시 종료한다.
+// (미설정 시 jwt.sign 이 런타임에 터지거나, 약한 시크릿은 토큰 위조로 이어진다.)
+for (const name of ['JWT_SECRET', 'JWT_REFRESH_SECRET']) {
+  const val = process.env[name];
+  if (!val || val.length < 16) {
+    console.error(`[BOOT] ${name} 가 설정되지 않았거나 너무 짧습니다(최소 16자). 서버를 종료합니다.`);
+    process.exit(1);
+  }
+}
+
+// 처리되지 않은 비동기 에러로 프로세스가 조용히 죽지 않도록 로깅.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+});
+
 const app = express();
 app.set('trust proxy', 1);
 const server = createServer(app);
@@ -77,12 +95,24 @@ function debouncedChatPush({ senderId, partnerId, coupleId, token, senderNicknam
       : entry.lastBody;
     sendPushNotification({
       token,
+      userId: partnerId,
       title: senderNickname || '상대방',
       body: pushBody,
       data: { type: 'chat', coupleId: coupleId || '' },
     });
     _chatPushTimers.delete(key);
   }, 3000);
+}
+
+// 메시지 전송 멱등성: 클라이언트가 ack 유실 후 재연결로 같은 _tempId 를 재전송해도
+// DB 에 중복 row 가 생기지 않도록 최근 처리한 (coupleId:_tempId) → messageId 를 캐시.
+// 60초 TTL. 서버 재시작 시 사라지지만 재시작은 클라이언트 full resync 를 유발하므로 무방.
+const _recentSendKeys = new Map(); // key: `${coupleId}:${tempId}` -> messageId
+function rememberSend(coupleId, tempId, messageId) {
+  if (!tempId) return;
+  const key = `${coupleId}:${tempId}`;
+  _recentSendKeys.set(key, messageId);
+  setTimeout(() => _recentSendKeys.delete(key), 60000);
 }
 
 function addUserSocket(userId, socketId) {
@@ -156,6 +186,30 @@ app.use('/api/home', homeRoutes);
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// 404 핸들러 (등록되지 않은 API 경로)
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: '요청하신 경로를 찾을 수 없습니다.' });
+});
+
+// 전역 에러 핸들러 — 라우트의 try/catch 밖에서 던져지는 에러(multer 파일 크기/형식,
+// 동기 throw 등)를 일관된 JSON 으로 변환하고 스택트레이스 노출을 막는다.
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  // multer 에러는 4xx 로 매핑
+  if (err && (err.code === 'LIMIT_FILE_SIZE')) {
+    return res.status(413).json({ error: '파일 크기가 너무 큽니다.' });
+  }
+  if (err && typeof err.code === 'string' && err.code.startsWith('LIMIT_')) {
+    return res.status(400).json({ error: '파일 업로드 요청이 올바르지 않습니다.' });
+  }
+  if (err && typeof err.message === 'string' && err.message.includes('이미지 파일만')) {
+    return res.status(400).json({ error: err.message });
+  }
+  console.error('[errorHandler]', err);
+  res.status(500).json({ error: '서버 오류가 발생했습니다.' });
 });
 
 // Socket.io - 채팅
@@ -237,6 +291,17 @@ io.on('connection', async (socket) => {
         return;
       }
 
+      // 재전송 멱등성: 같은 _tempId 가 최근에 처리됐으면 새 row 를 만들지 않고
+      // 동일한 결과를 ack 로 돌려준다.
+      const tempId = data._tempId || null;
+      if (tempId) {
+        const cachedId = _recentSendKeys.get(`${socket.coupleId}:${tempId}`);
+        if (cachedId) {
+          ack?.(null, { ok: true, messageId: cachedId });
+          return;
+        }
+      }
+
       const message = await prisma.message.create({
         data: {
           coupleId: socket.coupleId,
@@ -248,9 +313,10 @@ io.on('connection', async (socket) => {
           sender: { select: { id: true, nickname: true, profileImage: true } },
         },
       });
+      rememberSend(socket.coupleId, tempId, message.id);
 
       const room = `couple:${socket.coupleId}`;
-      const payload = { ...message, _tempId: data._tempId || null };
+      const payload = { ...message, _tempId: tempId };
       io.to(room).emit('message:new', payload);
       ack?.(null, { ok: true, messageId: message.id });
 
@@ -404,21 +470,30 @@ async function deliverScheduledLetters() {
     });
 
     for (const letter of letters) {
-      await prisma.letter.update({
-        where: { id: letter.id },
-        data: { status: 'DELIVERED' },
-      });
+      // 한 통이 실패해도 나머지 배치가 멈추지 않도록 per-letter 로 격리.
+      try {
+        // 원자적 claim: SCHEDULED 인 동안에만 DELIVERED 로 전환.
+        // count===1 일 때만 이 인스턴스가 "선점"한 것이므로 푸시를 보낸다.
+        // (다중 인스턴스/중복 tick 으로 인한 이중 발송 방지)
+        const claimed = await prisma.letter.updateMany({
+          where: { id: letter.id, status: 'SCHEDULED' },
+          data: { status: 'DELIVERED' },
+        });
+        if (claimed.count !== 1) continue;
 
-      // 수신자에게 푸시 알림
-      notifyPartner({
-        userId: letter.writerId,
-        coupleId: letter.writer.coupleId,
-        title: letter.writer.nickname || '상대방',
-        body: '편지가 도착했어요 💌',
-        data: { type: 'letter', letterId: letter.id },
-      });
+        // 수신자에게 푸시 알림
+        notifyPartner({
+          userId: letter.writerId,
+          coupleId: letter.writer.coupleId,
+          title: letter.writer.nickname || '상대방',
+          body: '편지가 도착했어요 💌',
+          data: { type: 'letter', letterId: letter.id },
+        });
 
-      console.log(`[Scheduler] Letter ${letter.id} delivered`);
+        console.log(`[Scheduler] Letter ${letter.id} delivered`);
+      } catch (e) {
+        console.error(`[Scheduler] letter ${letter.id} deliver failed:`, e.message);
+      }
     }
   } catch (err) {
     console.error('[Scheduler] deliverScheduledLetters error:', err.message);
@@ -475,8 +550,10 @@ async function sendAnniversaryReminders() {
         for (const ann of upcoming) {
           if (!remindDays.includes(ann.daysLeft)) continue;
 
-          // 중복 방지: 오늘 같은 알림을 이미 보냈는지 확인
-          const dedupKey = `anniversary_remind:${ann.title}:d-${ann.daysLeft}`;
+          // 중복 방지: 같은 기념일은 KST 하루에 한 번만.
+          // daysLeft 를 키에 넣지 않는다 — daysLeft 는 UTC 기준이라 KST 00:00~09:00
+          // 사이엔 값이 1 커서, 키에 포함하면 같은 날 daysLeft 가 바뀌며 이중 발송된다.
+          const dedupKey = `anniversary_remind:${ann.title}`;
           // KST 자정 기준으로 중복 방지 (UTC 기준이 아닌 KST 00:00부터)
           const kstMidnightUtc = new Date(todayStr + 'T00:00:00+09:00');
           const existing = await prisma.notification.findFirst({

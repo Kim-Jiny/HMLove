@@ -1,16 +1,15 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../core/api_client.dart';
 import '../core/constants.dart';
-import '../models/wish_item.dart';
 import 'badge_provider.dart';
 import 'calendar_provider.dart';
 import 'feed_provider.dart';
 import 'mission_provider.dart';
-import 'question_provider.dart';
+import 'realtime_event_router.dart';
 import 'wishlist_provider.dart';
 
 // Message send status
@@ -167,13 +166,19 @@ class ChatState {
 // Chat Notifier
 class ChatNotifier extends Notifier<ChatState> {
   late final Dio _dio;
-  IO.Socket? _socket;
+  io.Socket? _socket;
   String? _socketToken;
   int _socketGeneration = 0;
   bool _chatScreenActive = false;
   bool _hasConnectedOnce = false;
   bool _recoverStateOnNextConnect = false;
   DateTime? _lastForcedReconnectAt;
+  // 같은 밀리초에 여러 메시지를 보낼 때(다중 이미지 루프/연타) temp id 충돌 방지용
+  int _tempSeq = 0;
+  // temp 메시지별 재연결 재시도 횟수. ack 실패 → forceReconnect → 재전송 →
+  // 또 실패 가 무한 반복되며 소켓을 thrash 하지 않도록 상한을 둔다.
+  final Map<String, int> _reconnectAttempts = {};
+  static const int _maxReconnectAttempts = 2;
   DateTime? _lastRealtimeRefreshAt;
   DateTime? _lastReadEmitAt;
   Future<void>? _realtimeRefreshInFlight;
@@ -220,9 +225,9 @@ class ChatNotifier extends Notifier<ChatState> {
     _socketToken = token;
     final generation = ++_socketGeneration;
 
-    final socket = IO.io(
+    final socket = io.io(
       AppConstants.socketUrl,
-      IO.OptionBuilder()
+      io.OptionBuilder()
           .setTransports(['websocket', 'polling'])
           .setAuth({'token': token})
           .enableReconnection()
@@ -275,11 +280,18 @@ class ChatNotifier extends Notifier<ChatState> {
         final myId = ApiClient.getUserId();
 
         if (tempId != null && message.senderId == myId) {
-          // 내가 보낸 메시지 → 임시 메시지를 서버 메시지로 교체
-          final updated = state.messages.map((msg) {
-            return msg.id == tempId ? message : msg;
-          }).toList();
-          state = state.copyWith(messages: updated);
+          // 내가 보낸 메시지 → 임시 메시지를 서버 메시지로 교체.
+          final hasTemp = state.messages.any((m) => m.id == tempId);
+          if (hasTemp) {
+            final updated = state.messages.map((msg) {
+              return msg.id == tempId ? message : msg;
+            }).toList();
+            state = state.copyWith(messages: updated);
+          } else if (!state.messages.any((m) => m.id == message.id)) {
+            // 임시 메시지가 이미 교체/제거된 경우(재전송 등) 유실 방지: id 중복이
+            // 아니면 추가한다.
+            state = state.copyWith(messages: [message, ...state.messages]);
+          }
         } else {
           // 상대방 메시지 (또는 tempId 없는 경우) → 앞에 추가
           // 중복 방지
@@ -299,8 +311,15 @@ class ChatNotifier extends Notifier<ChatState> {
 
     socket.on('message:read', (_) {
       if (!_isCurrentSocket(socket, generation)) return;
+      // 읽음 영수증은 "내가 보낸" 메시지에만 적용된다. 상대가 보낸 메시지까지
+      // isRead 로 뒤집으면 안읽음 상태가 깨진다.
+      final myId = ApiClient.getUserId();
+      // 바꿀 게 없으면 불필요한 리빌드 생략.
+      final hasUnreadMine =
+          state.messages.any((m) => m.senderId == myId && !m.isRead);
+      if (!hasUnreadMine) return;
       final updatedMessages = state.messages.map((msg) {
-        return msg.copyWith(isRead: true);
+        return msg.senderId == myId ? msg.copyWith(isRead: true) : msg;
       }).toList();
       state = state.copyWith(messages: updatedMessages);
     });
@@ -347,181 +366,19 @@ class ChatNotifier extends Notifier<ChatState> {
       state = state.copyWith(partnerOnline: false);
     });
 
-    // 피드 실시간 수신
-    socket.on('feed:new', (data) {
-      if (!_isCurrentSocket(socket, generation)) return;
-      if (data != null) {
-        final map = data as Map<String, dynamic>;
-        final feedJson = map['feed'] as Map<String, dynamic>;
-        final feed = Feed.fromJson(feedJson);
-        final myId = ApiClient.getUserId();
-        if (feed.authorId != myId) {
-          ref.read(feedProvider.notifier).addFeedFromSocket(feed);
-        }
-      }
-    });
-
-    socket.on('feed:deleted', (data) {
-      if (!_isCurrentSocket(socket, generation)) return;
-      if (data != null) {
-        final map = data as Map<String, dynamic>;
-        final feedId = map['feedId'] as String;
-        ref.read(feedProvider.notifier).removeFeedFromSocket(feedId);
-      }
-    });
-
-    // 피드 댓글 실시간 수신 (상대방 댓글만 반영, 내 댓글은 이미 로컬 처리)
-    socket.on('feed:comment:new', (data) {
-      if (!_isCurrentSocket(socket, generation)) return;
-      if (data != null) {
-        final map = data as Map<String, dynamic>;
-        final feedId = map['feedId'] as String;
-        final commentJson = map['comment'] as Map<String, dynamic>;
-        final comment = FeedComment.fromJson(commentJson);
-        final myId = ApiClient.getUserId();
-        if (comment.authorId != myId) {
-          ref.read(feedProvider.notifier).addComment(feedId, comment);
-        }
-      }
-    });
-
-    socket.on('feed:comment:deleted', (data) {
-      if (!_isCurrentSocket(socket, generation)) return;
-      if (data != null) {
-        final map = data as Map<String, dynamic>;
-        final feedId = map['feedId'] as String;
-        final commentId = map['commentId'] as String;
-        ref.read(feedProvider.notifier).removeComment(feedId, commentId);
-      }
-    });
-
-    // 미션 실시간 수신
-    socket.on('mission:complete', (data) {
-      if (!_isCurrentSocket(socket, generation)) return;
-      if (data != null) {
-        final map = Map<String, dynamic>.from(data as Map);
-        if (_isOwnActor(map)) return;
-        final missionJson = Map<String, dynamic>.from(map['mission'] as Map);
-        final mission = Mission.fromJson(missionJson);
-        ref.read(missionProvider.notifier).updateMissionFromSocket(mission);
-      }
-    });
-
-    socket.on('mission:cancel', (data) {
-      if (!_isCurrentSocket(socket, generation)) return;
-      if (data != null) {
-        final map = Map<String, dynamic>.from(data as Map);
-        if (_isOwnActor(map)) return;
-        final missionJson = Map<String, dynamic>.from(map['mission'] as Map);
-        final mission = Mission.fromJson(missionJson);
-        ref.read(missionProvider.notifier).updateMissionFromSocket(mission);
-      }
-    });
-
-    // 캘린더 실시간 동기화 (상대방이 변경한 경우만)
-    socket.on('calendar:updated', (data) {
-      if (!_isCurrentSocket(socket, generation)) return;
-      if (data != null) {
-        final map = data as Map<String, dynamic>;
-        final senderId = map['senderId'] as String?;
-        final myId = ApiClient.getUserId();
-        if (senderId != myId) {
-          ref.read(calendarProvider.notifier).refreshCurrentMonth();
-        }
-      }
-    });
-
-    // 위시리스트 실시간 동기화 (상대방 액션만 반영, 내 액션은 API 응답에서 처리)
-    socket.on('wish:new', (data) {
-      if (!_isCurrentSocket(socket, generation)) return;
-      try {
-        if (data != null) {
-          final map = Map<String, dynamic>.from(data as Map);
-          if (_isOwnActor(map)) return;
-          final itemMap = _socketItemPayload(map);
-          final authorId = itemMap['authorId'] as String?;
-          final myId = ApiClient.getUserId();
-          if (authorId == myId) return; // 내가 추가한 건 API 응답에서 처리
-          final item = WishItem.fromJson(itemMap);
-          ref.read(wishlistProvider.notifier).onSocketNew(item);
-        }
-      } catch (e) {
-        debugPrint('[Socket] wish:new parse error: $e');
-      }
-    });
-
-    socket.on('wish:updated', (data) {
-      if (!_isCurrentSocket(socket, generation)) return;
-      try {
-        if (data != null) {
-          final map = Map<String, dynamic>.from(data as Map);
-          if (_isOwnActor(map)) return;
-          final item = WishItem.fromJson(_socketItemPayload(map));
-          ref.read(wishlistProvider.notifier).onSocketUpdated(item);
-        }
-      } catch (e) {
-        debugPrint('[Socket] wish:updated parse error: $e');
-      }
-    });
-
-    socket.on('wish:toggled', (data) {
-      if (!_isCurrentSocket(socket, generation)) return;
-      try {
-        if (data != null) {
-          final map = Map<String, dynamic>.from(data as Map);
-          if (_isOwnActor(map)) return;
-          final item = WishItem.fromJson(_socketItemPayload(map));
-          ref.read(wishlistProvider.notifier).onSocketToggled(item);
-        }
-      } catch (e) {
-        debugPrint('[Socket] wish:toggled parse error: $e');
-      }
-    });
-
-    socket.on('wish:deleted', (data) {
-      if (!_isCurrentSocket(socket, generation)) return;
-      try {
-        if (data != null) {
-          final map = Map<String, dynamic>.from(data as Map);
-          if (_isOwnActor(map)) return;
-          final id = map['id'] as String;
-          ref.read(wishlistProvider.notifier).onSocketDeleted(id);
-        }
-      } catch (e) {
-        debugPrint('[Socket] wish:deleted parse error: $e');
-      }
-    });
-
-    // 질문 카드 실시간 동기화
-    socket.on('question:answered', (data) {
-      if (!_isCurrentSocket(socket, generation)) return;
-      try {
-        if (data != null) {
-          final map = Map<String, dynamic>.from(data as Map);
-          if (_isOwnActor(map, key: 'userId')) return;
-          ref.read(questionProvider.notifier).onPartnerAnswered();
-        }
-      } catch (e) {
-        debugPrint('[Socket] question:answered error: $e');
-      }
-    });
+    // 채팅 외 기능(피드·미션·캘린더·위시리스트·질문)의 실시간 라우팅은
+    // 별도 모듈로 분리. 소켓 소유/생명주기는 그대로 ChatNotifier 가 갖는다.
+    registerRealtimeFeatureHandlers(
+      socket,
+      ref,
+      () => _isCurrentSocket(socket, generation),
+    );
 
     socket.connect();
   }
 
-  bool _isCurrentSocket(IO.Socket socket, int generation) {
+  bool _isCurrentSocket(io.Socket socket, int generation) {
     return identical(_socket, socket) && _socketGeneration == generation;
-  }
-
-  bool _isOwnActor(Map<String, dynamic> payload, {String key = 'actorId'}) {
-    final actorId = payload[key] as String?;
-    return actorId != null && actorId == ApiClient.getUserId();
-  }
-
-  Map<String, dynamic> _socketItemPayload(Map<String, dynamic> payload) {
-    final nested = payload['item'];
-    if (nested is Map) return Map<String, dynamic>.from(nested);
-    return payload;
   }
 
   void _disposeSocket() {
@@ -651,7 +508,7 @@ class ChatNotifier extends Notifier<ChatState> {
     List<String> imageUrls = const [],
   }) {
     final myId = ApiClient.getUserId() ?? '';
-    final tempId = 'temp-${DateTime.now().millisecondsSinceEpoch}';
+    final tempId = 'temp-${DateTime.now().millisecondsSinceEpoch}-${_tempSeq++}';
 
     // 즉시 UI에 표시 (sending 상태)
     final optimistic = ChatMessage(
@@ -704,7 +561,17 @@ class ChatNotifier extends Notifier<ChatState> {
           if (imageUrls.isNotEmpty) 'imageUrls': imageUrls,
           '_tempId': tempId,
         })
-        .then((_) {
+        .then((ackData) {
+          // ack 성공: 서버가 돌려준 실제 messageId 로 즉시 reconcile 한다.
+          // broadcast(message:new) 누락에 의존하지 않으므로, 브로드캐스트가
+          // 유실돼도 메시지가 sending 에 묶여 실패 처리/중복 재전송되지 않는다.
+          final messageId =
+              ackData is Map ? ackData['messageId'] as String? : null;
+          if (messageId != null) {
+            _reconcileTempMessage(tempId: tempId, messageId: messageId);
+            return;
+          }
+          // messageId 가 없으면(구버전 서버) 기존 폴백: 잠시 후에도 sending 이면 동기화.
           Future.delayed(const Duration(milliseconds: 500), () {
             final idx = state.messages.indexWhere((m) => m.id == tempId);
             if (idx != -1 &&
@@ -716,11 +583,15 @@ class ChatNotifier extends Notifier<ChatState> {
         .catchError((error) {
           debugPrint('[Chat] message:send ack error: $error');
 
-          if (allowReconnectRetry) {
+          final attempts = (_reconnectAttempts[tempId] ?? 0) + 1;
+          if (allowReconnectRetry && attempts <= _maxReconnectAttempts) {
+            _reconnectAttempts[tempId] = attempts;
             forceReconnect();
             return;
           }
 
+          // 상한 도달 → 더 이상 재연결 루프 돌지 않고 실패로 확정.
+          _reconnectAttempts.remove(tempId);
           _markMessageFailed(tempId);
         });
   }
@@ -741,6 +612,27 @@ class ChatNotifier extends Notifier<ChatState> {
 
     final updated = [...state.messages];
     updated[idx] = updated[idx].copyWith(status: MessageStatus.failed);
+    state = state.copyWith(messages: updated);
+  }
+
+  /// ack 로 받은 실제 messageId 로 임시 메시지를 확정한다.
+  /// 이미 broadcast 로 교체됐으면 no-op, broadcast 가 먼저 도착해 실제 메시지가
+  /// 들어와 있으면 임시 메시지만 제거해 중복을 막는다.
+  void _reconcileTempMessage({
+    required String tempId,
+    required String messageId,
+  }) {
+    _reconnectAttempts.remove(tempId);
+    final idx = state.messages.indexWhere((m) => m.id == tempId);
+    if (idx == -1) return; // 이미 broadcast 로 교체됨
+    final updated = [...state.messages];
+    final alreadyHasReal = state.messages.any((m) => m.id == messageId);
+    if (alreadyHasReal) {
+      updated.removeAt(idx);
+    } else {
+      updated[idx] =
+          updated[idx].copyWith(id: messageId, status: MessageStatus.sent);
+    }
     state = state.copyWith(messages: updated);
   }
 
@@ -782,11 +674,12 @@ class ChatNotifier extends Notifier<ChatState> {
 
     final msg = state.messages[idx];
     // 실패 메시지 제거
+    _reconnectAttempts.remove(tempId);
     final updated = [...state.messages];
     updated.removeAt(idx);
     state = state.copyWith(messages: updated);
 
-    // 재전송
+    // 재전송 (새 tempId 로 처음부터)
     sendMessage(content: msg.content, imageUrls: msg.imageUrls);
   }
 
@@ -945,7 +838,7 @@ class ChatNotifier extends Notifier<ChatState> {
     try {
       final queryParams = <String, dynamic>{
         'limit': 30,
-        if (cursor != null) 'cursor': cursor,
+        'cursor': ?cursor,
       };
 
       final response = await _dio.get(

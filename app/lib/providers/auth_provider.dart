@@ -2,12 +2,15 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
+import '../core/pending_route.dart';
+import '../core/server_date.dart';
 import '../core/push_notification_service.dart';
 import '../core/social_auth_service.dart';
 import '../core/widget_service.dart';
 import '../models/user.dart';
 import 'chat_provider.dart';
 import 'couple_provider.dart';
+import 'session_reset.dart';
 
 // Auth state enum
 enum AuthStatus { initial, authenticated, unauthenticated }
@@ -276,7 +279,7 @@ class AuthNotifier extends Notifier<AuthState> {
           'email': email,
           'password': password,
           'nickname': nickname,
-          if (birthDate != null) 'birthDate': birthDate.toIso8601String(),
+          if (birthDate != null) 'birthDate': toServerDateOnly(birthDate),
         },
       );
 
@@ -311,6 +314,8 @@ class AuthNotifier extends Notifier<AuthState> {
   /// Logout.
   Future<void> logout() async {
     ref.read(chatProvider.notifier).disconnect();
+    clearPendingWidgetRoute();
+    resetFeatureProviders(ref);
     await ApiClient.clearTokens();
     await WidgetService.clearData();
     PushNotificationService.reset();
@@ -335,6 +340,8 @@ class AuthNotifier extends Notifier<AuthState> {
       return;
     }
     ref.read(chatProvider.notifier).disconnect();
+    clearPendingWidgetRoute();
+    resetFeatureProviders(ref);
     await ApiClient.clearTokens();
     await WidgetService.clearData();
     PushNotificationService.reset();
@@ -487,7 +494,7 @@ class AuthNotifier extends Notifier<AuthState> {
         data: {
           'signupToken': signupToken,
           'nickname': nickname,
-          if (birthDate != null) 'birthDate': birthDate.toIso8601String(),
+          if (birthDate != null) 'birthDate': toServerDateOnly(birthDate),
         },
       );
       final data = response.data as Map<String, dynamic>;

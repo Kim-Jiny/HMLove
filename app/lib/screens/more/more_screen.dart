@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,7 @@ import '../../core/top_snackbar.dart';
 import '../../widgets/banner_ad_widget.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
+import '../../providers/session_reset.dart';
 import '../../providers/inquiry_provider.dart';
 import '../../providers/letter_provider.dart';
 import 'inquiry_screen.dart';
@@ -23,8 +25,22 @@ final _appVersionProvider = FutureProvider<String>((ref) async {
   return 'v${info.version}+${info.buildNumber}';
 });
 
-class MoreScreen extends ConsumerWidget {
+class MoreScreen extends ConsumerStatefulWidget {
   const MoreScreen({super.key});
+
+  @override
+  ConsumerState<MoreScreen> createState() => _MoreScreenState();
+}
+
+class _MoreScreenState extends ConsumerState<MoreScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // 화면 진입 시 미확인 문의 수 갱신 (빌드마다가 아닌 1회만)
+    Future.microtask(() {
+      ref.read(unreadInquiryCountProvider.notifier).fetch();
+    });
+  }
 
   void _showInviteCode(BuildContext context, String code) {
     showDialog(
@@ -211,10 +227,12 @@ class MoreScreen extends ConsumerWidget {
     if (step1 != true || !context.mounted) return;
 
     // 2단계: "탈퇴" 입력 확인
-    final step2 = await showDialog<bool>(
+    final controller = TextEditingController();
+    final bool? step2;
+    try {
+      step2 = await showDialog<bool>(
       context: context,
       builder: (ctx) {
-        final controller = TextEditingController();
         return StatefulBuilder(
           builder: (ctx, setState) => AlertDialog(
             shape: RoundedRectangleBorder(
@@ -262,6 +280,9 @@ class MoreScreen extends ConsumerWidget {
         );
       },
     );
+    } finally {
+      controller.dispose();
+    }
 
     if (step2 != true || !context.mounted) return;
 
@@ -394,10 +415,12 @@ class MoreScreen extends ConsumerWidget {
       if (step2 != true || !context.mounted) return;
 
       // 3단계: 최종 확인 - "해제" 입력
-      final step3 = await showDialog<bool>(
+      final controller = TextEditingController();
+      final bool? step3;
+      try {
+        step3 = await showDialog<bool>(
         context: context,
         builder: (ctx) {
-          final controller = TextEditingController();
           return StatefulBuilder(
             builder: (ctx, setState) => AlertDialog(
               shape: RoundedRectangleBorder(
@@ -448,6 +471,9 @@ class MoreScreen extends ConsumerWidget {
           );
         },
       );
+      } finally {
+        controller.dispose();
+      }
 
       if (step3 != true || !context.mounted) return;
     }
@@ -456,6 +482,8 @@ class MoreScreen extends ConsumerWidget {
     final success = await ref.read(coupleProvider.notifier).leaveCouple();
     if (context.mounted) {
       if (success) {
+        // 커플 해제 시 이전 커플의 피드·사진·캘린더 등 잔존 데이터 초기화
+        resetFeatureProviders(ref);
         context.go('/couple-connect');
       } else {
         showTopSnackBar(context, '커플 해제에 실패했습니다', isError: true);
@@ -464,15 +492,12 @@ class MoreScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final coupleState = ref.watch(coupleProvider);
     final unreadLetters = ref.watch(unreadLettersCountProvider);
     final unreadInquiries = ref.watch(unreadInquiryCountProvider);
     final partner = coupleState.couple?.getPartner(user?.id ?? '');
-
-    // 화면 진입 시 미확인 문의 수 갱신
-    ref.read(unreadInquiryCountProvider.notifier).fetch();
 
     return Scaffold(
       appBar: AppBar(title: const Text('더보기')),
@@ -502,7 +527,7 @@ class MoreScreen extends ConsumerWidget {
                           alpha: 0.3,
                         ),
                         backgroundImage: user?.profileImage != null
-                            ? NetworkImage(user!.profileImage!)
+                            ? CachedNetworkImageProvider(user!.profileImage!)
                             : null,
                         child: user?.profileImage == null
                             ? Text(

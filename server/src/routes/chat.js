@@ -39,7 +39,7 @@ router.get('/unread-count', async (req, res) => {
 router.get('/messages', async (req, res) => {
   try {
     const { cursor, after, limit = '30' } = req.query;
-    const take = Math.min(parseInt(limit), 100);
+    const take = Math.min(Number.parseInt(limit, 10) || 30, 100);
 
     const where = { coupleId: req.user.coupleId };
 
@@ -139,7 +139,7 @@ router.post('/upload', uploadLimiter, upload.fields([{ name: 'images', maxCount:
 router.get('/media', async (req, res) => {
   try {
     const { cursor, limit = '20' } = req.query;
-    const take = Math.min(parseInt(limit), 50);
+    const take = Math.min(Number.parseInt(limit, 10) || 20, 50);
 
     const messages = await prisma.message.findMany({
       where: {
@@ -223,7 +223,7 @@ router.get('/messages/around/:messageId', async (req, res) => {
 router.get('/links', async (req, res) => {
   try {
     const { cursor, limit = '30' } = req.query;
-    const take = Math.min(parseInt(limit), 50);
+    const take = Math.min(Number.parseInt(limit, 10) || 30, 50);
 
     const messages = await prisma.message.findMany({
       where: {
@@ -257,7 +257,7 @@ router.get('/search', async (req, res) => {
       return res.json({ messages: [], nextCursor: null });
     }
 
-    const take = Math.min(parseInt(limit), 50);
+    const take = Math.min(Number.parseInt(limit, 10) || 20, 50);
 
     const messages = await prisma.message.findMany({
       where: {

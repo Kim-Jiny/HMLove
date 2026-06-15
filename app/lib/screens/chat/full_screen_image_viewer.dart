@@ -37,11 +37,11 @@ class FullScreenImageViewer extends StatefulWidget {
     Navigator.of(context, rootNavigator: true).push(
       PageRouteBuilder(
         opaque: false,
-        pageBuilder: (_, __, ___) => FullScreenImageViewer(
+        pageBuilder: (_, _, _) => FullScreenImageViewer(
           imageUrls: [imageUrl],
           timestamps: [timestamp],
         ),
-        transitionsBuilder: (_, animation, __, child) {
+        transitionsBuilder: (_, animation, _, child) {
           return FadeTransition(opacity: animation, child: child);
         },
       ),
@@ -58,12 +58,12 @@ class FullScreenImageViewer extends StatefulWidget {
     Navigator.of(context, rootNavigator: true).push(
       PageRouteBuilder(
         opaque: false,
-        pageBuilder: (_, __, ___) => FullScreenImageViewer(
+        pageBuilder: (_, _, _) => FullScreenImageViewer(
           imageUrls: imageUrls,
           timestamps: timestamps,
           initialIndex: initialIndex,
         ),
-        transitionsBuilder: (_, animation, __, child) {
+        transitionsBuilder: (_, animation, _, child) {
           return FadeTransition(opacity: animation, child: child);
         },
       ),
@@ -83,8 +83,10 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
+    _currentIndex = widget.imageUrls.isEmpty
+        ? 0
+        : widget.initialIndex.clamp(0, widget.imageUrls.length - 1);
+    _pageController = PageController(initialPage: _currentIndex);
   }
 
   @override
@@ -191,13 +193,13 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
                     child: CachedNetworkImage(
                       imageUrl: widget.imageUrls[index],
                       fit: BoxFit.contain,
-                      placeholder: (_, __) => const Center(
+                      placeholder: (_, _) => const Center(
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: Colors.white54,
                         ),
                       ),
-                      errorWidget: (_, __, ___) => const Icon(
+                      errorWidget: (_, _, _) => const Icon(
                         Icons.broken_image,
                         color: Colors.white54,
                         size: 64,

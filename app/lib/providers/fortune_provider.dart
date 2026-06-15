@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
+import '../core/api_error.dart';
 
 // Fortune model
 class Fortune {
@@ -35,18 +36,18 @@ class Fortune {
 
   factory Fortune.fromJson(Map<String, dynamic> json) {
     return Fortune(
-      id: json['id'] as String,
-      generalLuck: json['generalLuck'] as String,
-      coupleLuck: json['coupleLuck'] as String,
-      dateTip: json['dateTip'] as String,
-      caution: json['caution'] as String,
-      luckyScore: json['luckyScore'] as int,
+      id: json['id'] as String? ?? '',
+      generalLuck: json['generalLuck'] as String? ?? '',
+      coupleLuck: json['coupleLuck'] as String? ?? '',
+      dateTip: json['dateTip'] as String? ?? '',
+      caution: json['caution'] as String? ?? '',
+      luckyScore: (json['luckyScore'] as num?)?.toInt() ?? 0,
       user1Id: json['user1Id'] as String?,
       user1Luck: json['user1Luck'] as String?,
       user2Id: json['user2Id'] as String?,
       user2Luck: json['user2Luck'] as String?,
-      date: DateTime.parse(json['date'] as String),
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      date: DateTime.tryParse(json['date'] as String? ?? '') ?? DateTime.now(),
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
     );
   }
 
@@ -66,6 +67,8 @@ class Fortune {
 
 // Fortune state class
 class FortuneState {
+  static const _sentinel = Object();
+
   final Fortune? fortune;
   final bool isLoading;
   final String? error;
@@ -81,13 +84,13 @@ class FortuneState {
   FortuneState copyWith({
     Fortune? fortune,
     bool? isLoading,
-    String? error,
+    Object? error = _sentinel,
     bool? exists,
   }) {
     return FortuneState(
       fortune: fortune ?? this.fortune,
       isLoading: isLoading ?? this.isLoading,
-      error: error,
+      error: identical(error, _sentinel) ? this.error : error as String?,
       exists: exists ?? this.exists,
     );
   }
@@ -143,7 +146,7 @@ class FortuneNotifier extends Notifier<FortuneState> {
       }
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '오늘의 운세를 불러오지 못했습니다';
+          extractDioErrorMessage(e, fallback: '오늘의 운세를 불러오지 못했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
@@ -161,7 +164,7 @@ class FortuneNotifier extends Notifier<FortuneState> {
       state = FortuneState(fortune: fortune, isLoading: false, exists: true);
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '운세 생성에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '운세 생성에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');

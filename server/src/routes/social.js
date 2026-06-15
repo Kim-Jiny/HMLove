@@ -109,6 +109,10 @@ router.post('/login', authLimiter, async (req, res) => {
       return res.status(401).json({ error: '소셜 인증에 실패했습니다.' });
     }
 
+    // 검증되지 않은 이메일은 신뢰하지 않는다. 미인증 이메일로 기존 계정을 조회/연동하면
+    // 공격자가 임의 이메일로 피해자 계정과 충돌시켜 계정 탈취 흐름을 유발할 수 있다.
+    const trustedEmail = verified.emailVerified ? verified.email : null;
+
     // 1) 이미 연동된 계정 → 바로 로그인
     const existingLink = await prisma.socialAccount.findUnique({
       where: { provider_providerId: { provider, providerId: verified.providerId } },
@@ -120,26 +124,26 @@ router.post('/login', authLimiter, async (req, res) => {
     }
 
     // 2) 같은 이메일 유저 존재 → 연동 안내 (사용자가 이메일 로그인 후 link)
-    if (verified.email) {
+    if (trustedEmail) {
       const userByEmail = await prisma.user.findUnique({
-        where: { email: verified.email },
+        where: { email: trustedEmail },
         select: { id: true },
       });
       if (userByEmail) {
         return res.status(409).json({
           error: 'EMAIL_EXISTS',
           message: '이미 가입된 이메일입니다. 로그인 후 연동해주세요.',
-          email: verified.email,
+          email: trustedEmail,
           provider,
         });
       }
     }
 
-    // 3) 신규 가입 → 가입 토큰 발급
+    // 3) 신규 가입 → 가입 토큰 발급 (검증된 이메일만 담는다)
     const signupToken = generateSignupToken({
       provider,
       providerId: verified.providerId,
-      email: verified.email,
+      email: trustedEmail,
       name: verified.name || null,
       picture: verified.picture || null,
     });
@@ -148,7 +152,7 @@ router.post('/login', authLimiter, async (req, res) => {
       needsSignup: true,
       signupToken,
       profile: {
-        email: verified.email,
+        email: trustedEmail,
         name: verified.name || null,
         picture: verified.picture || null,
         provider,

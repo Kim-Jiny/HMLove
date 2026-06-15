@@ -20,6 +20,7 @@ import 'core/ad_service.dart';
 import 'core/api_client.dart';
 import 'core/constants.dart';
 import 'core/notification_sound_service.dart';
+import 'core/pending_route.dart';
 import 'core/push_notification_service.dart';
 import 'core/router.dart';
 import 'core/social_auth_service.dart';

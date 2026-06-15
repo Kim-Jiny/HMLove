@@ -60,22 +60,23 @@ router.get('/summary', async (req, res) => {
     const dailyPick = pickMission(DAILY_MISSIONS, coupleId, missionTodayStr);
     const weeklyPick = pickMission(WEEKLY_MISSIONS, coupleId, mondayStr);
 
+    const start = new Date(`${localDate}T00:00:00.000Z`);
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 1);
+
+    // 읽기 전용 쿼리들은 트랜잭션 격리가 필요 없으므로 Promise.all로 병렬 실행
     const [
       couple,
       moods,
       fortune,
-      daily,
-      weekly,
-      _removedQuestions,
-      dailyQuestion,
       wishlistItems,
       latestDoodle,
       notificationUnreadCount,
       chatUnreadCount,
       feedUnseenCount,
       todayEvents,
-    ] = await prisma.$transaction(async (tx) => {
-      const coupleQuery = tx.couple.findUnique({
+    ] = await Promise.all([
+      prisma.couple.findUnique({
         where: { id: coupleId },
         include: {
           users: {
@@ -92,15 +93,77 @@ router.get('/summary', async (req, res) => {
             },
           },
         },
-      });
-      const moodsQuery = tx.mood.findMany({
+      }),
+      prisma.mood.findMany({
         where: { coupleId, date: moodDate },
         include: { user: { select: { id: true, nickname: true, profileImage: true } } },
-      });
-      const fortuneQuery = tx.fortune.findUnique({
+      }),
+      prisma.fortune.findUnique({
         where: { coupleId_date: { coupleId, date: missionToday } },
-      });
-      const dailyQuery = tx.coupleMission.upsert({
+      }),
+      prisma.wishItem.findMany({
+        where: { coupleId },
+        orderBy: [
+          { isFavorite: 'desc' },
+          { isCompleted: 'asc' },
+          { createdAt: 'desc' },
+        ],
+      }),
+      prisma.doodle.findFirst({
+        where: { receiverId: userId },
+        orderBy: { createdAt: 'desc' },
+        include: { sender: { select: { id: true, nickname: true } } },
+      }),
+      prisma.notification.count({
+        where: { userId, isRead: false },
+      }),
+      prisma.message.count({
+        where: {
+          coupleId,
+          senderId: { not: userId },
+          isRead: false,
+        },
+      }),
+      prisma.feed.count({
+        where: {
+          coupleId,
+          authorId: { not: userId },
+          ...(lastSeenFeedAt && { createdAt: { gt: new Date(lastSeenFeedAt) } }),
+        },
+      }),
+      prisma.calendarEvent.findMany({
+        where: {
+          coupleId,
+          OR: [
+            // 오늘 날짜의 단발 일정
+            { date: { gte: start, lt: end }, repeatType: 'NONE' },
+            // 반복 일정은 전부 가져와 아래에서 오늘 해당분만 필터
+            { repeatType: 'YEARLY' },
+            { repeatType: 'MONTHLY' },
+          ],
+        },
+        orderBy: { date: 'asc' },
+      }),
+    ]);
+
+    // 반복 일정(매년/매월)이 오늘에 해당하면 "오늘의 일정"에 포함.
+    // (캘린더 화면은 반복을 펼쳐 보여주는데 홈 위젯은 누락하던 문제)
+    const todayMonth = start.getUTCMonth();
+    const todayDay = start.getUTCDate();
+    const todayScheduleEvents = todayEvents.filter((ev) => {
+      if (ev.repeatType === 'YEARLY') {
+        return ev.date.getUTCMonth() === todayMonth &&
+          ev.date.getUTCDate() === todayDay;
+      }
+      if (ev.repeatType === 'MONTHLY') {
+        return ev.date.getUTCDate() === todayDay;
+      }
+      return true; // NONE: 이미 오늘 윈도우로 필터됨
+    });
+
+    // 멱등 upsert/cleanup 쓰기 — 트랜잭션 격리 없이 병렬 실행
+    const [daily, weekly, , dailyQuestion] = await Promise.all([
+      prisma.coupleMission.upsert({
         where: { coupleId_type_date: { coupleId, type: 'DAILY', date: missionToday } },
         update: {},
         create: {
@@ -111,8 +174,8 @@ router.get('/summary', async (req, res) => {
           description: dailyPick.description,
           emoji: dailyPick.emoji,
         },
-      });
-      const weeklyQuery = tx.coupleMission.upsert({
+      }),
+      prisma.coupleMission.upsert({
         where: { coupleId_type_date: { coupleId, type: 'WEEKLY', date: monday } },
         update: {},
         create: {
@@ -123,15 +186,15 @@ router.get('/summary', async (req, res) => {
           description: weeklyPick.description,
           emoji: weeklyPick.emoji,
         },
-      });
-      const cleanupQuestionQuery = tx.dailyQuestion.deleteMany({
+      }),
+      prisma.dailyQuestion.deleteMany({
         where: {
           coupleId,
           date: { lt: questionTodayDate },
           answers: { none: {} },
         },
-      });
-      const questionQuery = tx.dailyQuestion.upsert({
+      }),
+      prisma.dailyQuestion.upsert({
         where: { coupleId_date: { coupleId, date: questionTodayDate } },
         update: {},
         create: { coupleId, questionIdx, date: questionTodayDate },
@@ -140,64 +203,8 @@ router.get('/summary', async (req, res) => {
             select: { id: true, userId: true, answer: true, createdAt: true },
           },
         },
-      });
-      const wishlistQuery = tx.wishItem.findMany({
-        where: { coupleId },
-        orderBy: [
-          { isFavorite: 'desc' },
-          { isCompleted: 'asc' },
-          { createdAt: 'desc' },
-        ],
-      });
-      const doodleQuery = tx.doodle.findFirst({
-        where: { receiverId: userId },
-        orderBy: { createdAt: 'desc' },
-        include: { sender: { select: { id: true, nickname: true } } },
-      });
-      const notificationUnreadQuery = tx.notification.count({
-        where: { userId, isRead: false },
-      });
-      const chatUnreadQuery = tx.message.count({
-        where: {
-          coupleId,
-          senderId: { not: userId },
-          isRead: false,
-        },
-      });
-      const feedUnseenQuery = tx.feed.count({
-        where: {
-          coupleId,
-          authorId: { not: userId },
-          ...(lastSeenFeedAt && { createdAt: { gt: new Date(lastSeenFeedAt) } }),
-        },
-      });
-      const start = new Date(`${localDate}T00:00:00.000Z`);
-      const end = new Date(start);
-      end.setUTCDate(end.getUTCDate() + 1);
-      const todayEventsQuery = tx.calendarEvent.findMany({
-        where: {
-          coupleId,
-          date: { gte: start, lt: end },
-        },
-        orderBy: { date: 'asc' },
-      });
-
-      return Promise.all([
-        coupleQuery,
-        moodsQuery,
-        fortuneQuery,
-        dailyQuery,
-        weeklyQuery,
-        cleanupQuestionQuery,
-        questionQuery,
-        wishlistQuery,
-        doodleQuery,
-        notificationUnreadQuery,
-        chatUnreadQuery,
-        feedUnseenQuery,
-        todayEventsQuery,
-      ]);
-    });
+      }),
+    ]);
 
     const bothAnswered = dailyQuestion.answers.length >= 2;
     const canReveal = bothAnswered || isNextDayKST(questionTodayDate);
@@ -231,7 +238,7 @@ router.get('/summary', async (req, res) => {
       notifications: { unreadCount: notificationUnreadCount },
       widgets: {
         month,
-        todaySchedule: formatSchedule(todayEvents),
+        todaySchedule: formatSchedule(todayScheduleEvents),
       },
     });
   } catch (err) {

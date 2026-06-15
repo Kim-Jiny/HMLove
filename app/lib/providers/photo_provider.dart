@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
+import '../core/api_error.dart';
 
 // Photo model
 class Photo {
@@ -76,6 +77,8 @@ class Photo {
 
 // Photo state class
 class PhotoState {
+  static const _sentinel = Object();
+
   final List<Photo> photos;
   final List<Photo> mapPhotos;
   final bool isLoading;
@@ -92,13 +95,13 @@ class PhotoState {
     List<Photo>? photos,
     List<Photo>? mapPhotos,
     bool? isLoading,
-    String? error,
+    Object? error = _sentinel,
   }) {
     return PhotoState(
       photos: photos ?? this.photos,
       mapPhotos: mapPhotos ?? this.mapPhotos,
       isLoading: isLoading ?? this.isLoading,
-      error: error,
+      error: identical(error, _sentinel) ? this.error : error as String?,
     );
   }
 }
@@ -131,7 +134,7 @@ class PhotoNotifier extends Notifier<PhotoState> {
       state = state.copyWith(photos: photos, isLoading: false);
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '사진을 불러오지 못했습니다';
+          extractDioErrorMessage(e, fallback: '사진을 불러오지 못했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(
@@ -153,7 +156,7 @@ class PhotoNotifier extends Notifier<PhotoState> {
       state = state.copyWith(mapPhotos: mapPhotos, isLoading: false);
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '지도 사진을 불러오지 못했습니다';
+          extractDioErrorMessage(e, fallback: '지도 사진을 불러오지 못했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(
@@ -180,10 +183,10 @@ class PhotoNotifier extends Notifier<PhotoState> {
           imageFile.path,
           filename: fileName,
         ),
-        if (caption != null) 'caption': caption,
-        if (latitude != null) 'latitude': latitude,
-        if (longitude != null) 'longitude': longitude,
-        if (location != null) 'location': location,
+        'caption': ?caption,
+        'latitude': ?latitude,
+        'longitude': ?longitude,
+        'location': ?location,
       });
 
       final response = await _dio.post(
@@ -207,7 +210,7 @@ class PhotoNotifier extends Notifier<PhotoState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '사진 업로드에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '사진 업로드에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -237,7 +240,7 @@ class PhotoNotifier extends Notifier<PhotoState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['message'] as String? ?? '사진 삭제에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '사진 삭제에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {

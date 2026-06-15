@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api_client.dart';
+import '../core/api_error.dart';
 import '../models/daily_question.dart';
 
 class QuestionState {
@@ -89,8 +90,14 @@ class QuestionNotifier extends Notifier<QuestionState> {
       final question = DailyQuestion.fromJson(data);
       state = state.copyWith(today: question);
       return true;
+    } on DioException catch (e) {
+      final message =
+          extractDioErrorMessage(e, fallback: '답변 제출에 실패했습니다.');
+      state = state.copyWith(error: message);
+      return false;
     } catch (e) {
       debugPrint('[Question] submitAnswer error: $e');
+      state = state.copyWith(error: '알 수 없는 오류가 발생했습니다.');
       return false;
     }
   }

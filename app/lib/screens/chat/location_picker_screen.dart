@@ -87,6 +87,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
 
+      if (!mounted) return;
       final target = NLatLng(position.latitude, position.longitude);
       setState(() {
         _currentCenter = target;
@@ -98,6 +99,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       );
       _reverseGeocode(target);
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
@@ -115,6 +117,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   void _onCameraIdle() async {
     if (_mapController == null) return;
     final position = await _mapController!.getCameraPosition();
+    if (!mounted) return;
     final center = position.target;
     setState(() => _currentCenter = center);
     _reverseGeocode(center);

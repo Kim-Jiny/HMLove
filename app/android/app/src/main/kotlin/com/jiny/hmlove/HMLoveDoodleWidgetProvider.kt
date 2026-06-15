@@ -51,9 +51,12 @@ class HMLoveDoodleWidgetProvider : AppWidgetProvider() {
         // 같은 latest 를 반복 fetch 하지 않도록.
         private const val FETCH_SUCCESS_COOLDOWN_MS = 5 * 60 * 1000L
         private const val PREF_KEY_FETCH_SUCCESS = "doodleFetchSuccess"
-    }
 
-    private val ioExecutor by lazy { Executors.newSingleThreadExecutor() }
+        // AppWidgetProvider 는 broadcast 마다 새 인스턴스로 생성되므로, executor 를
+        // 인스턴스에 두면 update 사이클마다 non-daemon 스레드가 누수된다.
+        // 프로세스 전역 단일 executor 로 공유해 누수를 방지.
+        private val ioExecutor by lazy { Executors.newSingleThreadExecutor() }
+    }
 
     private fun isOnFetchCooldown(prefs: android.content.SharedPreferences): Boolean {
         val now = System.currentTimeMillis()

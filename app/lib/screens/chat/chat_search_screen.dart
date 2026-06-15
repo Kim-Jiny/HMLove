@@ -69,6 +69,7 @@ class _ChatSearchScreenState extends State<ChatSearchScreen> {
 
       final response =
           await _dio.get('/chat/search', queryParameters: params);
+      if (!mounted) return;
       final data = response.data as Map<String, dynamic>;
       final messages = (data['messages'] as List)
           .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
@@ -82,6 +83,7 @@ class _ChatSearchScreenState extends State<ChatSearchScreen> {
         _isLoading = false;
       });
     } on DioException {
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
@@ -141,7 +143,7 @@ class _ChatSearchScreenState extends State<ChatSearchScreen> {
                         : Colors.grey.shade300,
                     radius: 18,
                     child: Text(
-                      name[0],
+                      name.isNotEmpty ? name.characters.first : '?',
                       style: TextStyle(
                         color: isMe ? Colors.white : AppTheme.textPrimary,
                         fontSize: 14,

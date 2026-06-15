@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
+import '../core/api_error.dart';
 
 // Fight model
 class Fight {
@@ -34,23 +35,25 @@ class Fight {
   factory Fight.fromJson(Map<String, dynamic> json) {
     final author = json['author'] as Map<String, dynamic>?;
     return Fight(
-      id: json['id'] as String,
-      date: DateTime.parse(json['date'] as String),
-      reason: json['reason'] as String,
+      id: json['id'] as String? ?? '',
+      date: DateTime.tryParse(json['date'] as String? ?? '') ?? DateTime.now(),
+      reason: json['reason'] as String? ?? '',
       resolution: json['resolution'] as String?,
       reflection: json['reflection'] as String?,
       isResolved: json['isResolved'] as bool? ?? false,
-      coupleId: json['coupleId'] as String,
-      authorId: json['authorId'] as String,
+      coupleId: json['coupleId'] as String? ?? '',
+      authorId: json['authorId'] as String? ?? '',
       authorNickname: author?['nickname'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ?? DateTime.now(),
     );
   }
 }
 
 // Fight state class
 class FightState {
+  static const _sentinel = Object();
+
   final List<Fight> fights;
   final bool isLoading;
   final String? error;
@@ -64,12 +67,12 @@ class FightState {
   FightState copyWith({
     List<Fight>? fights,
     bool? isLoading,
-    String? error,
+    Object? error = _sentinel,
   }) {
     return FightState(
       fights: fights ?? this.fights,
       isLoading: isLoading ?? this.isLoading,
-      error: error,
+      error: identical(error, _sentinel) ? this.error : error as String?,
     );
   }
 }
@@ -90,7 +93,7 @@ class FightNotifier extends Notifier<FightState> {
 
     try {
       final queryParams = <String, dynamic>{
-        if (isResolved != null) 'isResolved': isResolved,
+        'isResolved': ?isResolved,
       };
 
       final response =
@@ -102,7 +105,7 @@ class FightNotifier extends Notifier<FightState> {
       state = state.copyWith(fights: fights, isLoading: false);
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '다툼 기록을 불러오지 못했습니다';
+          extractDioErrorMessage(e, fallback: '다툼 기록을 불러오지 못했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(
@@ -126,9 +129,9 @@ class FightNotifier extends Notifier<FightState> {
       final response = await _dio.post('/fight', data: {
         'date': date.toIso8601String(),
         'reason': reason,
-        if (resolution != null) 'resolution': resolution,
-        if (reflection != null) 'reflection': reflection,
-        if (isResolved != null) 'isResolved': isResolved,
+        'resolution': ?resolution,
+        'reflection': ?reflection,
+        'isResolved': ?isResolved,
       });
 
       final data = response.data as Map<String, dynamic>;
@@ -140,7 +143,7 @@ class FightNotifier extends Notifier<FightState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '다툼 기록 생성에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '다툼 기록 생성에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -166,10 +169,10 @@ class FightNotifier extends Notifier<FightState> {
     try {
       final response = await _dio.put('/fight/$id', data: {
         if (date != null) 'date': date.toIso8601String(),
-        if (reason != null) 'reason': reason,
-        if (resolution != null) 'resolution': resolution,
-        if (reflection != null) 'reflection': reflection,
-        if (isResolved != null) 'isResolved': isResolved,
+        'reason': ?reason,
+        'resolution': ?resolution,
+        'reflection': ?reflection,
+        'isResolved': ?isResolved,
       });
 
       final data = response.data as Map<String, dynamic>;
@@ -183,7 +186,7 @@ class FightNotifier extends Notifier<FightState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '다툼 기록 수정에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '다툼 기록 수정에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -212,7 +215,7 @@ class FightNotifier extends Notifier<FightState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '다툼 해결 처리에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '다툼 해결 처리에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -236,7 +239,7 @@ class FightNotifier extends Notifier<FightState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '다툼 기록 삭제에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '다툼 기록 삭제에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {

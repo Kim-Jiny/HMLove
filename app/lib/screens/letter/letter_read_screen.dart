@@ -20,6 +20,7 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
+  bool _readRequested = false;
 
   @override
   void initState() {
@@ -49,7 +50,8 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
     final letterState = ref.watch(letterProvider);
     final letter = letterState.selectedLetter;
 
-    if (letterState.isLoading || letter == null) {
+    // selectedLetter 가 아직 이 화면의 편지가 아니면(이전 선택 잔존 포함) 로딩 처리.
+    if (letterState.isLoading || letter == null || letter.id != widget.letterId) {
       return Scaffold(
         appBar: AppBar(title: const Text('편지')),
         body: const Center(
@@ -68,16 +70,21 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
       return _buildLockedView(letter.deliveryDate);
     }
 
-    // 수신자이고 배달 완료되었으면 읽음 처리
-    if (!isWriter && !letter.isRead) {
-      Future.microtask(() {
-        ref.read(letterProvider.notifier).markAsRead(widget.letterId);
+    // 수신자이고 배달 완료되었으면 읽음 처리 (한 번만)
+    if (!isWriter && !letter.isRead && !_readRequested) {
+      _readRequested = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(letterProvider.notifier).markAsRead(widget.letterId);
+        }
       });
     }
 
     // Start fade animation
-    if (!_fadeController.isCompleted) {
-      _fadeController.forward();
+    if (!_fadeController.isCompleted && !_fadeController.isAnimating) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _fadeController.forward();
+      });
     }
 
     return _buildLetterView(letter, isWriter: isWriter);

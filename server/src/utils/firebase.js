@@ -33,18 +33,32 @@ if (serviceAccountEnv) {
  * @param {boolean} [opts.sound=true] - 소리 활성화 여부
  * @param {boolean} [opts.mutableContent=false] - iOS Notification Service Extension 트리거 여부 (위젯 갱신 등 사전 작업)
  */
-export async function sendPushNotification({ token, title, body, data, sound = true, mutableContent = false }) {
+export async function sendPushNotification({ token, title, body, data, sound = true, mutableContent = false, userId = null }) {
   if (!token) return;
+
+  // userId 가 주어지면 그 유저의 최신 토큰을 우선 사용한다. debounce 등으로 호출 시점에
+  // 토큰이 회전(rotate)했을 수 있어, 닫아둔 stale 토큰으로 보내 유실되는 것을 막는다.
+  let effectiveToken = token;
 
   try {
     // 실제 미읽음 알림 개수 조회
     let badgeCount = 1;
     try {
       const prisma = (await import('./prisma.js')).default;
-      const user = await prisma.user.findFirst({
-        where: { fcmToken: token },
-        select: { id: true, coupleId: true },
-      });
+      // fcmToken 은 unique 가 아니라(무효화 시 여러 유저가 공유 가능) findFirst 로
+      // 엉뚱한 유저의 미읽음 수를 셀 수 있다. 수신자 userId 를 알면 그걸로 조회.
+      const user = userId
+        ? await prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, coupleId: true, fcmToken: true },
+          })
+        : await prisma.user.findFirst({
+            where: { fcmToken: token },
+            select: { id: true, coupleId: true },
+          });
+      if (userId && user?.fcmToken) {
+        effectiveToken = user.fcmToken;
+      }
       if (user) {
         const [unreadMessages, unreadNotifications] = await Promise.all([
           prisma.message.count({
@@ -79,7 +93,7 @@ export async function sendPushNotification({ token, title, body, data, sound = t
     }
 
     await admin.messaging().send({
-      token,
+      token: effectiveToken,
       notification: { title, body },
       data: mergedData,
       android: {
@@ -107,15 +121,15 @@ export async function sendPushNotification({ token, title, body, data, sound = t
         },
       },
     });
-    console.log(`[Push] Sent to token: ${token.substring(0, 20)}... (sound: ${sound}, mutable: ${mutableContent})`);
+    console.log(`[Push] Sent to token: ${effectiveToken.substring(0, 20)}... (sound: ${sound}, mutable: ${mutableContent})`);
   } catch (err) {
-    // 토큰이 유효하지 않으면 DB에서 삭제
+    // 토큰이 유효하지 않으면 DB에서 삭제 (실제로 보낸 토큰 기준)
     if (err.code === 'messaging/registration-token-not-registered' ||
         err.code === 'messaging/invalid-registration-token') {
       console.log('[Push] Invalid token, removing from DB');
       const prisma = (await import('./prisma.js')).default;
       await prisma.user.updateMany({
-        where: { fcmToken: token },
+        where: { fcmToken: effectiveToken },
         data: { fcmToken: null },
       });
     } else {
@@ -266,7 +280,7 @@ export async function notifyPartner({ userId, coupleId, title, body, data, silen
       // (silent push는 OS가 throttle하지만 alert push는 즉시 전달됨)
       const mutableContent = type === 'calendar' || type === 'doodle';
 
-      await sendPushNotification({ token: partner.fcmToken, title, body, data, sound, mutableContent });
+      await sendPushNotification({ token: partner.fcmToken, title, body, data, sound, mutableContent, userId: partner.id });
 
       // 동일 partner 토큰으로 사일런트 푸시도 전송 (DB 재조회 없음)
       // Android는 이 silent push로 위젯 갱신, iOS는 위 NSE로 갱신

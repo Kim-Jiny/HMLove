@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/api_client.dart';
+import '../core/api_error.dart';
 
 // Letter model
 class Letter {
@@ -63,6 +64,8 @@ class Letter {
 
 // Letter state class
 class LetterState {
+  static const _sentinel = Object();
+
   final List<Letter> letters;
   final Letter? selectedLetter;
   final bool isLoading;
@@ -79,13 +82,13 @@ class LetterState {
     List<Letter>? letters,
     Letter? selectedLetter,
     bool? isLoading,
-    String? error,
+    Object? error = _sentinel,
   }) {
     return LetterState(
       letters: letters ?? this.letters,
       selectedLetter: selectedLetter ?? this.selectedLetter,
       isLoading: isLoading ?? this.isLoading,
-      error: error,
+      error: identical(error, _sentinel) ? this.error : error as String?,
     );
   }
 }
@@ -114,7 +117,7 @@ class LetterNotifier extends Notifier<LetterState> {
       state = state.copyWith(letters: letters, isLoading: false);
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '편지를 불러오지 못했습니다';
+          extractDioErrorMessage(e, fallback: '편지를 불러오지 못했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(
@@ -135,7 +138,7 @@ class LetterNotifier extends Notifier<LetterState> {
       state = state.copyWith(selectedLetter: letter, isLoading: false);
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '편지를 불러오지 못했습니다';
+          extractDioErrorMessage(e, fallback: '편지를 불러오지 못했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(
@@ -170,7 +173,7 @@ class LetterNotifier extends Notifier<LetterState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '편지 작성에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '편지 작성에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -193,8 +196,8 @@ class LetterNotifier extends Notifier<LetterState> {
 
     try {
       final response = await _dio.put('/letter/$id', data: {
-        if (title != null) 'title': title,
-        if (content != null) 'content': content,
+        'title': ?title,
+        'content': ?content,
         if (deliveryDate != null)
           'deliveryDate': deliveryDate.toIso8601String(),
       });
@@ -209,13 +212,13 @@ class LetterNotifier extends Notifier<LetterState> {
       state = state.copyWith(
         letters: updatedLetters,
         selectedLetter:
-            state.selectedLetter?.id == id ? updatedLetter : null,
+            state.selectedLetter?.id == id ? updatedLetter : state.selectedLetter,
         isLoading: false,
       );
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '편지 수정에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '편지 수정에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -244,7 +247,7 @@ class LetterNotifier extends Notifier<LetterState> {
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '편지 삭제에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '편지 삭제에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -271,11 +274,12 @@ class LetterNotifier extends Notifier<LetterState> {
         letters: updatedLetters,
         selectedLetter:
             state.selectedLetter?.id == id ? updatedLetter : null,
+        error: null,
       );
       return true;
     } on DioException catch (e) {
       final message =
-          e.response?.data?['error'] as String? ?? '읽음 처리에 실패했습니다';
+          extractDioErrorMessage(e, fallback: '읽음 처리에 실패했습니다');
       state = state.copyWith(error: message);
       return false;
     } catch (e) {

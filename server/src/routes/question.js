@@ -44,11 +44,14 @@ router.get('/today', async (req, res) => {
     const questionIdx = getQuestionIndex(coupleId, todayStr);
     const questionText = QUESTION_POOL[questionIdx] || '오늘의 질문을 준비 중이에요.';
 
-    // 둘 다 답변하지 않고 지나간 과거 질문은 정리 — 히스토리에서 빠지고, 같은 questionIdx가 미래에 다시 등장 가능
+    // 둘 다 답변하지 않고 지나간 과거 질문은 정리 — 히스토리에서 빠지고, 같은 questionIdx가 미래에 다시 등장 가능.
+    // 단, 어제 질문은 KST 자정 직후에도 한쪽이 답변 중일 수 있으므로 1일 유예를 둔다
+    // (그러지 않으면 GET /today 가 어제 질문을 지우는 사이 POST answer 가 FK 에러로 실패).
+    const yesterdayDate = new Date(todayDate.getTime() - 24 * 60 * 60 * 1000);
     await prisma.dailyQuestion.deleteMany({
       where: {
         coupleId,
-        date: { lt: todayDate },
+        date: { lt: yesterdayDate },
         answers: { none: {} },
       },
     });

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -23,6 +24,9 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
   bool _isMapView = true;
   Set<Marker> _markers = {};
   String _markerSignature = '';
+  // 위치 권한이 없는데 myLocationEnabled:true 면 Android 에서 PlatformException 으로
+  // 지도가 죽는다. 권한 확인 후에만 내 위치 레이어를 켠다.
+  bool _hasLocationPermission = false;
 
   static const LatLng _defaultCenter = LatLng(37.5665, 126.9780); // Seoul
 
@@ -32,6 +36,20 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
     Future.microtask(() {
       ref.read(photoProvider.notifier).fetchMapPhotos();
     });
+    _checkLocationPermission();
+  }
+
+  Future<void> _checkLocationPermission() async {
+    try {
+      final perm = await Geolocator.checkPermission();
+      final granted = perm == LocationPermission.always ||
+          perm == LocationPermission.whileInUse;
+      if (mounted && granted != _hasLocationPermission) {
+        setState(() => _hasLocationPermission = granted);
+      }
+    } catch (_) {
+      // 권한 조회 실패 시 내 위치 레이어는 끈 채로 둔다.
+    }
   }
 
   void _buildMarkers(List<dynamic> photos) {
@@ -196,7 +214,9 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
 
     // Show caption dialog
     final captionController = TextEditingController();
-    final caption = await showDialog<String>(
+    final String? caption;
+    try {
+      caption = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('사진 설명'),
@@ -228,6 +248,9 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
         ],
       ),
     );
+    } finally {
+      captionController.dispose();
+    }
 
     if (caption == null) return;
 
@@ -325,8 +348,8 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
           _mapController.complete(controller);
         }
       },
-      myLocationEnabled: true,
-      myLocationButtonEnabled: true,
+      myLocationEnabled: _hasLocationPermission,
+      myLocationButtonEnabled: _hasLocationPermission,
       zoomControlsEnabled: false,
       mapToolbarEnabled: false,
     );

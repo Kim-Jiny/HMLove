@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../core/server_date.dart';
 import '../../core/top_snackbar.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user.dart';
@@ -105,7 +107,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         showTopSnackBar(context, '이미지 업로드에 실패했습니다.', isError: true);
       }
     } finally {
-      setState(() => _isUploadingImage = false);
+      if (mounted) setState(() => _isUploadingImage = false);
     }
   }
 
@@ -144,7 +146,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       final response = await dio.patch('/auth/profile', data: {
         'nickname': nickname,
         if (_birthDate != null)
-          'birthDate': _birthDate!.toIso8601String(),
+          'birthDate': toServerDateOnly(_birthDate!),
       });
 
       final userData = response.data['user'] as Map<String, dynamic>;
@@ -166,7 +168,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         showTopSnackBar(context, '프로필 수정에 실패했습니다.', isError: true);
       }
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -212,7 +214,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                       backgroundColor:
                           AppTheme.primaryLight.withValues(alpha: 0.3),
                       backgroundImage: user?.profileImage != null
-                          ? NetworkImage(user!.profileImage!)
+                          ? CachedNetworkImageProvider(user!.profileImage!)
                           : null,
                       child: _isUploadingImage
                           ? const CircularProgressIndicator(
@@ -267,8 +269,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             const SizedBox(height: 16),
 
             // Email (read-only)
-            TextField(
-              controller: TextEditingController(text: user?.email ?? ''),
+            TextFormField(
+              initialValue: user?.email ?? '',
               readOnly: true,
               decoration: InputDecoration(
                 labelText: '이메일',

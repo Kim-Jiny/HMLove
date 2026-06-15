@@ -10,9 +10,10 @@ router.use(fortuneLimiter);
 
 const anthropic = new Anthropic();
 
+// "오늘"은 KST 기준 (mission.getToday / home localDate 과 동일한 표현).
 function getTodayDate() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  return new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate()));
 }
 
 async function generateFortune({ coupleId, today, todayStr, user1, user2, daysTogether }) {
@@ -44,8 +45,12 @@ async function generateFortune({ coupleId, today, todayStr, user1, user2, daysTo
     messages: [{ role: 'user', content: prompt }],
   });
 
-  const text = message.content[0].text;
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  // 응답이 비어있거나 첫 블록이 text 가 아닐 수 있으므로 text 블록을 안전하게 찾는다.
+  const textBlock = Array.isArray(message.content)
+    ? message.content.find((b) => b?.type === 'text' && typeof b.text === 'string')
+    : null;
+  const text = textBlock?.text;
+  const jsonMatch = text ? text.match(/\{[\s\S]*\}/) : null;
   if (!jsonMatch) {
     throw new Error('운세 JSON 파싱 실패');
   }

@@ -88,13 +88,20 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
     _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
-        _rewardedAd = null;
+        if (mounted) {
+          setState(() => _rewardedAd = null);
+          _loadRewardedAd();
+        } else {
+          _rewardedAd = null;
+        }
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
         ad.dispose();
-        _rewardedAd = null;
         if (mounted) {
+          setState(() => _rewardedAd = null);
           _loadRewardedAd();
+        } else {
+          _rewardedAd = null;
         }
       },
     );

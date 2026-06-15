@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api_client.dart';
+import '../core/api_error.dart';
 
 class Mission {
   final String id;
@@ -44,16 +45,20 @@ class Mission {
 }
 
 class MissionState {
+  static const _sentinel = Object();
+
   final Mission? daily;
   final Mission? weekly;
   final bool isLoading;
   final Map<String, List<Mission>> completedDates; // date string -> missions
+  final String? error;
 
   const MissionState({
     this.daily,
     this.weekly,
     this.isLoading = false,
     this.completedDates = const {},
+    this.error,
   });
 
   MissionState copyWith({
@@ -61,12 +66,14 @@ class MissionState {
     Mission? weekly,
     bool? isLoading,
     Map<String, List<Mission>>? completedDates,
+    Object? error = _sentinel,
   }) {
     return MissionState(
       daily: daily ?? this.daily,
       weekly: weekly ?? this.weekly,
       isLoading: isLoading ?? this.isLoading,
       completedDates: completedDates ?? this.completedDates,
+      error: identical(error, _sentinel) ? this.error : error as String?,
     );
   }
 }
@@ -131,8 +138,14 @@ class MissionNotifier extends Notifier<MissionState> {
       }
       _refreshCalendar();
       return true;
+    } on DioException catch (e) {
+      final message =
+          extractDioErrorMessage(e, fallback: '미션 완료에 실패했습니다.');
+      state = state.copyWith(error: message);
+      return false;
     } catch (e) {
       debugPrint('[Mission] completeMission error: $e');
+      state = state.copyWith(error: '알 수 없는 오류가 발생했습니다.');
       return false;
     }
   }
@@ -149,8 +162,14 @@ class MissionNotifier extends Notifier<MissionState> {
       }
       _refreshCalendar();
       return true;
+    } on DioException catch (e) {
+      final message =
+          extractDioErrorMessage(e, fallback: '미션 취소에 실패했습니다.');
+      state = state.copyWith(error: message);
+      return false;
     } catch (e) {
       debugPrint('[Mission] cancelMission error: $e');
+      state = state.copyWith(error: '알 수 없는 오류가 발생했습니다.');
       return false;
     }
   }

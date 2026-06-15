@@ -3,11 +3,12 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../utils/prisma.js';
 import { sendPushNotification } from '../utils/firebase.js';
+import { authLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 
-// POST /admin/login
-router.post('/login', async (req, res) => {
+// POST /admin/login (브루트포스 방지: 15분 10회 제한)
+router.post('/login', authLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {
@@ -354,7 +355,9 @@ router.get('/users/:id', async (req, res) => {
       },
     });
     if (!user) return res.status(404).json({ error: '유저를 찾을 수 없습니다.' });
-    res.json({ user });
+    // FCM 토큰 원문은 노출하지 않고 보유 여부만 내려준다 (푸시 스푸핑 방지).
+    const { fcmToken, ...safeUser } = user;
+    res.json({ user: { ...safeUser, hasPushToken: !!fcmToken } });
   } catch (err) {
     console.error('Admin user detail error:', err);
     res.status(500).json({ error: '유저 조회에 실패했습니다.' });
@@ -371,22 +374,43 @@ router.delete('/users/:id', async (req, res) => {
     });
     if (!user) return res.status(404).json({ error: '유저를 찾을 수 없습니다.' });
 
-    if (user.coupleId) {
-      await prisma.user.update({ where: { id }, data: { coupleId: null } });
-    }
+    const { coupleId } = user;
 
-    await prisma.$transaction([
-      prisma.feedLike.deleteMany({ where: { userId: id } }),
-      prisma.feedComment.deleteMany({ where: { authorId: id } }),
-      prisma.mood.deleteMany({ where: { userId: id } }),
-      prisma.letter.deleteMany({ where: { OR: [{ writerId: id }, { receiverId: id }] } }),
-      prisma.fight.deleteMany({ where: { authorId: id } }),
-      prisma.photo.deleteMany({ where: { authorId: id } }),
-      prisma.feed.deleteMany({ where: { authorId: id } }),
-      prisma.message.deleteMany({ where: { senderId: id } }),
-      prisma.calendarEvent.deleteMany({ where: { authorId: id } }),
-      prisma.user.delete({ where: { id } }),
-    ]);
+    await prisma.$transaction(async (tx) => {
+      if (coupleId) {
+        // 커플 소속 유저 삭제 → 커플을 해제하고 공유 데이터 전체를 삭제한다.
+        // (커플 데이터는 공동 소유라 한쪽만 지우면 파트너가 깨진 커플에 남는다.
+        //  /couple/leave 의 마지막-멤버 정책과 동일하게 처리.)
+        await tx.user.updateMany({ where: { coupleId }, data: { coupleId: null } });
+        await tx.feedLike.deleteMany({ where: { feed: { coupleId } } });
+        await tx.feedComment.deleteMany({ where: { feed: { coupleId } } });
+        await tx.feed.deleteMany({ where: { coupleId } });
+        await tx.message.deleteMany({ where: { coupleId } });
+        await tx.calendarEvent.deleteMany({ where: { coupleId } });
+        await tx.mood.deleteMany({ where: { coupleId } });
+        await tx.photo.deleteMany({ where: { coupleId } });
+        await tx.letter.deleteMany({ where: { coupleId } });
+        await tx.fight.deleteMany({ where: { coupleId } });
+        await tx.fortune.deleteMany({ where: { coupleId } });
+        await tx.coupleMission.deleteMany({ where: { coupleId } });
+        await tx.questionAnswer.deleteMany({ where: { question: { coupleId } } });
+        await tx.dailyQuestion.deleteMany({ where: { coupleId } });
+        await tx.wishItem.deleteMany({ where: { coupleId } });
+        await tx.couple.delete({ where: { id: coupleId } });
+      } else {
+        // 커플이 없는 유저: 본인이 만든 데이터만 정리.
+        await tx.feedLike.deleteMany({ where: { userId: id } });
+        await tx.feedComment.deleteMany({ where: { authorId: id } });
+        await tx.mood.deleteMany({ where: { userId: id } });
+        await tx.letter.deleteMany({ where: { OR: [{ writerId: id }, { receiverId: id }] } });
+        await tx.fight.deleteMany({ where: { authorId: id } });
+        await tx.photo.deleteMany({ where: { authorId: id } });
+        await tx.feed.deleteMany({ where: { authorId: id } });
+        await tx.message.deleteMany({ where: { senderId: id } });
+        await tx.calendarEvent.deleteMany({ where: { authorId: id } });
+      }
+      await tx.user.delete({ where: { id } });
+    });
 
     res.json({ message: `${user.nickname} 유저가 삭제되었습니다.` });
   } catch (err) {
@@ -741,7 +765,7 @@ router.patch('/inquiries/:id', async (req, res) => {
         pushResult = { sent: false, reason: '유저에게 FCM 토큰이 없습니다 (푸시 알림 미허용 또는 미등록)' };
       } else {
         try {
-          await sendPushNotification({ token: inquiry.user.fcmToken, title: nTitle, body: nBody, data: nData });
+          await sendPushNotification({ token: inquiry.user.fcmToken, userId: inquiry.user.id, title: nTitle, body: nBody, data: nData });
           pushResult = { sent: true, reason: `전송 성공 (토큰: ${inquiry.user.fcmToken.substring(0, 20)}...)` };
         } catch (pushErr) {
           pushResult = { sent: false, reason: `전송 실패: ${pushErr.message}` };
@@ -767,7 +791,7 @@ router.patch('/inquiries/:id', async (req, res) => {
         pushResult = { sent: false, reason: '유저에게 FCM 토큰이 없습니다' };
       } else {
         try {
-          await sendPushNotification({ token: inquiry.user.fcmToken, title: nTitle, body: nBody, data: nData });
+          await sendPushNotification({ token: inquiry.user.fcmToken, userId: inquiry.user.id, title: nTitle, body: nBody, data: nData });
           pushResult = { sent: true, reason: `전송 성공 (토큰: ${inquiry.user.fcmToken.substring(0, 20)}...)` };
         } catch (pushErr) {
           pushResult = { sent: false, reason: `전송 실패: ${pushErr.message}` };
@@ -831,6 +855,7 @@ router.post('/push/send', async (req, res) => {
       try {
         await sendPushNotification({
           token: user.fcmToken,
+          userId: user.id,
           title,
           body,
           data: { type: 'notice' },
@@ -850,12 +875,19 @@ router.post('/push/send', async (req, res) => {
 });
 
 // GET /admin/push/tokens - FCM 토큰 보유 유저 목록
+// 토큰 원문은 내려주지 않고 보유 여부만 노출한다 (전체 유저 토큰 유출 방지).
 router.get('/push/tokens', async (req, res) => {
   try {
-    const users = await prisma.user.findMany({
+    // 토큰 원문은 내려주지 않고 보유 여부(hasPushToken)만 노출한다.
+    // 관리자 전용 화면이라 전체 목록을 반환(별도 페이저 없음).
+    const rows = await prisma.user.findMany({
       select: { id: true, nickname: true, email: true, fcmToken: true },
       orderBy: { createdAt: 'desc' },
     });
+    const users = rows.map(({ fcmToken, ...u }) => ({
+      ...u,
+      hasPushToken: !!fcmToken,
+    }));
     res.json({ users });
   } catch (err) {
     console.error('Admin push tokens error:', err);

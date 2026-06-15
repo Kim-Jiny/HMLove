@@ -1,3 +1,6 @@
+// 값 이름이 그대로 서버와 직렬화된다(category.name == 'PLACE' 등). 서버 enum 과
+// 일치시켜야 하므로 대문자 유지 — lowerCamelCase 로 바꾸면 직렬화가 깨진다.
+// ignore_for_file: constant_identifier_names
 enum WishCategory {
   PLACE,
   FOOD,

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requireCouple } from '../middleware/auth.js';
 import prisma from '../utils/prisma.js';
+import { loadCoupleOwned, paginateArgs, buildPage } from '../utils/coupleScope.js';
 import { notifyPartner } from '../utils/firebase.js';
 
 const router = Router();
@@ -9,27 +10,24 @@ router.use(authenticate, requireCouple);
 // GET /fight?isResolved=true&cursor=xxx&limit=20
 router.get('/', async (req, res) => {
   try {
-    const { isResolved, cursor } = req.query;
-    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    const { isResolved } = req.query;
+    const { take, cursorArgs } = paginateArgs(req.query);
 
     const where = { coupleId: req.user.coupleId };
     if (isResolved !== undefined) {
       where.isResolved = isResolved === 'true';
     }
 
-    const fights = await prisma.fight.findMany({
+    const rows = await prisma.fight.findMany({
       where,
       orderBy: { date: 'desc' },
-      take: limit + 1,
-      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
+      ...cursorArgs,
       include: {
         author: { select: { id: true, nickname: true } },
       },
     });
 
-    const hasMore = fights.length > limit;
-    if (hasMore) fights.pop();
-    const nextCursor = hasMore ? fights[fights.length - 1].id : null;
+    const { items: fights, nextCursor, hasMore } = buildPage(rows, take);
 
     res.json({ fights, hasMore, nextCursor });
   } catch (err) {
@@ -83,8 +81,8 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { reason, resolution, reflection, date, isResolved } = req.body;
 
-    const existing = await prisma.fight.findUnique({ where: { id } });
-    if (!existing || existing.coupleId !== req.user.coupleId) {
+    const existing = await loadCoupleOwned(prisma.fight, id, req.user.coupleId);
+    if (!existing) {
       return res.status(404).json({ error: '다툼 기록을 찾을 수 없습니다.' });
     }
 
@@ -114,8 +112,8 @@ router.patch('/:id/resolve', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const existing = await prisma.fight.findUnique({ where: { id } });
-    if (!existing || existing.coupleId !== req.user.coupleId) {
+    const existing = await loadCoupleOwned(prisma.fight, id, req.user.coupleId);
+    if (!existing) {
       return res.status(404).json({ error: '다툼 기록을 찾을 수 없습니다.' });
     }
 

@@ -760,13 +760,13 @@ async function userDetail(id) {
       '</div>'+
       '<div class="info-box" style="margin-bottom:12px;">'+
         '<div class="label">FCM 푸시 토큰</div>'+
-        '<div class="value" style="font-size:11px;word-break:break-all;color:'+(u.fcmToken?'#10b981':'#dc2626')+';">'+(u.fcmToken||'미등록 (푸시 수신 불가)')+'</div>'+
+        '<div class="value" style="font-size:11px;word-break:break-all;color:'+(u.hasPushToken?'#10b981':'#dc2626')+';">'+(u.hasPushToken?'등록됨 (푸시 수신 가능)':'미등록 (푸시 수신 불가)')+'</div>'+
       '</div>'+
       '<div style="font-size:13px;font-weight:600;color:#4b5563;margin-bottom:8px;">활동 통계</div>'+
       '<div class="modal-stats-5" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:20px;">'+
         stats.map(([l,v]) => '<div class="stat-mini"><div class="num">'+v+'</div><div class="lbl">'+l+'</div></div>').join('')+
       '</div>'+
-      (u.fcmToken ? '<div style="margin-bottom:16px;padding:12px;background:#f8fafc;border-radius:8px;">'+
+      (u.hasPushToken ? '<div style="margin-bottom:16px;padding:12px;background:#f8fafc;border-radius:8px;">'+
         '<div style="font-size:12px;font-weight:600;color:#4b5563;margin-bottom:8px;">이 유저에게 푸시 보내기</div>'+
         '<input id="pushTitle_'+u.id+'" class="input" style="margin-bottom:6px;" placeholder="제목">'+
         '<input id="pushBody_'+u.id+'" class="input" style="margin-bottom:8px;" placeholder="내용">'+
@@ -1309,15 +1309,15 @@ async function loadPushPage() {
   const d = await api('/push/tokens');
   if (!d) return;
   const users = d.users;
-  const withToken = users.filter(u => u.fcmToken);
+  const withToken = users.filter(u => u.hasPushToken);
   document.getElementById('pushTokenStats').textContent = '토큰 보유: ' + withToken.length + ' / ' + users.length + '명';
   document.getElementById('pushTokensBody').innerHTML = users.map(u =>
     '<tr>'+
       '<td style="font-weight:500;">'+esc(u.nickname)+'</td>'+
       '<td style="color:#6b7280;font-size:12px;">'+esc(u.email)+'</td>'+
-      '<td style="font-size:10px;color:#9ca3af;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+(u.fcmToken ? esc(u.fcmToken.substring(0,30))+'...' : '-')+'</td>'+
-      '<td style="text-align:center;">'+(u.fcmToken ? '<span class="badge badge-green">활성</span>' : '<span class="badge badge-gray">미등록</span>')+'</td>'+
-      '<td style="text-align:center;">'+(u.fcmToken ? '<button class="btn btn-outline btn-sm" onclick="testPush(\''+u.id+'\',\''+esc(u.nickname)+'\')">테스트</button>' : '-')+'</td>'+
+      '<td style="font-size:11px;color:#9ca3af;">'+(u.hasPushToken ? '등록됨' : '-')+'</td>'+
+      '<td style="text-align:center;">'+(u.hasPushToken ? '<span class="badge badge-green">활성</span>' : '<span class="badge badge-gray">미등록</span>')+'</td>'+
+      '<td style="text-align:center;">'+(u.hasPushToken ? '<button class="btn btn-outline btn-sm" onclick="testPush(\''+u.id+'\',\''+esc(u.nickname)+'\')">테스트</button>' : '-')+'</td>'+
     '</tr>'
   ).join('');
 }

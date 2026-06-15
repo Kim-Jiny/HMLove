@@ -10,6 +10,7 @@ import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
+import '../../providers/session_reset.dart';
 
 class CoupleConnectScreen extends ConsumerStatefulWidget {
   const CoupleConnectScreen({super.key});
@@ -99,6 +100,8 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
     if (!mounted) return;
 
     if (success) {
+      // 커플 해제 시 이전 커플의 피드·사진·캘린더 등 잔존 데이터 초기화
+      resetFeatureProviders(ref);
       showTopSnackBar(context, '커플이 해제되었습니다');
     }
   }
@@ -242,9 +245,10 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
         title: const Text('커플 연결'),
         actions: [
           TextButton(
-            onPressed: () => ref.read(authProvider.notifier).logout().then(
-                  (_) => context.go('/login'),
-                ),
+            onPressed: () async {
+              await ref.read(authProvider.notifier).logout();
+              if (context.mounted) context.go('/login');
+            },
             child: const Text(
               '로그아웃',
               style: TextStyle(color: AppTheme.textSecondary),
