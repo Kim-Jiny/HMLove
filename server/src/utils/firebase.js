@@ -217,6 +217,7 @@ const _typeToPrefKey = {
   calendar: 'noti_calendar',
   anniversary: 'noti_anniversary',
   letter: 'noti_letter',
+  diary: 'noti_letter',
   doodle: 'noti_doodle',
   mission: 'noti_mission',
   mood: 'noti_mood',
