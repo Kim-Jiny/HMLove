@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import '../core/api_client.dart';
 import '../core/api_error.dart';
 import '../core/device_calendar_service.dart';
+import '../core/holiday_utils.dart';
 import '../core/widget_service.dart';
 import 'auth_provider.dart';
 
@@ -492,16 +493,19 @@ class CalendarNotifier extends Notifier<CalendarState> {
       end: end,
     );
 
-    final holidayEvents = rawEvents.map((e) {
-      final dateOnly = _normalizeEventStartDate(e);
-      return CalendarEvent(
-        id: 'holiday_${e.calendarId ?? ''}_${e.eventId ?? ''}',
-        title: e.title ?? '',
-        date: dateOnly,
-        eventType: 'holiday',
-        color: '#D32F2F',
-      );
-    }).toList();
+    // 기념일(식목일·어버이날·국군의날 등)은 공휴일이 아니므로 뺀다.
+    final holidayEvents = dedupeHolidays(
+      rawEvents.where((e) => !isObservanceDescription(e.description)).map((e) {
+        final dateOnly = _normalizeEventStartDate(e);
+        return CalendarEvent(
+          id: 'holiday_${e.calendarId ?? ''}_${e.eventId ?? ''}',
+          title: e.title ?? '',
+          date: dateOnly,
+          eventType: 'holiday',
+          color: '#D32F2F',
+        );
+      }),
+    );
 
     await WidgetService.updateHolidayEvents(
       holidayEvents
@@ -992,3 +996,30 @@ final selectedDayEventsProvider = Provider<List<CalendarEvent>>((ref) {
   if (selectedDay == null) return [];
   return calendarState.getEventsForDay(selectedDay);
 });
+
+/// 공휴일 목록을 날짜당 하나로 정리한다.
+///
+/// 같은 날을 여러 캘린더(구글 계정 2개, 삼성 공휴일)가 각자 넣어 중복되므로
+///  1) "쉬는 날 X" 를 "대체공휴일(X)" 로 바꾸고
+///  2) 같은 날 구체적인 이름이 있으면 일반 "대체공휴일" 은 버리고
+///  3) 그래도 여러 개면 첫 번째만 남긴다.
+List<CalendarEvent> dedupeHolidays(Iterable<CalendarEvent> events) {
+  final byDate = <DateTime, List<CalendarEvent>>{};
+  for (final e in events) {
+    final key = DateTime(e.date.year, e.date.month, e.date.day);
+    byDate.putIfAbsent(key, () => []).add(CalendarEvent(
+          id: e.id,
+          title: normalizeHolidayTitle(e.title),
+          date: e.date,
+          eventType: e.eventType,
+          color: e.color,
+        ));
+  }
+  final result = <CalendarEvent>[];
+  for (final group in byDate.values) {
+    final specific =
+        group.where((e) => !isGenericSubstituteTitle(e.title)).toList();
+    result.add((specific.isNotEmpty ? specific : group).first);
+  }
+  return result;
+}
