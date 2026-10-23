@@ -12,6 +12,8 @@ import 'in_app_notification.dart';
 import 'notification_sound_service.dart';
 import 'router.dart';
 import 'widget_service.dart';
+import '../models/poke.dart';
+import '../widgets/poke/poke_overlay.dart';
 import 'store_mode.dart';
 
 /// 알림 타입 → Hive 설정 키 프리픽스 매핑
@@ -24,9 +26,11 @@ const _typeToKeyPrefix = <String, String>{
   'anniversary': 'noti_anniversary',
   'anniversary_remind': 'noti_anniversary',
   'letter': 'noti_letter',
+  'diary': 'noti_letter',
   'doodle': 'noti_doodle',
   'mood': 'noti_mood',
   'fight': 'noti_fight',
+  'poke': 'noti_poke',
   'notice': 'noti_all',
 };
 
@@ -135,6 +139,11 @@ class PushNotificationService {
         await WidgetService.refreshDoodleFromServer();
         // alert push 는 배너 표시도 계속.
       }
+      if (pushType == 'poke_widget_refresh') return;
+      if (pushType == 'poke') {
+        _showPoke(message.data);
+        return;
+      }
       _showInAppBanner(message);
     });
 
@@ -183,6 +192,9 @@ class PushNotificationService {
         } else {
           GoRouter.of(context).push('/letter');
         }
+        break;
+      case 'diary':
+        GoRouter.of(context).push('/diary');
         break;
       case 'calendar':
         GoRouter.of(context).go('/calendar');
@@ -251,6 +263,17 @@ class PushNotificationService {
     } catch (e) {
       debugPrint('[Push] Failed to send token: $e');
     }
+  }
+
+  /// 포그라운드에서 받은 콕: 알림 설정을 따르고, 켜져 있으면 화면 가득 보여준다.
+  static void _showPoke(Map<String, dynamic> data) {
+    final box = Hive.box(AppConstants.settingsBox);
+    if (!(box.get('noti_all', defaultValue: true) as bool)) return;
+    if (!(box.get('noti_poke', defaultValue: true) as bool)) return;
+    showPokeOverlay(
+      kind: PokeKind.fromKey(data['kind'] as String?),
+      senderName: data['senderName'] as String? ?? '',
+    );
   }
 
   /// 포그라운드 알림 → 인앱 배너 + 소리/진동

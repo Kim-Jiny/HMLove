@@ -204,12 +204,14 @@ router.delete('/leave', async (req, res) => {
         prisma.mood.deleteMany({ where: { coupleId } }),
         prisma.photo.deleteMany({ where: { coupleId } }),
         prisma.letter.deleteMany({ where: { coupleId } }),
+        prisma.diaryEntry.deleteMany({ where: { coupleId } }),
         prisma.fight.deleteMany({ where: { coupleId } }),
         prisma.fortune.deleteMany({ where: { coupleId } }),
         prisma.coupleMission.deleteMany({ where: { coupleId } }),
         prisma.questionAnswer.deleteMany({ where: { question: { coupleId } } }),
         prisma.dailyQuestion.deleteMany({ where: { coupleId } }),
         prisma.wishItem.deleteMany({ where: { coupleId } }),
+        prisma.poke.deleteMany({ where: { coupleId } }),
         prisma.couple.delete({ where: { id: coupleId } }),
       ]);
 

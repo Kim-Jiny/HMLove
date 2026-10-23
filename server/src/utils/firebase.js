@@ -33,7 +33,7 @@ if (serviceAccountEnv) {
  * @param {boolean} [opts.sound=true] - 소리 활성화 여부
  * @param {boolean} [opts.mutableContent=false] - iOS Notification Service Extension 트리거 여부 (위젯 갱신 등 사전 작업)
  */
-export async function sendPushNotification({ token, title, body, data, sound = true, mutableContent = false, userId = null }) {
+export async function sendPushNotification({ token, title, body, data, sound = true, mutableContent = false, userId = null, channelId = null }) {
   if (!token) return;
 
   // userId 가 주어지면 그 유저의 최신 토큰을 우선 사용한다. debounce 등으로 호출 시점에
@@ -99,7 +99,8 @@ export async function sendPushNotification({ token, title, body, data, sound = t
       android: {
         priority: 'high',
         notification: {
-          channelId: sound ? 'default' : 'silent',
+          // 콕처럼 전용 진동 패턴이 있는 알림은 채널을 지정(앱 MainActivity 에서 생성). 소리를 끈 경우는 무음 채널.
+          channelId: sound ? (channelId || 'default') : 'silent',
           ...(sound ? { sound: 'default' } : {}),
         },
       },
@@ -216,12 +217,14 @@ const _typeToPrefKey = {
   calendar: 'noti_calendar',
   anniversary: 'noti_anniversary',
   letter: 'noti_letter',
+  diary: 'noti_letter',
   doodle: 'noti_doodle',
   mission: 'noti_mission',
   mood: 'noti_mood',
   fight: 'noti_fight',
   wishlist: 'noti_wishlist',
   question: 'noti_question',
+  poke: 'noti_poke',
 };
 
 export async function notifyPartner({ userId, coupleId, title, body, data, silentData }) {
@@ -280,7 +283,7 @@ export async function notifyPartner({ userId, coupleId, title, body, data, silen
       // (silent push는 OS가 throttle하지만 alert push는 즉시 전달됨)
       const mutableContent = type === 'calendar' || type === 'doodle';
 
-      await sendPushNotification({ token: partner.fcmToken, title, body, data, sound, mutableContent, userId: partner.id });
+      await sendPushNotification({ token: partner.fcmToken, title, body, data, sound, mutableContent, userId: partner.id, channelId: type === 'poke' ? 'poke' : undefined });
 
       // 동일 partner 토큰으로 사일런트 푸시도 전송 (DB 재조회 없음)
       // Android는 이 silent push로 위젯 갱신, iOS는 위 NSE로 갱신

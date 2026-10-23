@@ -123,7 +123,7 @@ class HMLoveDoodleWidgetProvider : AppWidgetProvider() {
         } else {
             val cached = cacheFileFor(context, imageUrl)
             if (cached.exists() && cached.length() > 0) {
-                showImage(views, cached)
+                if (showImage(views, cached)) showCaption(views, prefs)
             } else {
                 showEmpty(views)
             }
@@ -246,16 +246,46 @@ class HMLoveDoodleWidgetProvider : AppWidgetProvider() {
     private fun showEmpty(views: RemoteViews) {
         views.setViewVisibility(R.id.widget_doodle_image, View.GONE)
         views.setViewVisibility(R.id.widget_doodle_empty, View.VISIBLE)
+        views.setViewVisibility(R.id.widget_doodle_caption, View.GONE)
     }
 
-    private fun showImage(views: RemoteViews, file: File) {
+    /// 폴라로이드 하단 캡션: "{보낸 사람}의 그림" + MM/dd. 값이 없으면 숨김.
+    private fun showCaption(views: RemoteViews, prefs: android.content.SharedPreferences) {
+        val sender = prefs.getString("doodleSenderName", null)
+        val receivedAt = prefs.getString("doodleReceivedAt", null)
+        val dateText = formatReceivedDate(receivedAt)
+        if (sender.isNullOrEmpty() && dateText.isEmpty()) return
+        views.setTextViewText(
+            R.id.widget_doodle_sender,
+            if (sender.isNullOrEmpty()) "그림" else "${sender}의 그림"
+        )
+        views.setTextViewText(R.id.widget_doodle_date, dateText)
+        views.setViewVisibility(R.id.widget_doodle_caption, View.VISIBLE)
+    }
+
+    private fun formatReceivedDate(iso: String?): String {
+        if (iso.isNullOrEmpty()) return ""
+        return try {
+            val zoned = java.time.OffsetDateTime.parse(iso)
+                .atZoneSameInstant(java.time.ZoneId.systemDefault())
+            "%02d/%02d".format(zoned.monthValue, zoned.dayOfMonth)
+        } catch (_: Throwable) {
+            if (iso.length >= 10 && iso[4] == '-' && iso[7] == '-') {
+                "${iso.substring(5, 7)}/${iso.substring(8, 10)}"
+            } else {
+                ""
+            }
+        }
+    }
+
+    private fun showImage(views: RemoteViews, file: File): Boolean {
         // RemoteViews IPC 한도(~1MB)를 피하려고 적절히 다운샘플링.
         val sizeOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         try {
             BitmapFactory.decodeFile(file.absolutePath, sizeOpts)
         } catch (_: Throwable) {
             showEmpty(views)
-            return
+            return false
         }
         val target = 512
         var sample = 1
@@ -276,12 +306,13 @@ class HMLoveDoodleWidgetProvider : AppWidgetProvider() {
 
         if (bitmap == null) {
             showEmpty(views)
-            return
+            return false
         }
 
         views.setImageViewBitmap(R.id.widget_doodle_image, bitmap)
         views.setViewVisibility(R.id.widget_doodle_image, View.VISIBLE)
         views.setViewVisibility(R.id.widget_doodle_empty, View.GONE)
+        return true
     }
 
     private fun cacheFileFor(context: Context, urlString: String): File {

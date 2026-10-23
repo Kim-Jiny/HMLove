@@ -24,6 +24,9 @@ import '../../providers/question_provider.dart';
 import '../../providers/wishlist_provider.dart';
 import '../../providers/doodle_provider.dart';
 import '../../providers/home_summary_provider.dart';
+import '../../providers/poke_provider.dart';
+import '../../models/poke.dart';
+import '../../widgets/poke/poke_picker_sheet.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -127,6 +130,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       receivedAt: latest?.createdAt,
       senderName: latest?.senderNickname,
     );
+  }
+
+  Future<void> _sendPoke(PokeKind kind) async {
+    final result = await ref.read(pokeProvider.notifier).send(kind);
+    if (!mounted) return;
+    showTopSnackBar(
+      context,
+      result.ok ? '${kind.label} 콕을 보냈어요' : result.error!,
+      isError: !result.ok,
+    );
+  }
+
+  Future<void> _pickPoke() async {
+    final kind = await showPokePickerSheet(context);
+    if (kind != null) _sendPoke(kind);
   }
 
   void _showEditStartDate(DateTime? currentDate) async {
@@ -340,6 +358,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   }
                 },
                 onAnniversary: () => context.push('/anniversary'),
+                onPoke: isSolo && couple != null ? null : () => _sendPoke(PokeKind.miss),
+                onPokeLong: isSolo && couple != null ? null : _pickPoke,
               ),
 
               ShortcutRow(

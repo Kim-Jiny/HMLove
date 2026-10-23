@@ -1,136 +1,283 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 종이 더미 + 폴라로이드 스타일 (기본 테마). 배경 커스텀 시 back 카드/테이프는 코드에서 숨김 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@drawable/widget_background"
-    android:paddingStart="16dp"
-    android:paddingTop="12dp"
-    android:paddingEnd="16dp"
-    android:paddingBottom="16dp">
+    android:layout_height="match_parent">
 
-    <LinearLayout
+    <FrameLayout
+        android:id="@+id/paper_back_pink"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="4dp"
+        android:background="@drawable/widget_paper_back_pink"
+        android:rotation="-2" />
+
+    <FrameLayout
+        android:id="@+id/paper_back_lavender"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="4dp"
+        android:background="@drawable/widget_paper_back_lavender"
+        android:rotation="1.7" />
+
+    <FrameLayout
+        android:id="@+id/widget_card"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="4dp"
+        android:background="@drawable/widget_paper_front"
+        android:paddingStart="14dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="12dp">
 
         <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical">
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/couple_names"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:singleLine="true"
-                android:ellipsize="end"
-                android:textColor="#EC5F8E"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/days_together"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:fontFamily="sans-serif-black"
-                android:includeFontPadding="false"
-                android:singleLine="true"
-                android:textColor="#EC5F8E"
-                android:textSize="34sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/start_date"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:textColor="#B9B3BE"
-                android:textSize="11sp" />
-
-            <TextView
-                android:id="@+id/next_anniversary"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="5dp"
-                android:background="@drawable/widget_pill_bg"
-                android:paddingStart="8dp"
-                android:paddingTop="2dp"
-                android:paddingEnd="8dp"
-                android:paddingBottom="2dp"
-                android:singleLine="true"
-                android:ellipsize="end"
-                android:textColor="#4A3B52"
-                android:textSize="10sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center_horizontal"
-            android:orientation="vertical">
-
+            <!-- 왼쪽: 이름 / 일수 / 시작일 / 진행바 -->
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <ImageView
-                    android:id="@+id/mood_my_face"
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
-                    android:contentDescription="@null"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/mood_face_neutral" />
+                android:layout_weight="11"
+                android:gravity="start"
+                android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/mood_heart"
+                    android:id="@+id/couple_names"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
-                    android:layout_marginEnd="6dp"
-                    android:text="♥"
-                    android:textColor="#EC5F8E"
-                    android:textSize="16sp" />
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:textColor="#4A3B52"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
-                <ImageView
-                    android:id="@+id/mood_partner_face"
-                    android:layout_width="34dp"
-                    android:layout_height="34dp"
-                    android:contentDescription="@null"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/mood_face_neutral" />
+                <TextView
+                    android:id="@+id/days_together"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:includeFontPadding="false"
+                    android:singleLine="true"
+                    android:textColor="#EC5F8E"
+                    android:textSize="30sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/start_date"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:singleLine="true"
+                    android:textColor="#7A7480"
+                    android:textSize="10sp" />
+
+                <LinearLayout
+                    android:id="@+id/anniv_progress_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:id="@+id/anniv_progress"
+                        android:layout_width="0dp"
+                        android:layout_height="22dp"
+                        android:layout_weight="1"
+                        android:contentDescription="@null"
+                        android:scaleType="fitStart" />
+
+                    <TextView
+                        android:id="@+id/anniv_dday"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:singleLine="true"
+                        android:textColor="#4A3B52"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/next_anniversary"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:textColor="#7A7480"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/today_schedule"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:ellipsize="end"
-                android:gravity="center"
-                android:maxLines="3"
-                android:textColor="#2E2A33"
-                android:textSize="12sp" />
-        </LinearLayout>
-    </LinearLayout>
+            <!-- 오른쪽: 폴라로이드 두 장 + 스티커 -->
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="4dp"
+                android:layout_weight="9">
 
-    <TextView
-        android:id="@+id/widget_settings_btn"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:layout_gravity="top|end"
-        android:background="@drawable/widget_calendar_nav_btn_bg"
-        android:gravity="center"
-        android:text="⚙"
-        android:textColor="#EC5F8E"
-        android:textSize="14sp" />
+                <LinearLayout
+                    android:layout_width="58dp"
+                    android:layout_height="72dp"
+                    android:layout_gravity="start|center_vertical"
+                    android:layout_marginStart="4dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/widget_polaroid"
+                    android:orientation="vertical"
+                    android:padding="5dp"
+                    android:rotation="-6">
+
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/widget_polaroid_inner">
+
+                        <ImageView
+                            android:id="@+id/mood_my_face"
+                            android:layout_width="34dp"
+                            android:layout_height="34dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@null"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/mood_face_neutral" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:id="@+id/mood_my_name"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:paddingTop="2dp"
+                        android:singleLine="true"
+                        android:textColor="#4A3B52"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="58dp"
+                    android:layout_height="72dp"
+                    android:layout_gravity="end|center_vertical"
+                    android:layout_marginTop="14dp"
+                    android:layout_marginEnd="14dp"
+                    android:background="@drawable/widget_polaroid"
+                    android:orientation="vertical"
+                    android:padding="5dp"
+                    android:rotation="5">
+
+                    <FrameLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/widget_polaroid_inner">
+
+                        <ImageView
+                            android:id="@+id/mood_partner_face"
+                            android:layout_width="34dp"
+                            android:layout_height="34dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@null"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/mood_face_neutral" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:id="@+id/mood_partner_name"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:paddingTop="2dp"
+                        android:singleLine="true"
+                        android:textColor="#4A3B52"
+                        android:textSize="10sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- 스티커 -->
+                <!-- 누르면 '보고싶어' 콕 -->
+                <ImageView
+                    android:id="@+id/widget_poke_btn"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_gravity="start|bottom"
+                    android:contentDescription="보고싶어 콕 보내기"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_sticker_heart" />
+
+                <ImageView
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_gravity="end|bottom"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_sticker_sparkle" />
+
+                <ImageView
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_gravity="start|top"
+                    android:layout_marginStart="26dp"
+                    android:layout_marginTop="2dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_sticker_sparkle" />
+
+                <!-- 오늘 일정 칩 (설정 버튼 왼쪽) -->
+                <TextView
+                    android:id="@+id/today_schedule"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top|end"
+                    android:layout_marginEnd="24dp"
+                    android:background="@drawable/widget_pill_bg"
+                    android:ellipsize="end"
+                    android:maxWidth="84dp"
+                    android:paddingStart="6dp"
+                    android:paddingTop="1dp"
+                    android:paddingEnd="6dp"
+                    android:paddingBottom="1dp"
+                    android:singleLine="true"
+                    android:textColor="#4A3B52"
+                    android:textSize="9sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/widget_settings_btn"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_gravity="top|end"
+            android:background="@drawable/widget_calendar_nav_btn_bg"
+            android:gravity="center"
+            android:text="⚙"
+            android:textColor="#EC5F8E"
+            android:textSize="13sp" />
+    </FrameLayout>
+
+    <ImageView
+        android:id="@+id/paper_tape"
+        android:layout_width="74dp"
+        android:layout_height="20dp"
+        android:layout_gravity="top|center_horizontal"
+        android:contentDescription="@null"
+        android:rotation="-3"
+        android:src="@drawable/widget_tape" />
 
 </FrameLayout>

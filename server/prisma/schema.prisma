@@ -40,6 +40,9 @@ model User {
   socialAccounts  SocialAccount[]
   doodlesSent     Doodle[]         @relation("doodleSender")
   doodlesReceived Doodle[]         @relation("doodleReceiver")
+  pokesSent       Poke[]           @relation("pokeSender")
+  pokesReceived   Poke[]           @relation("pokeReceiver")
+  diaryEntries    DiaryEntry[]
 
   @@index([coupleId])
 }
@@ -88,6 +91,8 @@ model Couple {
   wishItems      WishItem[]
   dailyQuestions DailyQuestion[]
   doodles        Doodle[]
+  pokes          Poke[]
+  diaryEntries   DiaryEntry[]
 }
 
 enum MissionType {
@@ -284,6 +289,22 @@ model Doodle {
   @@index([receiverId, createdAt])
 }
 
+/// "보고싶어" 콕 — 상대에게 보내는 한 번의 가벼운 마음 표현 (푸시 + 위젯/홈 표시용 기록)
+model Poke {
+  id         String   @id @default(uuid())
+  coupleId   String
+  couple     Couple   @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User     @relation("pokeSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String
+  receiver   User     @relation("pokeReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  kind       String   // miss, love, cheer, thanks, sorry, goodnight
+  createdAt  DateTime @default(now())
+
+  @@index([receiverId, createdAt])
+  @@index([coupleId, createdAt])
+}
+
 model Letter {
   id           String       @id @default(uuid())
   coupleId     String
@@ -416,4 +437,22 @@ model QuestionAnswer {
   createdAt  DateTime      @default(now())
 
   @@unique([questionId, userId])
+}
+
+// 일기. SHARED = 교환일기(둘 다 언제든 쓰고 함께 봄), PRIVATE = 개인일기(쓴 사람만 봄).
+model DiaryEntry {
+  id        String    @id @default(uuid())
+  coupleId  String
+  couple    Couple    @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  kind      String    @default("SHARED")
+  entryDate DateTime  @default(now())
+  mood      String?
+  content   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([coupleId, kind, entryDate])
+  @@index([authorId, kind])
 }

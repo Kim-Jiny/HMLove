@@ -63,12 +63,24 @@ class HMLoveSmallWidgetProvider : AppWidgetProvider() {
         if (nextAnniversaryName != null && nextAnniversaryDaysLeft != null) {
             views.setTextViewText(
                 R.id.next_anniversary,
-                "$nextAnniversaryName D-$nextAnniversaryDaysLeft"
+                "${nextAnniversaryName}까지 D-$nextAnniversaryDaysLeft"
             )
         } else {
             views.setTextViewText(R.id.next_anniversary, "")
             views.setViewVisibility(R.id.next_anniversary, View.GONE)
         }
+
+        runCatching {
+            applyAnniversaryProgress(
+                context,
+                views,
+                R.id.anniv_progress,
+                listOf(R.id.anniv_progress),
+                anniversaryProgressFraction(daysTogether, nextAnniversaryDaysLeft),
+                if (applyStyling) selectedWidgetTheme(prefs) else null,
+                84f
+            )
+        }.onFailure { views.setViewVisibility(R.id.anniv_progress, View.GONE) }
 
         return views
     }

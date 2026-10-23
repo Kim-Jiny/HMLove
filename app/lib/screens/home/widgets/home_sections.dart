@@ -27,6 +27,8 @@ class HomeHero extends StatelessWidget {
   final VoidCallback onPickMood;
   final VoidCallback onInvite;
   final VoidCallback onAnniversary;
+  final VoidCallback? onPoke;
+  final VoidCallback? onPokeLong;
 
   const HomeHero({
     super.key,
@@ -44,6 +46,8 @@ class HomeHero extends StatelessWidget {
     required this.onPickMood,
     required this.onInvite,
     required this.onAnniversary,
+    this.onPoke,
+    this.onPokeLong,
   });
 
   Widget _person(String name, String? mood, {required bool mine}) {
@@ -137,11 +141,20 @@ class HomeHero extends StatelessWidget {
               _person(myName, myMood, mine: true),
               Padding(
                 padding: const EdgeInsets.only(top: 26),
-                child: Heartbeat(
-                  child: Icon(
-                    Icons.favorite_rounded,
-                    color: AppTheme.primaryColor.withValues(alpha: 0.9),
-                    size: 26,
+                // 누르면 '보고싶어' 콕, 길게 누르면 다른 스티커 선택
+                child: Bouncy(
+                  onTap: onPoke,
+                  onLongPress: onPokeLong,
+                  pressedScale: 0.8,
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Heartbeat(
+                      child: Icon(
+                        Icons.favorite_rounded,
+                        color: AppTheme.primaryColor.withValues(alpha: 0.9),
+                        size: 30,
+                      ),
+                    ),
                   ),
                 ),
               ),
