@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 종이 카드 앞장: 잉크색 하드 바닥 모서리(블러 없음) 위에 종이색 카드를 얹는다 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:top="6dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#4A3B52" />
+            <corners android:radius="22dp" />
+        </shape>
+    </item>
+    <item android:bottom="6dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFBFD" />
+            <stroke
+                android:width="2dp"
+                android:color="#4A3B52" />
+            <corners android:radius="22dp" />
+        </shape>
+    </item>
+</layer-list>

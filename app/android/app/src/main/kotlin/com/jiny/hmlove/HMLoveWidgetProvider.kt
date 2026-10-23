@@ -7,6 +7,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Matrix
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
 import android.os.Build
 import android.view.View
 import android.widget.RemoteViews
@@ -76,29 +82,156 @@ internal fun hasCustomWidgetBackground(prefs: SharedPreferences): Boolean {
     return !(opaque && isDefaultWidgetTheme(selectedWidgetTheme(prefs)))
 }
 
+/** 사용자 지정 배경이 있을 때 종이 더미 장식(뒤 카드·테이프)을 숨긴다. 레이아웃에 없는 id 는 건드리지 않도록 호출부에서 구분. */
+internal fun hidePaperDecor(views: RemoteViews, backCards: Boolean = true) {
+    if (backCards) {
+        views.setViewVisibility(R.id.paper_back_pink, View.GONE)
+        views.setViewVisibility(R.id.paper_back_lavender, View.GONE)
+    }
+    views.setViewVisibility(R.id.paper_tape, View.GONE)
+}
+
 internal fun applyWidgetBackground(
     views: RemoteViews,
-    prefs: SharedPreferences
+    prefs: SharedPreferences,
+    hasBackCards: Boolean = true
 ) {
     if (!hasCustomWidgetBackground(prefs)) return
     val argb = prefs.getInt(
         CalendarWidgetSettingsActivity.PREF_KEY_BG_ARGB,
         0xFFFFFFFF.toInt()
     )
+    hidePaperDecor(views, hasBackCards)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         views.setInt(
-            R.id.widget_root,
+            R.id.widget_card,
             "setBackgroundResource",
             R.drawable.widget_background_tintable
         )
         views.setColorStateList(
-            R.id.widget_root,
+            R.id.widget_card,
             "setBackgroundTintList",
             ColorStateList.valueOf(argb)
         )
     } else {
-        views.setInt(R.id.widget_root, "setBackgroundColor", argb)
+        views.setInt(R.id.widget_card, "setBackgroundColor", argb)
     }
+}
+
+private const val INK_COLOR = 0xFF4A3B52.toInt()
+private const val ROSE_COLOR = 0xFFEC5F8E.toInt()
+
+/** 다음 기념일까지의 진행률(0..1). 값이 없거나 비정상이면 null (막대 숨김). */
+internal fun anniversaryProgressFraction(daysTogether: Long, daysLeft: Long?): Float? {
+    if (daysLeft == null || daysLeft < 0 || daysTogether <= 0) return null
+    val total = daysTogether + daysLeft
+    if (total <= 0) return null
+    return (daysTogether.toFloat() / total).coerceIn(0f, 1f)
+}
+
+/**
+ * 진행 막대 비트맵: 잉크 외곽선 트랙 + 장미색 채움 + 채움 끝의 하트 스티커.
+ * 레이아웃만으로는 하트를 채움 끝에 둘 수 없어 Canvas 로 직접 그린다.
+ */
+internal fun createAnniversaryProgressBitmap(
+    context: Context,
+    fraction: Float,
+    fillColor: Int,
+    widthDp: Float,
+    heightDp: Float = 22f
+): Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (widthDp * density).toInt().coerceAtLeast(1)
+    val h = (heightDp * density).toInt().coerceAtLeast(1)
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val sw = 1.6f * density
+    val trackH = 10f * density
+    val heartSize = h - sw
+    val heartR = heartSize / 2f
+    val cy = h / 2f
+
+    val track = RectF(sw / 2f, cy - trackH / 2f, w - sw / 2f, cy + trackH / 2f)
+    val trackRadius = trackH / 2f
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    // 트랙(흰색)
+    paint.style = Paint.Style.FILL
+    paint.color = 0xFFFFFFFF.toInt()
+    canvas.drawRoundRect(track, trackRadius, trackRadius, paint)
+
+    // 채움
+    val endX = (track.left + track.width() * fraction).coerceIn(heartR + sw / 2f, w - heartR - sw / 2f)
+    val fill = RectF(track.left + sw / 2f, track.top + sw / 2f, endX, track.bottom - sw / 2f)
+    paint.color = fillColor
+    canvas.drawRoundRect(fill, trackRadius - sw / 2f, trackRadius - sw / 2f, paint)
+    // 채움 윗부분 하이라이트
+    paint.color = 0x55FFFFFF
+    val hl = RectF(fill.left + trackRadius / 2f, fill.top + sw * 0.6f, fill.right - trackRadius / 2f, fill.top + sw * 0.6f + 2f * density)
+    if (hl.right > hl.left) canvas.drawRoundRect(hl, density, density, paint)
+
+    // 트랙 외곽선
+    paint.style = Paint.Style.STROKE
+    paint.strokeWidth = sw
+    paint.color = INK_COLOR
+    canvas.drawRoundRect(track, trackRadius, trackRadius, paint)
+
+    // 하트 스티커(24x24 격자를 heartSize 로 스케일)
+    val heart = Path().apply {
+        moveTo(12f, 21f)
+        cubicTo(12f, 21f, 3f, 15f, 3f, 8.8f)
+        cubicTo(3f, 5.8f, 5.2f, 3.8f, 7.8f, 3.8f)
+        cubicTo(9.6f, 3.8f, 11.2f, 4.8f, 12f, 6.4f)
+        cubicTo(12.8f, 4.8f, 14.4f, 3.8f, 16.2f, 3.8f)
+        cubicTo(18.8f, 3.8f, 21f, 5.8f, 21f, 8.8f)
+        cubicTo(21f, 15f, 12f, 21f, 12f, 21f)
+        close()
+    }
+    val highlight = Path().apply {
+        moveTo(6.2f, 9f)
+        cubicTo(6.1f, 7.6f, 6.9f, 6.6f, 8f, 6.4f)
+    }
+    val scale = heartSize * 1.1f / 24f
+    val m = Matrix().apply {
+        postScale(scale, scale)
+        postTranslate(endX - 12f * scale, cy - 12f * scale)
+    }
+    heart.transform(m)
+    highlight.transform(m)
+    paint.style = Paint.Style.FILL
+    paint.color = ROSE_COLOR
+    canvas.drawPath(heart, paint)
+    paint.style = Paint.Style.STROKE
+    paint.strokeWidth = sw
+    paint.strokeJoin = Paint.Join.ROUND
+    paint.color = INK_COLOR
+    canvas.drawPath(heart, paint)
+    paint.strokeWidth = 1.3f * density
+    paint.strokeCap = Paint.Cap.ROUND
+    paint.color = 0xFFFFFFFF.toInt()
+    canvas.drawPath(highlight, paint)
+    return bitmap
+}
+
+/** 진행 막대를 그려 넣거나(값이 있을 때) 숨긴다. */
+internal fun applyAnniversaryProgress(
+    context: Context,
+    views: RemoteViews,
+    imageId: Int,
+    hideIds: List<Int>,
+    fraction: Float?,
+    theme: CalendarWidgetThemeOption?,
+    widthDp: Float
+) {
+    if (fraction == null) {
+        for (id in hideIds) views.setViewVisibility(id, View.GONE)
+        return
+    }
+    val fillColor = if (theme == null || isDefaultWidgetTheme(theme)) ROSE_COLOR else theme.primary
+    views.setImageViewBitmap(
+        imageId,
+        createAnniversaryProgressBitmap(context, fraction, fillColor, widthDp)
+    )
 }
 
 internal fun isDefaultWidgetTheme(theme: CalendarWidgetThemeOption): Boolean =
@@ -144,15 +277,16 @@ internal fun moodFaceResFor(moodKey: String?, legacyEmoji: String?): Int {
 }
 
 internal fun applyCoupleWidgetTheme(views: RemoteViews, theme: CalendarWidgetThemeOption) {
-    views.setTextColor(R.id.couple_names, theme.primary)
+    val isDefault = isDefaultWidgetTheme(theme)
+    // 기본(러브) 테마는 종이 카드 위 잉크색 글씨, 그 외 테마는 테마색을 그대로 사용.
+    views.setTextColor(R.id.couple_names, if (isDefault) INK_COLOR else theme.primary)
     views.setTextColor(R.id.days_together, theme.primary)
-    views.setTextColor(R.id.start_date, withAlpha(theme.primary, 128))
+    views.setTextColor(
+        R.id.start_date,
+        if (isDefault) 0xFF7A7480.toInt() else withAlpha(theme.primary, 128)
+    )
     views.setTextColor(R.id.next_anniversary, theme.textSecondary)
     views.setTextColor(R.id.widget_settings_btn, theme.primary)
-    if (!isDefaultWidgetTheme(theme)) {
-        // 기본(러브) 테마만 파스텔 알약 배경을 유지하고, 그 외 테마는 배경 없이 텍스트 색만 사용.
-        views.setInt(R.id.next_anniversary, "setBackgroundResource", 0)
-    }
     if (!isDefaultWidgetTheme(theme) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         views.setInt(
             R.id.widget_settings_btn,
@@ -171,8 +305,11 @@ internal fun applyMediumWidgetExtrasTheme(
     views: RemoteViews,
     theme: CalendarWidgetThemeOption
 ) {
-    views.setTextColor(R.id.mood_heart, theme.primary)
-    views.setTextColor(R.id.today_schedule, theme.textPrimary)
+    // 일정 칩은 흰 배경 위에 얹히므로 잉크색 고정. D-N 은 테마에 맞춘다.
+    views.setTextColor(
+        R.id.anniv_dday,
+        if (isDefaultWidgetTheme(theme)) INK_COLOR else theme.textPrimary
+    )
 }
 
 internal fun buildNotConnectedWidgetViews(
@@ -256,6 +393,8 @@ class HMLoveWidgetProvider : AppWidgetProvider() {
         views.setTextViewText(R.id.start_date, "$startDate ~")
         views.setImageViewResource(R.id.mood_my_face, myMoodFace)
         views.setImageViewResource(R.id.mood_partner_face, partnerMoodFace)
+        views.setTextViewText(R.id.mood_my_name, myName)
+        views.setTextViewText(R.id.mood_partner_name, partnerName)
 
         if (todaySchedule.isNotEmpty()) {
             views.setTextViewText(R.id.today_schedule, todaySchedule)
@@ -264,14 +403,25 @@ class HMLoveWidgetProvider : AppWidgetProvider() {
         }
 
         if (nextAnniversaryName != null && nextAnniversaryDaysLeft != null) {
-            views.setTextViewText(
-                R.id.next_anniversary,
-                "\uD83C\uDF89 $nextAnniversaryName D-$nextAnniversaryDaysLeft"
-            )
+            views.setTextViewText(R.id.next_anniversary, "${nextAnniversaryName}까지")
+            views.setTextViewText(R.id.anniv_dday, "D-$nextAnniversaryDaysLeft")
         } else {
             views.setTextViewText(R.id.next_anniversary, "")
             views.setViewVisibility(R.id.next_anniversary, View.GONE)
+            views.setTextViewText(R.id.anniv_dday, "")
         }
+
+        runCatching {
+            applyAnniversaryProgress(
+                context,
+                views,
+                R.id.anniv_progress,
+                listOf(R.id.anniv_progress_row),
+                anniversaryProgressFraction(daysTogether, nextAnniversaryDaysLeft),
+                if (applyStyling) selectedWidgetTheme(prefs) else null,
+                96f
+            )
+        }.onFailure { views.setViewVisibility(R.id.anniv_progress_row, View.GONE) }
 
         return views
     }

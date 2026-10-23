@@ -127,19 +127,20 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
             CalendarWidgetSettingsActivity.PREF_KEY_BG_ARGB,
             0xFFFFFFFF.toInt()
         )
+        hidePaperDecor(views, backCards = false)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             views.setInt(
-                R.id.widget_root,
+                R.id.widget_card,
                 "setBackgroundResource",
                 R.drawable.widget_background_tintable
             )
             views.setColorStateList(
-                R.id.widget_root,
+                R.id.widget_card,
                 "setBackgroundTintList",
                 ColorStateList.valueOf(argb)
             )
         } else {
-            views.setInt(R.id.widget_root, "setBackgroundColor", argb)
+            views.setInt(R.id.widget_card, "setBackgroundColor", argb)
         }
         return argb
     }

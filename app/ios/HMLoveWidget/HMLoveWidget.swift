@@ -756,52 +756,104 @@ struct CoupleTimelineProvider: AppIntentTimelineProvider {
 
 // MARK: - Small Widget (D-Day)
 
+/// 종이 더미 카드 + 상단 마스킹 테이프로 감싸는 공통 래퍼(small/medium).
+struct PaperCardContainer<Content: View>: View {
+    let theme: CalendarWidgetTheme
+    var radius: CGFloat = 20
+    var tapeWidth: CGFloat = 74
+    var topPadding: CGFloat = 14
+    let content: Content
+
+    init(theme: CalendarWidgetTheme, radius: CGFloat = 20, tapeWidth: CGFloat = 74, topPadding: CGFloat = 14, @ViewBuilder content: () -> Content) {
+        self.theme = theme
+        self.radius = radius
+        self.tapeWidth = tapeWidth
+        self.topPadding = topPadding
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(
+                PaperCardBackground(
+                    fill: theme.paperFill,
+                    ink: theme.paperInk,
+                    radius: radius,
+                    edge: 5,
+                    lineWidth: 2,
+                    backs: theme.paperBacks
+                )
+            )
+            .overlay(alignment: .top) {
+                if theme.isDefault {
+                    WashiTape(width: tapeWidth, height: tapeWidth * 0.27)
+                        .offset(y: -tapeWidth * 0.12)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, topPadding)
+            .padding(.bottom, 15)
+    }
+}
+
 struct SmallWidgetView: View {
     let data: CoupleData
     private var theme: CalendarWidgetTheme { data.calendarTheme }
+    private var primary: Color { Color(hex: theme.primaryHex) }
+    private var inkText: Color { theme.isDefault ? WidgetPalette.ink : Color(hex: theme.textPrimaryHex) }
 
     var body: some View {
-        VStack(spacing: 4) {
-            HStack(spacing: 4) {
-                Text(data.myName)
-                    .lineLimit(1)
-                Text("♥")
-                    .font(.system(size: 10, weight: .heavy, design: .rounded))
-                Text(data.partnerName)
-                    .lineLimit(1)
-            }
-            .font(.system(size: 11, weight: .bold, design: .rounded))
-            .minimumScaleFactor(0.7)
-            .foregroundColor(Color(hex: theme.primaryHex))
-            .modifier(CartoonPill(theme: theme))
+        PaperCardContainer(theme: theme, radius: 18, tapeWidth: 58, topPadding: 13) {
+            VStack(spacing: 3) {
+                HStack(spacing: 4) {
+                    Text(data.displayMyName)
+                        .lineLimit(1)
+                    Text("♥")
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .foregroundColor(primary)
+                    Text(data.displayPartnerName)
+                        .lineLimit(1)
+                }
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .minimumScaleFactor(0.7)
+                .foregroundColor(inkText)
 
-            HStack(alignment: .firstTextBaseline, spacing: 1) {
-                CartoonNumber(text: "\(data.daysTogether)", size: 38, theme: theme)
-                Text("일")
-                    .font(.system(size: 16, weight: .heavy, design: .rounded))
-                    .foregroundColor(Color(hex: theme.primaryHex))
-            }
-            .padding(.bottom, 2)
+                HStack(alignment: .firstTextBaseline, spacing: 1) {
+                    Text("\(data.daysTogether)")
+                        .font(.system(size: 36, weight: .heavy, design: .rounded))
+                    Text("일째")
+                        .font(.system(size: 14, weight: .heavy, design: .rounded))
+                }
+                .foregroundColor(primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
 
-            Text(data.startDate + " ~")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundColor(Color(hex: theme.textSecondaryHex))
-
-            if let name = data.nextAnniversaryName,
-               let daysLeft = data.nextAnniversaryDaysLeft {
-                HStack(spacing: 3) {
-                    Text(name)
+                if let progress = data.anniversaryProgress,
+                   let name = data.nextAnniversaryName,
+                   let daysLeft = data.nextAnniversaryDaysLeft {
+                    AnniversaryProgress(
+                        progress: progress,
+                        fill: primary,
+                        ink: theme.paperInk,
+                        trackColor: theme.isDefault ? .white : Color(hex: theme.backgroundHex)
+                    )
+                    .padding(.horizontal, 2)
+                    Text("\(name)까지 D-\(daysLeft)")
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .foregroundColor(inkText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                } else {
+                    Text(data.startDate + " ~")
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundColor(Color(hex: theme.textSecondaryHex))
-                    Text("D-\(daysLeft)")
-                        .font(.system(size: 11, weight: .heavy, design: .rounded))
-                        .foregroundColor(Color(hex: theme.primaryHex))
                 }
-                .modifier(CartoonPill(theme: theme))
             }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 6)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
     }
 }
 
@@ -810,98 +862,115 @@ struct SmallWidgetView: View {
 struct MediumWidgetView: View {
     let data: CoupleData
     private var theme: CalendarWidgetTheme { data.calendarTheme }
+    private var primary: Color { Color(hex: theme.primaryHex) }
+    private var inkText: Color { theme.isDefault ? WidgetPalette.ink : Color(hex: theme.textPrimaryHex) }
+
+    private var scheduleText: String {
+        data.todaySchedule.isEmpty ? "오늘 일정 없음" : data.todaySchedule
+    }
 
     var body: some View {
-        HStack(spacing: 10) {
-            // Left: D-Day
-            VStack(spacing: 4) {
-                HStack(spacing: 4) {
-                    Text(data.myName)
-                        .lineLimit(1)
-                    Text("♥")
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
-                    Text(data.partnerName)
-                        .lineLimit(1)
-                }
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .minimumScaleFactor(0.7)
-                .foregroundColor(Color(hex: theme.primaryHex))
-                .modifier(CartoonPill(theme: theme))
-
-                HStack(alignment: .firstTextBaseline, spacing: 1) {
-                    CartoonNumber(text: "\(data.daysTogether)", size: 40, theme: theme)
-                    Text("일째")
-                        .font(.system(size: 14, weight: .heavy, design: .rounded))
-                        .foregroundColor(Color(hex: theme.primaryHex))
-                }
-                .padding(.bottom, 2)
-
-                Text(data.startDate + " ~")
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundColor(Color(hex: theme.textSecondaryHex))
-
-                if let name = data.nextAnniversaryName,
-                   let daysLeft = data.nextAnniversaryDaysLeft {
-                    HStack(spacing: 3) {
-                        Text("🎉 \(name)")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundColor(Color(hex: theme.textSecondaryHex))
-                        Text("D-\(daysLeft)")
-                            .font(.system(size: 11, weight: .heavy, design: .rounded))
-                            .foregroundColor(Color(hex: theme.primaryHex))
+        PaperCardContainer(theme: theme, radius: 22, tapeWidth: 74, topPadding: 13) {
+            HStack(spacing: 6) {
+                // Left: D-Day
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 4) {
+                        Text(data.displayMyName)
+                            .lineLimit(1)
+                        Text("♥")
+                            .font(.system(size: 10, weight: .heavy, design: .rounded))
+                            .foregroundColor(primary)
+                        Text(data.displayPartnerName)
+                            .lineLimit(1)
                     }
-                    .modifier(CartoonPill(theme: theme))
-                }
-            }
-            .frame(maxWidth: .infinity)
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .minimumScaleFactor(0.7)
+                    .foregroundColor(inkText)
 
-            // Right: Mood + Schedule (카드)
-            VStack(spacing: 6) {
-                HStack(spacing: 6) {
-                    VStack(spacing: 2) {
-                        MoodFaceView(moodKey: data.myMoodKey, size: 34)
-                        Text(data.myName)
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                    HStack(alignment: .firstTextBaseline, spacing: 1) {
+                        Text("\(data.daysTogether)")
+                            .font(.system(size: 38, weight: .heavy, design: .rounded))
+                        Text("일째")
+                            .font(.system(size: 16, weight: .heavy, design: .rounded))
+                    }
+                    .foregroundColor(primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+
+                    Text(data.startDate + " ~")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundColor(Color(hex: theme.textSecondaryHex))
+
+                    if let progress = data.anniversaryProgress,
+                       let name = data.nextAnniversaryName,
+                       let daysLeft = data.nextAnniversaryDaysLeft {
+                        HStack(spacing: 5) {
+                            AnniversaryProgress(
+                                progress: progress,
+                                fill: primary,
+                                ink: theme.paperInk,
+                                trackColor: theme.isDefault ? .white : Color(hex: theme.backgroundHex)
+                            )
+                            Text("D-\(daysLeft)")
+                                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                                .foregroundColor(inkText)
+                                .lineLimit(1)
+                                .fixedSize()
+                        }
+                        Text("\(name)까지")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
                             .foregroundColor(Color(hex: theme.textSecondaryHex))
                             .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
-                    Text("♥")
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
-                        .foregroundColor(Color(hex: theme.primaryHex).opacity(0.7))
-                    VStack(spacing: 2) {
-                        MoodFaceView(moodKey: data.partnerMoodKey, size: 34)
-                        Text(data.partnerName)
-                            .font(.system(size: 9, weight: .bold, design: .rounded))
-                            .foregroundColor(Color(hex: theme.textSecondaryHex))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 6)
 
-                // Today's schedule
-                if !data.todaySchedule.isEmpty {
-                    Text(data.todaySchedule)
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .foregroundColor(Color(hex: theme.textPrimaryHex))
-                        .lineLimit(3)
+                // Right: 폴라로이드 두 장 + 스티커 + 오늘 일정 태그
+                VStack(spacing: 4) {
+                    ZStack {
+                        PolaroidFace(moodKey: data.myMoodKey, name: data.displayMyName, width: 62, angle: -6)
+                            .offset(x: -24, y: -3)
+                        PolaroidFace(moodKey: data.partnerMoodKey, name: data.displayPartnerName, width: 62, angle: 5)
+                            .offset(x: 22, y: 4)
+                        SparkleSticker(size: 17)
+                            .offset(x: 55, y: -30)
+                        SparkleSticker(size: 10)
+                            .offset(x: 66, y: -42)
+                        HeartSticker(size: 17)
+                            .offset(x: -2, y: 36)
+                        SparkleSticker(size: 12)
+                            .offset(x: 62, y: 38)
+                    }
+                    .frame(width: 150, height: 80)
+
+                    Text(scheduleText)
+                        .font(.system(size: 9.5, weight: .heavy, design: .rounded))
+                        .foregroundColor(inkText)
+                        .lineLimit(2)
                         .multilineTextAlignment(.center)
-                } else {
-                    Text("오늘 일정 없음")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundColor(Color(hex: theme.textSecondaryHex).opacity(0.8))
+                        .minimumScaleFactor(0.85)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .frame(maxWidth: 138)
+                        .background(
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(theme.isDefault ? PaperKit.washiYellow.opacity(0.55) : primary.opacity(0.12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                        .strokeBorder(theme.paperInk, lineWidth: 1.2)
+                                )
+                        )
                 }
+                .frame(width: 150)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(CartoonCardBackground(theme: theme, radius: 16, shadowY: 3))
-            .padding(.bottom, 3)
+            .padding(.horizontal, 10)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 16)
     }
 }
+
 
 // MARK: - Large Widget (Calendar)
 
@@ -1019,7 +1088,7 @@ struct LargeWidgetView: View {
                         .background(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .fill(Color(hex: theme.primaryHex).opacity(0.12))
-                                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(theme.outlineColor, lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(theme.outlineColor, lineWidth: 1.5))
                         )
                 }
                 .buttonStyle(.plain)
@@ -1041,7 +1110,7 @@ struct LargeWidgetView: View {
                         .background(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .fill(Color(hex: theme.primaryHex).opacity(0.12))
-                                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(theme.outlineColor, lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(theme.outlineColor, lineWidth: 1.5))
                         )
                 }
                 .buttonStyle(.plain)
@@ -1055,7 +1124,7 @@ struct LargeWidgetView: View {
                         .background(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .fill(Color(hex: theme.primaryHex).opacity(0.12))
-                                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(theme.outlineColor, lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(theme.outlineColor, lineWidth: 1.5))
                         )
                 }
                 .buttonStyle(.plain)
@@ -1068,6 +1137,29 @@ struct LargeWidgetView: View {
     }
 
     var body: some View {
+        calendarContent
+            .background(
+                PaperCardBackground(
+                    fill: theme.paperFill,
+                    ink: theme.paperInk,
+                    radius: 22,
+                    edge: 4,
+                    lineWidth: 2,
+                    backs: []
+                )
+            )
+            .overlay(alignment: .top) {
+                if theme.isDefault {
+                    WashiTape(width: 64, height: 17)
+                        .offset(y: -8)
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.top, 11)
+            .padding(.bottom, 10)
+    }
+
+    private var calendarContent: some View {
         VStack(spacing: 0) {
             // Top bar: couple name + D-Day
             HStack {
@@ -1088,7 +1180,7 @@ struct LargeWidgetView: View {
                     .modifier(CartoonPill(theme: theme, filled: true))
             }
             .padding(.horizontal, 14)
-            .padding(.top, 8)
+            .padding(.top, 13)
             .padding(.bottom, 4)
 
             // Month header with prev / title / today / next navigation
@@ -1127,8 +1219,8 @@ struct LargeWidgetView: View {
                                         if today {
                                             Circle()
                                                 .fill(Color(hex: theme.primaryHex))
-                                                .overlay(Circle().strokeBorder(theme.outlineColor, lineWidth: 1))
-                                                .frame(width: 15, height: 15)
+                                                .overlay(Circle().strokeBorder(theme.outlineColor, lineWidth: 1.5))
+                                                .frame(width: 16, height: 16)
                                         }
                                         Text("\(dayItem.day)")
                                             .font(.system(size: 10, weight: (today || holiday) ? .heavy : .medium, design: .rounded))
@@ -1176,7 +1268,7 @@ struct LargeWidgetView: View {
                     }
                 }
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 2)
 
             Spacer(minLength: 0)
         }
@@ -1230,7 +1322,15 @@ struct WidgetContentView: View {
 // MARK: - Not Connected View
 
 struct NotConnectedView: View {
+    var theme: CalendarWidgetTheme = .defaultTheme
+
     var body: some View {
+        PaperCardContainer(theme: theme, radius: 20, tapeWidth: 60, topPadding: 13) {
+            content
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 6) {
             MoodFaceView(moodKey: "missing", size: 52)
             Text("우리연애")
@@ -1250,23 +1350,18 @@ struct WidgetView: View {
 
     var body: some View {
         if !entry.data.isConnected {
-            NotConnectedView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay(CartoonFrame(theme: entry.data.calendarTheme))
+            NotConnectedView(theme: entry.data.calendarTheme)
         } else {
             switch family {
             case .systemSmall:
                 SmallWidgetView(data: entry.data)
-                    .overlay(CartoonFrame(theme: entry.data.calendarTheme))
             case .systemMedium:
                 MediumWidgetView(data: entry.data)
-                    .overlay(CartoonFrame(theme: entry.data.calendarTheme))
             case .systemLarge:
                 LargeWidgetView(data: entry.data)
                     .widgetURL(URL(string: "hmlove://calendar?homeWidget=true"))
             default:
                 MediumWidgetView(data: entry.data)
-                    .overlay(CartoonFrame(theme: entry.data.calendarTheme))
             }
         }
     }

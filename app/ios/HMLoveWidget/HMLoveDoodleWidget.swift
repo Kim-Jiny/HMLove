@@ -259,13 +259,15 @@ struct DoodleWidgetView: View {
     let entry: DoodleEntry
 
     var body: some View {
-        ZStack {
-            DoodleCardBackground()
-
+        DoodlePolaroidCard {
             if !entry.data.isConnected {
                 DoodleNotConnectedView()
             } else if let image = entry.data.image {
-                DoodlePhotoView(image: image, senderName: entry.data.senderName)
+                DoodlePhotoView(
+                    image: image,
+                    senderName: entry.data.senderName,
+                    receivedAt: entry.data.receivedAt
+                )
             } else if entry.data.imageUrl != nil {
                 // URL은 있지만 캐시 미스 (위젯이 첫 fetch 중)
                 VStack(spacing: 6) {
@@ -285,31 +287,53 @@ struct DoodleWidgetView: View {
     }
 }
 
-/// 잉크 윤곽선 + 하드 오프셋 그림자가 있는 스티커/폴라로이드 카드.
-struct DoodleCardBackground: View {
+/// 흰 폴라로이드 카드(잉크 윤곽선 + 하드 아래 모서리) + 분홍 테이프 + 뒤에 깔린 라벤더 종이.
+struct DoodlePolaroidCard<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(WidgetPalette.hardShadow)
-                .offset(y: 3)
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color.white)
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(WidgetPalette.ink, lineWidth: 1.5)
-        }
-        .padding(.top, 8)
-        .padding(.horizontal, 8)
-        .padding(.bottom, 11)
+        content
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(
+                PaperCardBackground(
+                    fill: .white,
+                    ink: WidgetPalette.ink,
+                    radius: 14,
+                    edge: 5,
+                    lineWidth: 2,
+                    backs: [PaperBack(color: PaperKit.backLavender, angle: 2.5)]
+                )
+            )
+            .overlay(alignment: .top) {
+                WashiTape(color: PaperKit.washiPink, width: 54, height: 16, angle: -3)
+                    .offset(y: -8)
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 14)
+            .padding(.bottom, 15)
     }
 }
 
 struct DoodlePhotoView: View {
     let image: CGImage
     let senderName: String?
+    var receivedAt: Date? = nil
 
     private var caption: String {
         if let name = senderName, !name.isEmpty { return "\(name)의 그림" }
         return "받은 그림"
+    }
+
+    private var dateText: String? {
+        guard let date = receivedAt else { return nil }
+        let f = DateFormatter()
+        f.dateFormat = "M/d"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f.string(from: date)
     }
 
     var body: some View {
@@ -320,35 +344,39 @@ struct DoodlePhotoView: View {
                         .resizable()
                         .scaledToFill()
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        .strokeBorder(WidgetPalette.border, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(WidgetPalette.ink.opacity(0.18), lineWidth: 1)
                 )
 
-            Text(caption)
-                .font(.system(size: 10, weight: .heavy, design: .rounded))
-                .foregroundColor(WidgetPalette.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .padding(.horizontal, 9)
-                .frame(height: 17)
-                .background(Capsule().fill(WidgetPalette.roseSoft))
-                .overlay(Capsule().strokeBorder(WidgetPalette.ink, lineWidth: 1.2))
+            HStack(spacing: 4) {
+                Text(caption)
+                    .font(.system(size: 10, weight: .heavy, design: .rounded))
+                    .foregroundColor(WidgetPalette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Spacer(minLength: 2)
+                if let dateText = dateText {
+                    Text(dateText)
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(WidgetPalette.textSecondary)
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+            }
+            .padding(.horizontal, 2)
         }
-        .padding(.top, 6)
-        .padding(.horizontal, 6)
-        .padding(.bottom, 6)
-        .padding(.top, 8)
+        .padding(.top, 9)
         .padding(.horizontal, 8)
-        .padding(.bottom, 11)
+        .padding(.bottom, 7)
     }
 }
 
 struct DoodleEmptyView: View {
     var body: some View {
         VStack(spacing: 3) {
-            MoodFaceView(moodKey: "peaceful", size: 42)
+            MoodFaceView(moodKey: "peaceful", size: 40)
             Text("아직 받은\n그림이 없어요")
                 .font(.system(size: 12, weight: .bold, design: .rounded))
                 .foregroundColor(WidgetPalette.textPrimary)
@@ -358,7 +386,7 @@ struct DoodleEmptyView: View {
                 .foregroundColor(WidgetPalette.textHint)
                 .multilineTextAlignment(.center)
         }
-        .padding(.bottom, 3)
+        .padding(.top, 6)
     }
 }
 
@@ -374,7 +402,7 @@ struct DoodleNotConnectedView: View {
                 .foregroundColor(WidgetPalette.textSecondary)
                 .multilineTextAlignment(.center)
         }
-        .padding(.bottom, 3)
+        .padding(.top, 6)
     }
 }
 

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 폴라로이드: 밀린 소프트 그림자 + 흰 카드 + 잉크 외곽선 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:left="2dp"
+        android:top="3dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#334A3B52" />
+            <corners android:radius="8dp" />
+        </shape>
+    </item>
+    <item
+        android:right="2dp"
+        android:bottom="3dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#FFFFFF" />
+            <stroke
+                android:width="1.6dp"
+                android:color="#4A3B52" />
+            <corners android:radius="8dp" />
+        </shape>
+    </item>
+</layer-list>
