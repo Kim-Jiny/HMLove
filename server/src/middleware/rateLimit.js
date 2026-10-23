@@ -46,3 +46,13 @@ export const doodleLimiter = rateLimit({
   keyGenerator: (req) => req.user?.id || ipKeyGenerator(req.ip),
   message: { error: '그림을 너무 빠르게 보내고 있어요. 잠시 후 다시 시도해주세요.' },
 });
+
+// 콕 보내기: 1분에 8회 (사용자별). 연타로 상대 기기가 계속 울리는 걸 막는다.
+export const pokeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req.ip),
+  message: { error: '콕을 너무 빠르게 보내고 있어요. 잠시 후 다시 보내주세요.' },
+});

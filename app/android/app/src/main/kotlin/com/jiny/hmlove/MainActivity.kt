@@ -34,6 +34,17 @@ class MainActivity : FlutterActivity() {
                 enableVibration(false)
             }
             manager.createNotificationChannel(silentChannel)
+
+            // 콕 채널 (두근두근 진동)
+            val pokeChannel = NotificationChannel(
+                "poke",
+                "콕 알림",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 120, 80, 120, 80, 260)
+            }
+            manager.createNotificationChannel(pokeChannel)
         }
     }
 }

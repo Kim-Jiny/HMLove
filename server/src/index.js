@@ -37,6 +37,7 @@ import mapRoutes from './routes/map.js';
 import wishlistRoutes from './routes/wishlist.js';
 import questionRoutes from './routes/question.js';
 import doodleRoutes from './routes/doodle.js';
+import pokeRoutes from './routes/poke.js';
 import homeRoutes from './routes/home.js';
 
 // 부팅 시 필수 시크릿 검증 — 미설정/약한 값이면 즉시 종료한다.
@@ -181,6 +182,7 @@ app.use('/api/map', mapRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/question', questionRoutes);
 app.use('/api/doodle', doodleRoutes);
+app.use('/api/poke', pokeRoutes);
 app.use('/api/home', homeRoutes);
 
 // Health check

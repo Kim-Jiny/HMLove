@@ -125,6 +125,7 @@ class _NotificationSettingsScreenState
         'noti_doodle',
         'noti_doodle_sound',
         'noti_doodle_vibrate',
+        'noti_poke',
         'noti_mood',
         'noti_mood_sound',
         'noti_mood_vibrate',
@@ -290,6 +291,21 @@ class _NotificationSettingsScreenState
             enabledKey: 'noti_letter',
             soundKey: 'noti_letter_sound',
             vibrateKey: 'noti_letter_vibrate',
+            allOn: _allOn,
+            box: _box,
+            onChanged: () {
+              setState(() {});
+              _scheduleSyncToServer();
+            },
+          ),
+          _NotificationCategory(
+            icon: Icons.favorite_border_rounded,
+            iconColor: AppTheme.primaryColor,
+            title: '콕',
+            subtitle: '상대방이 보고싶어 콕을 보내면 알림',
+            enabledKey: 'noti_poke',
+            soundKey: 'noti_poke_sound',
+            vibrateKey: 'noti_poke_vibrate',
             allOn: _allOn,
             box: _box,
             onChanged: () {

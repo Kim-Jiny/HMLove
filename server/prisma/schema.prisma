@@ -40,6 +40,8 @@ model User {
   socialAccounts  SocialAccount[]
   doodlesSent     Doodle[]         @relation("doodleSender")
   doodlesReceived Doodle[]         @relation("doodleReceiver")
+  pokesSent       Poke[]           @relation("pokeSender")
+  pokesReceived   Poke[]           @relation("pokeReceiver")
 
   @@index([coupleId])
 }
@@ -88,6 +90,7 @@ model Couple {
   wishItems      WishItem[]
   dailyQuestions DailyQuestion[]
   doodles        Doodle[]
+  pokes          Poke[]
 }
 
 enum MissionType {
@@ -282,6 +285,22 @@ model Doodle {
 
   @@index([coupleId, createdAt])
   @@index([receiverId, createdAt])
+}
+
+/// "보고싶어" 콕 — 상대에게 보내는 한 번의 가벼운 마음 표현 (푸시 + 위젯/홈 표시용 기록)
+model Poke {
+  id         String   @id @default(uuid())
+  coupleId   String
+  couple     Couple   @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  senderId   String
+  sender     User     @relation("pokeSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String
+  receiver   User     @relation("pokeReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  kind       String   // miss, love, cheer, thanks, sorry, goodnight
+  createdAt  DateTime @default(now())
+
+  @@index([receiverId, createdAt])
+  @@index([coupleId, createdAt])
 }
 
 model Letter {
