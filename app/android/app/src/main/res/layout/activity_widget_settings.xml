@@ -14,15 +14,16 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="위젯 설정"
-            android:textColor="#212121"
-            android:textSize="18sp"
+            android:fontFamily="sans-serif-black"
+            android:textColor="#2E2A33"
+            android:textSize="20sp"
             android:textStyle="bold" />
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
             android:layout_marginTop="12dp"
-            android:background="#E0E0E0" />
+            android:background="#F6E7ED" />
 
         <!-- 테마 -->
         <TextView
@@ -30,7 +31,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="테마"
-            android:textColor="#424242"
+            android:textColor="#4A3B52"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -112,7 +113,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="투명도"
-                android:textColor="#424242"
+                android:textColor="#4A3B52"
                 android:textSize="14sp"
                 android:textStyle="bold" />
 
@@ -126,7 +127,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="100%"
-                android:textColor="#E91E63"
+                android:textColor="#EC5F8E"
                 android:textSize="13sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -144,7 +145,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="미리보기"
-            android:textColor="#424242"
+            android:textColor="#4A3B52"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -209,7 +210,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="기본값"
-                android:textColor="#757575"
+                android:textColor="#7A7480"
                 android:background="@android:color/transparent" />
 
             <View
@@ -222,7 +223,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="취소"
-                android:textColor="#757575"
+                android:textColor="#7A7480"
                 android:background="@android:color/transparent" />
 
             <Button

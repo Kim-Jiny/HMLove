@@ -12,15 +12,6 @@ import CoreGraphics
 
 private let doodleAppGroupId = "group.com.jiny.hmlove"
 
-private enum DoodlePalette {
-    static let background = Color(red: 1.0, green: 245.0 / 255, blue: 248.0 / 255)      // #FFF5F8
-    static let accent     = Color(red: 224.0 / 255, green: 122.0 / 255, blue: 95.0 / 255)  // #E07A5F
-    static let secondary  = Color(red: 142.0 / 255, green: 107.0 / 255, blue: 117.0 / 255) // #8E6B75
-    static let hint       = Color(red: 185.0 / 255, green: 160.0 / 255, blue: 150.0 / 255) // #B9A096
-    static let primary    = Color(red: 194.0 / 255, green: 24.0 / 255, blue: 91.0 / 255)   // #C2185B
-    static let muted      = Color(red: 158.0 / 255, green: 158.0 / 255, blue: 158.0 / 255) // #9E9E9E
-}
-
 // 위젯 디스크 캐시: imageUrl(절대) → 다운로드된 PNG 파일 경로
 // App Group 컨테이너에 캐싱해서 위젯 익스텐션이 매번 다시 다운받지 않게 함.
 // UIKit를 끌어오지 않기 위해 CGImage 기반으로 로드.
@@ -208,8 +199,10 @@ struct DoodleTimelineProvider: TimelineProvider {
         }
 
         var request = URLRequest(url: url)
-        if let token = defaults.string(forKey: "authToken"), !token.isEmpty {
-            // Bearer 보호된 URL일 수도, 공개 URL일 수도 있음. 토큰이 있으면 같이 보냄.
+        // 토큰은 API 와 같은 호스트일 때만 보낸다(이미지가 다른 도메인이면 토큰이 새지 않게).
+        let apiHost = defaults.string(forKey: "apiBaseUrl").flatMap { URL(string: $0)?.host }
+        if apiHost != nil, apiHost == url.host,
+           let token = defaults.string(forKey: "authToken"), !token.isEmpty {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         request.timeoutInterval = 15
@@ -267,22 +260,21 @@ struct DoodleWidgetView: View {
 
     var body: some View {
         ZStack {
+            DoodleCardBackground()
+
             if !entry.data.isConnected {
                 DoodleNotConnectedView()
             } else if let image = entry.data.image {
-                Image(decorative: image, scale: 1.0)
-                    .resizable()
-                    .scaledToFill()
-                    .clipped()
+                DoodlePhotoView(image: image, senderName: entry.data.senderName)
             } else if entry.data.imageUrl != nil {
                 // URL은 있지만 캐시 미스 (위젯이 첫 fetch 중)
                 VStack(spacing: 6) {
                     Image(systemName: "paintbrush.pointed")
                         .font(.system(size: 28))
-                        .foregroundColor(DoodlePalette.accent)
+                        .foregroundColor(WidgetPalette.rose)
                     Text("그림을\n불러오는 중...")
-                        .font(.system(size: 12))
-                        .foregroundColor(DoodlePalette.secondary)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundColor(WidgetPalette.textSecondary)
                         .multilineTextAlignment(.center)
                 }
             } else {
@@ -293,37 +285,96 @@ struct DoodleWidgetView: View {
     }
 }
 
+/// 잉크 윤곽선 + 하드 오프셋 그림자가 있는 스티커/폴라로이드 카드.
+struct DoodleCardBackground: View {
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(WidgetPalette.hardShadow)
+                .offset(y: 3)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.white)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(WidgetPalette.ink, lineWidth: 1.5)
+        }
+        .padding(.top, 8)
+        .padding(.horizontal, 8)
+        .padding(.bottom, 11)
+    }
+}
+
+struct DoodlePhotoView: View {
+    let image: CGImage
+    let senderName: String?
+
+    private var caption: String {
+        if let name = senderName, !name.isEmpty { return "\(name)의 그림" }
+        return "받은 그림"
+    }
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Color.clear
+                .overlay(
+                    Image(decorative: image, scale: 1.0)
+                        .resizable()
+                        .scaledToFill()
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .strokeBorder(WidgetPalette.border, lineWidth: 1)
+                )
+
+            Text(caption)
+                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                .foregroundColor(WidgetPalette.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .padding(.horizontal, 9)
+                .frame(height: 17)
+                .background(Capsule().fill(WidgetPalette.roseSoft))
+                .overlay(Capsule().strokeBorder(WidgetPalette.ink, lineWidth: 1.2))
+        }
+        .padding(.top, 6)
+        .padding(.horizontal, 6)
+        .padding(.bottom, 6)
+        .padding(.top, 8)
+        .padding(.horizontal, 8)
+        .padding(.bottom, 11)
+    }
+}
+
 struct DoodleEmptyView: View {
     var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: "paintbrush.pointed.fill")
-                .font(.system(size: 32))
-                .foregroundColor(DoodlePalette.accent)
+        VStack(spacing: 3) {
+            MoodFaceView(moodKey: "peaceful", size: 42)
             Text("아직 받은\n그림이 없어요")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(DoodlePalette.secondary)
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundColor(WidgetPalette.textPrimary)
                 .multilineTextAlignment(.center)
             Text("앱에서 그림을\n보내달라고 해보세요")
-                .font(.system(size: 10))
-                .foregroundColor(DoodlePalette.hint)
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .foregroundColor(WidgetPalette.textHint)
                 .multilineTextAlignment(.center)
         }
+        .padding(.bottom, 3)
     }
 }
 
 struct DoodleNotConnectedView: View {
     var body: some View {
-        VStack(spacing: 6) {
-            Text("💕")
-                .font(.system(size: 28))
+        VStack(spacing: 4) {
+            MoodFaceView(moodKey: "missing", size: 46)
             Text("우리연애")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(DoodlePalette.primary)
+                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .foregroundColor(WidgetPalette.rose)
             Text("로그인 후\n사용 가능")
-                .font(.system(size: 11))
-                .foregroundColor(DoodlePalette.muted)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundColor(WidgetPalette.textSecondary)
                 .multilineTextAlignment(.center)
         }
+        .padding(.bottom, 3)
     }
 }
 
@@ -351,11 +402,11 @@ struct DoodleWidgetContainer: View {
         if #available(iOS 17.0, *) {
             DoodleWidgetView(entry: entry)
                 .containerBackground(for: .widget) {
-                    DoodlePalette.background
+                    WidgetPalette.heroGradient
                 }
         } else {
             DoodleWidgetView(entry: entry)
-                .background(DoodlePalette.background)
+                .background(WidgetPalette.heroGradient)
         }
     }
 }

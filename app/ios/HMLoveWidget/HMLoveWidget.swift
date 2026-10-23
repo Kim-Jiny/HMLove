@@ -27,7 +27,7 @@ struct CalendarWidgetTheme {
     let textSecondaryHex: String
 
     static let themes: [CalendarWidgetTheme] = [
-        CalendarWidgetTheme(id: "blush", backgroundHex: "FFF5F8", primaryHex: "E91E63", textPrimaryHex: "424242", textSecondaryHex: "8E6B75"),
+        CalendarWidgetTheme(id: "blush", backgroundHex: "FFF8FA", primaryHex: "EC5F8E", textPrimaryHex: "2E2A33", textSecondaryHex: "7A7480"),
         CalendarWidgetTheme(id: "clean", backgroundHex: "FFFFFF", primaryHex: "E91E63", textPrimaryHex: "303030", textSecondaryHex: "757575"),
         CalendarWidgetTheme(id: "charcoal", backgroundHex: "242124", primaryHex: "FF7AA8", textPrimaryHex: "FFF7FA", textSecondaryHex: "E9B8C8"),
         CalendarWidgetTheme(id: "mint", backgroundHex: "F0FFF8", primaryHex: "00856F", textPrimaryHex: "20302B", textSecondaryHex: "53766B"),
@@ -39,6 +39,105 @@ struct CalendarWidgetTheme {
 
     static func theme(for id: String?) -> CalendarWidgetTheme {
         themes.first { $0.id == id } ?? defaultTheme
+    }
+
+    // MARK: Cartoon style helpers (기본 "blush" 테마만 파스텔 그라데이션/잉크 윤곽선)
+
+    var isDefault: Bool { id == "blush" }
+
+    /// 윤곽선 색: 기본 테마는 잉크, 나머지는 테마 본문색.
+    var outlineColor: Color {
+        isDefault ? WidgetPalette.ink : Color(hex: textPrimaryHex).opacity(id == "charcoal" ? 0.55 : 0.8)
+    }
+
+    /// 하드 오프셋 그림자 색(블러 없음).
+    var hardShadowColor: Color {
+        isDefault ? WidgetPalette.hardShadow : Color(hex: primaryHex).opacity(0.28)
+    }
+
+    /// 카드/필 채움 색.
+    var cardColor: Color {
+        isDefault ? Color.white.opacity(0.78) : Color(hex: textPrimaryHex).opacity(0.07)
+    }
+
+    @ViewBuilder
+    var backgroundView: some View {
+        if isDefault {
+            Rectangle().fill(WidgetPalette.heroGradient)
+        } else {
+            Color(hex: backgroundHex)
+        }
+    }
+}
+
+/// 잉크 윤곽선 + 하드 그림자가 있는 둥근 카드 배경.
+struct CartoonCardBackground: View {
+    let theme: CalendarWidgetTheme
+    var radius: CGFloat = 16
+    var shadowY: CGFloat = 3
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(theme.hardShadowColor)
+                .offset(y: shadowY)
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(theme.cardColor)
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .strokeBorder(theme.outlineColor, lineWidth: 1.5)
+        }
+    }
+}
+
+/// 위젯 가장자리를 두르는 잉크 윤곽선 프레임.
+struct CartoonFrame: View {
+    let theme: CalendarWidgetTheme
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 20, style: .continuous)
+            .strokeBorder(theme.outlineColor, lineWidth: 1.5)
+            .padding(6)
+            .allowsHitTesting(false)
+    }
+}
+
+/// 굵은 둥근 숫자 + 하드 오프셋 그림자.
+struct CartoonNumber: View {
+    let text: String
+    let size: CGFloat
+    let theme: CalendarWidgetTheme
+
+    var body: some View {
+        ZStack {
+            Text(text)
+                .font(.system(size: size, weight: .heavy, design: .rounded))
+                .foregroundColor(theme.hardShadowColor)
+                .offset(x: 0, y: 3)
+            Text(text)
+                .font(.system(size: size, weight: .heavy, design: .rounded))
+                .foregroundColor(Color(hex: theme.primaryHex))
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.6)
+    }
+}
+
+/// 윤곽선이 있는 알약 배경.
+struct CartoonPill: ViewModifier {
+    let theme: CalendarWidgetTheme
+    var filled: Bool = false
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+                ZStack {
+                    Capsule().fill(theme.hardShadowColor).offset(y: 2)
+                    Capsule().fill(filled ? Color(hex: theme.primaryHex) : (theme.isDefault ? Color.white : Color(hex: theme.backgroundHex)))
+                    Capsule().strokeBorder(theme.outlineColor, lineWidth: 1.2)
+                }
+            )
     }
 }
 
@@ -208,6 +307,9 @@ struct CoupleData {
     let nextAnniversaryDaysLeft: Int?
     let myMoodEmoji: String
     let partnerMoodEmoji: String
+    /// 기분 키("happy" 등). 없으면 이모지에서 역변환해 채운다. nil 이면 무표정 얼굴.
+    let myMoodKey: String?
+    let partnerMoodKey: String?
     let todaySchedule: String
     let calendarEvents: [CalendarEventData]
     let calendarYearMonth: String
@@ -226,6 +328,8 @@ struct CoupleData {
         nextAnniversaryDaysLeft: 135,
         myMoodEmoji: "🥰",
         partnerMoodEmoji: "😊",
+        myMoodKey: "love",
+        partnerMoodKey: "happy",
         todaySchedule: "데이트 약속",
         calendarEvents: [],
         calendarYearMonth: "",
@@ -239,6 +343,7 @@ struct CoupleData {
         daysTogether: 0, startDate: "",
         nextAnniversaryName: nil, nextAnniversaryDaysLeft: nil,
         myMoodEmoji: "", partnerMoodEmoji: "",
+        myMoodKey: nil, partnerMoodKey: nil,
         todaySchedule: "",
         calendarEvents: [],
         calendarYearMonth: "",
@@ -414,6 +519,10 @@ struct CoupleTimelineProvider: AppIntentTimelineProvider {
                             // Just update first mood found (could be improved)
                             if defaults.string(forKey: "myMoodEmoji") == "😶" || defaults.string(forKey: "myMoodEmoji") == nil {
                                 defaults.set(moodEmoji, forKey: "myMoodEmoji")
+                                // 서버 응답의 값이 기분 키이므로 키도 함께 저장 (이모지는 레거시 폴백)
+                                if resolveWidgetMoodKey(key: emoji, emoji: nil) != nil {
+                                    defaults.set(emoji, forKey: "myMoodKey")
+                                }
                             }
                         }
                     }
@@ -514,6 +623,9 @@ struct CoupleTimelineProvider: AppIntentTimelineProvider {
             holidayTitles = Self.parseHolidayTitles(holidayJson)
         }
 
+        let myMoodEmoji = defaults.string(forKey: "myMoodEmoji") ?? "😶"
+        let partnerMoodEmoji = defaults.string(forKey: "partnerMoodEmoji") ?? "😶"
+
         return CoupleData(
             isConnected: true,
             myName: defaults.string(forKey: "myName") ?? "나",
@@ -522,8 +634,10 @@ struct CoupleTimelineProvider: AppIntentTimelineProvider {
             startDate: startDateStr,
             nextAnniversaryName: nextAnniversaryName,
             nextAnniversaryDaysLeft: nextAnniversaryDaysLeft,
-            myMoodEmoji: defaults.string(forKey: "myMoodEmoji") ?? "😶",
-            partnerMoodEmoji: defaults.string(forKey: "partnerMoodEmoji") ?? "😶",
+            myMoodEmoji: myMoodEmoji,
+            partnerMoodEmoji: partnerMoodEmoji,
+            myMoodKey: resolveWidgetMoodKey(key: defaults.string(forKey: "myMoodKey"), emoji: myMoodEmoji),
+            partnerMoodKey: resolveWidgetMoodKey(key: defaults.string(forKey: "partnerMoodKey"), emoji: partnerMoodEmoji),
             todaySchedule: defaults.string(forKey: "todaySchedule") ?? "",
             calendarEvents: calendarEvents,
             calendarYearMonth: calendarYearMonth,
@@ -647,45 +761,47 @@ struct SmallWidgetView: View {
     private var theme: CalendarWidgetTheme { data.calendarTheme }
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 4) {
             HStack(spacing: 4) {
                 Text(data.myName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Color(hex: theme.primaryHex))
+                    .lineLimit(1)
                 Text("♥")
-                    .font(.system(size: 12))
-                    .foregroundColor(Color(hex: theme.primaryHex))
+                    .font(.system(size: 10, weight: .heavy, design: .rounded))
                 Text(data.partnerName)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(Color(hex: theme.primaryHex))
+                    .lineLimit(1)
             }
+            .font(.system(size: 11, weight: .bold, design: .rounded))
+            .minimumScaleFactor(0.7)
+            .foregroundColor(Color(hex: theme.primaryHex))
+            .modifier(CartoonPill(theme: theme))
 
-            HStack(alignment: .firstTextBaseline, spacing: 0) {
-                Text("\(data.daysTogether)")
-                    .font(.system(size: 42, weight: .bold, design: .rounded))
-                    .foregroundColor(Color(hex: theme.primaryHex))
+            HStack(alignment: .firstTextBaseline, spacing: 1) {
+                CartoonNumber(text: "\(data.daysTogether)", size: 38, theme: theme)
                 Text("일")
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .font(.system(size: 16, weight: .heavy, design: .rounded))
                     .foregroundColor(Color(hex: theme.primaryHex))
             }
+            .padding(.bottom, 2)
 
             Text(data.startDate + " ~")
-                .font(.system(size: 12))
-                .foregroundColor(Color(hex: theme.primaryHex).opacity(0.6))
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundColor(Color(hex: theme.textSecondaryHex))
 
             if let name = data.nextAnniversaryName,
                let daysLeft = data.nextAnniversaryDaysLeft {
                 HStack(spacing: 3) {
                     Text(name)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundColor(Color(hex: theme.textSecondaryHex))
                     Text("D-\(daysLeft)")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 11, weight: .heavy, design: .rounded))
                         .foregroundColor(Color(hex: theme.primaryHex))
                 }
+                .modifier(CartoonPill(theme: theme))
             }
         }
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
     }
 }
 
@@ -696,76 +812,94 @@ struct MediumWidgetView: View {
     private var theme: CalendarWidgetTheme { data.calendarTheme }
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 10) {
             // Left: D-Day
             VStack(spacing: 4) {
                 HStack(spacing: 4) {
                     Text(data.myName)
-                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
                     Text("♥")
-                        .font(.system(size: 11))
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
                     Text(data.partnerName)
-                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
                 }
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .minimumScaleFactor(0.7)
                 .foregroundColor(Color(hex: theme.primaryHex))
+                .modifier(CartoonPill(theme: theme))
 
-                HStack(alignment: .firstTextBaseline, spacing: 0) {
-                    Text("\(data.daysTogether)")
-                        .font(.system(size: 42, weight: .bold, design: .rounded))
-                        .foregroundColor(Color(hex: theme.primaryHex))
+                HStack(alignment: .firstTextBaseline, spacing: 1) {
+                    CartoonNumber(text: "\(data.daysTogether)", size: 40, theme: theme)
                     Text("일째")
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .font(.system(size: 14, weight: .heavy, design: .rounded))
                         .foregroundColor(Color(hex: theme.primaryHex))
                 }
+                .padding(.bottom, 2)
 
                 Text(data.startDate + " ~")
-                    .font(.system(size: 11))
-                    .foregroundColor(Color(hex: theme.primaryHex).opacity(0.5))
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundColor(Color(hex: theme.textSecondaryHex))
 
                 if let name = data.nextAnniversaryName,
                    let daysLeft = data.nextAnniversaryDaysLeft {
                     HStack(spacing: 3) {
                         Text("🎉 \(name)")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
                             .foregroundColor(Color(hex: theme.textSecondaryHex))
                         Text("D-\(daysLeft)")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.system(size: 11, weight: .heavy, design: .rounded))
                             .foregroundColor(Color(hex: theme.primaryHex))
                     }
+                    .modifier(CartoonPill(theme: theme))
                 }
             }
             .frame(maxWidth: .infinity)
 
-            // Right: Mood + Schedule
-            VStack(spacing: 8) {
-                // Mood (compact)
+            // Right: Mood + Schedule (카드)
+            VStack(spacing: 6) {
                 HStack(spacing: 6) {
-                    Text(data.myMoodEmoji)
-                        .font(.system(size: 24))
+                    VStack(spacing: 2) {
+                        MoodFaceView(moodKey: data.myMoodKey, size: 34)
+                        Text(data.myName)
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundColor(Color(hex: theme.textSecondaryHex))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
                     Text("♥")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color(hex: theme.primaryHex).opacity(0.6))
-                    Text(data.partnerMoodEmoji)
-                        .font(.system(size: 24))
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .foregroundColor(Color(hex: theme.primaryHex).opacity(0.7))
+                    VStack(spacing: 2) {
+                        MoodFaceView(moodKey: data.partnerMoodKey, size: 34)
+                        Text(data.partnerName)
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundColor(Color(hex: theme.textSecondaryHex))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
                 }
 
                 // Today's schedule
                 if !data.todaySchedule.isEmpty {
                     Text(data.todaySchedule)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundColor(Color(hex: theme.textPrimaryHex))
                         .lineLimit(3)
                         .multilineTextAlignment(.center)
                 } else {
                     Text("오늘 일정 없음")
-                        .font(.system(size: 12))
-                        .foregroundColor(Color(hex: theme.textSecondaryHex).opacity(0.7))
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundColor(Color(hex: theme.textSecondaryHex).opacity(0.8))
                 }
             }
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(CartoonCardBackground(theme: theme, radius: 16, shadowY: 3))
+            .padding(.bottom, 3)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
     }
 }
 
@@ -883,8 +1017,9 @@ struct LargeWidgetView: View {
                         .foregroundColor(Color(hex: theme.primaryHex))
                         .frame(width: 26, height: 22)
                         .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(Color(hex: theme.primaryHex).opacity(0.1))
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color(hex: theme.primaryHex).opacity(0.12))
+                                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(theme.outlineColor, lineWidth: 1))
                         )
                 }
                 .buttonStyle(.plain)
@@ -892,20 +1027,21 @@ struct LargeWidgetView: View {
                 Spacer(minLength: 6)
 
                 Text(yearMonthText)
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 14, weight: .heavy, design: .rounded))
                     .foregroundColor(Color(hex: theme.textPrimaryHex))
 
                 Spacer(minLength: 6)
 
                 Button(intent: TodayMonthIntent()) {
                     Text("오늘")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
                         .foregroundColor(Color(hex: theme.primaryHex))
                         .padding(.horizontal, 8)
                         .frame(height: 22)
                         .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(Color(hex: theme.primaryHex).opacity(0.1))
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color(hex: theme.primaryHex).opacity(0.12))
+                                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(theme.outlineColor, lineWidth: 1))
                         )
                 }
                 .buttonStyle(.plain)
@@ -917,15 +1053,16 @@ struct LargeWidgetView: View {
                         .foregroundColor(Color(hex: theme.primaryHex))
                         .frame(width: 26, height: 22)
                         .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(Color(hex: theme.primaryHex).opacity(0.1))
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Color(hex: theme.primaryHex).opacity(0.12))
+                                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(theme.outlineColor, lineWidth: 1))
                         )
                 }
                 .buttonStyle(.plain)
             }
         } else {
             Text(yearMonthText)
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 14, weight: .heavy, design: .rounded))
                 .foregroundColor(Color(hex: theme.textPrimaryHex))
         }
     }
@@ -935,18 +1072,20 @@ struct LargeWidgetView: View {
             // Top bar: couple name + D-Day
             HStack {
                 Text("\(data.myName) ♥ \(data.partnerName)")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(Color(hex: theme.primaryHex))
-                Spacer()
-                Text("\(data.daysTogether)일")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundColor(Color(hex: theme.primaryHex))
+                Spacer()
                 if let name = data.nextAnniversaryName,
                    let daysLeft = data.nextAnniversaryDaysLeft {
-                    Text("· \(name) D-\(daysLeft)")
-                        .font(.system(size: 11, weight: .medium))
+                    Text("\(name) D-\(daysLeft)")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
                         .foregroundColor(Color(hex: theme.textSecondaryHex))
+                        .padding(.trailing, 4)
                 }
+                Text("\(data.daysTogether)일")
+                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .foregroundColor(.white)
+                    .modifier(CartoonPill(theme: theme, filled: true))
             }
             .padding(.horizontal, 14)
             .padding(.top, 8)
@@ -961,7 +1100,7 @@ struct LargeWidgetView: View {
             HStack(spacing: 0) {
                 ForEach(0..<7, id: \.self) { index in
                     Text(weekdaySymbols[index])
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(index == 0 ? Color(hex: theme.primaryHex) : Color(hex: theme.textSecondaryHex))
                         .frame(maxWidth: .infinity)
                 }
@@ -988,10 +1127,11 @@ struct LargeWidgetView: View {
                                         if today {
                                             Circle()
                                                 .fill(Color(hex: theme.primaryHex))
-                                                .frame(width: 14, height: 14)
+                                                .overlay(Circle().strokeBorder(theme.outlineColor, lineWidth: 1))
+                                                .frame(width: 15, height: 15)
                                         }
                                         Text("\(dayItem.day)")
-                                            .font(.system(size: 10, weight: (today || holiday) ? .bold : .regular))
+                                            .font(.system(size: 10, weight: (today || holiday) ? .heavy : .medium, design: .rounded))
                                             .foregroundColor(
                                                 today ? .white :
                                                 !dayItem.isCurrentMonth ? Color(hex: theme.textSecondaryHex).opacity(0.55) :
@@ -1000,7 +1140,7 @@ struct LargeWidgetView: View {
                                                 Color(hex: theme.textPrimaryHex)
                                             )
                                     }
-                                    .frame(height: 14)
+                                    .frame(height: 15)
 
                                     // 휴일명 — 배경 없는 빨간 텍스트 (일정보다 위)
                                     if let name = holidayName {
@@ -1016,14 +1156,14 @@ struct LargeWidgetView: View {
                                     ForEach(Array(dayEvents.enumerated()), id: \.offset) { _, event in
                                         Text(event.title)
                                             .font(.system(size: 6, weight: .bold))
-                                            .foregroundColor(.white)
+                                            .foregroundColor(Color(hex: theme.textPrimaryHex))
                                             .lineLimit(1)
                                             .truncationMode(.tail)
                                             .padding(.horizontal, 1)
                                             .frame(maxWidth: .infinity, minHeight: 8, maxHeight: 8)
                                             .background(
-                                                RoundedRectangle(cornerRadius: 1.5)
-                                                    .fill(Color(hex: event.color.replacingOccurrences(of: "#", with: "")))
+                                                RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                                                    .fill(Color(hex: event.color.replacingOccurrences(of: "#", with: "")).opacity(0.3))
                                             )
                                             .clipped()
                                     }
@@ -1078,11 +1218,11 @@ struct WidgetContentView: View {
             if #available(iOS 17.0, *) {
                 WidgetView(entry: entry)
                     .containerBackground(for: .widget) {
-                        Color(hex: entry.data.calendarTheme.backgroundHex)
+                        entry.data.calendarTheme.backgroundView
                     }
             } else {
                 WidgetView(entry: entry)
-                    .background(Color(hex: entry.data.calendarTheme.backgroundHex))
+                    .background(entry.data.calendarTheme.backgroundView)
             }
     }
 }
@@ -1091,15 +1231,14 @@ struct WidgetContentView: View {
 
 struct NotConnectedView: View {
     var body: some View {
-        VStack(spacing: 8) {
-            Text("💕")
-                .font(.system(size: 36))
+        VStack(spacing: 6) {
+            MoodFaceView(moodKey: "missing", size: 52)
             Text("우리연애")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(Color(hex: "C2185B"))
+                .font(.system(size: 16, weight: .heavy, design: .rounded))
+                .foregroundColor(WidgetPalette.rose)
             Text("앱에서 로그인하고\n커플을 연결해보세요")
-                .font(.system(size: 13))
-                .foregroundColor(Color(hex: "9E9E9E"))
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundColor(WidgetPalette.textSecondary)
                 .multilineTextAlignment(.center)
         }
     }
@@ -1112,17 +1251,22 @@ struct WidgetView: View {
     var body: some View {
         if !entry.data.isConnected {
             NotConnectedView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay(CartoonFrame(theme: entry.data.calendarTheme))
         } else {
             switch family {
             case .systemSmall:
                 SmallWidgetView(data: entry.data)
+                    .overlay(CartoonFrame(theme: entry.data.calendarTheme))
             case .systemMedium:
                 MediumWidgetView(data: entry.data)
+                    .overlay(CartoonFrame(theme: entry.data.calendarTheme))
             case .systemLarge:
                 LargeWidgetView(data: entry.data)
                     .widgetURL(URL(string: "hmlove://calendar?homeWidget=true"))
             default:
                 MediumWidgetView(data: entry.data)
+                    .overlay(CartoonFrame(theme: entry.data.calendarTheme))
             }
         }
     }

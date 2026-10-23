@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
+import android.view.View
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetPlugin
 import java.time.LocalDate
@@ -66,6 +67,7 @@ class HMLoveSmallWidgetProvider : AppWidgetProvider() {
             )
         } else {
             views.setTextViewText(R.id.next_anniversary, "")
+            views.setViewVisibility(R.id.next_anniversary, View.GONE)
         }
 
         return views

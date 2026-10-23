@@ -3,51 +3,70 @@
     android:id="@+id/widget_doodle_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_background">
+    android:background="@drawable/widget_background"
+    android:paddingStart="7dp"
+    android:paddingTop="5dp"
+    android:paddingEnd="7dp"
+    android:paddingBottom="9dp">
 
-    <!-- 그림 이미지 (꽉 채움) -->
-    <ImageView
-        android:id="@+id/widget_doodle_image"
+    <!-- 사진 액자: 잉크 외곽선 프레임 -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="centerCrop"
-        android:visibility="gone"
-        android:contentDescription="@null" />
+        android:background="@drawable/widget_doodle_frame_bg"
+        android:padding="2dp">
 
-    <!-- 빈 상태: 그림 없음 -->
-    <LinearLayout
-        android:id="@+id/widget_doodle_empty"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:padding="12dp">
+        <!-- 그림 이미지 (꽉 채움, 둥근 모서리로 잘림) -->
+        <ImageView
+            android:id="@+id/widget_doodle_image"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/widget_doodle_image_bg"
+            android:clipToOutline="true"
+            android:contentDescription="@null"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="🎨"
-            android:textSize="32sp" />
+        <!-- 빈 상태: 그림 없음 -->
+        <LinearLayout
+            android:id="@+id/widget_doodle_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="8dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="아직 받은\n그림이 없어요"
-            android:textColor="#8E6B75"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:gravity="center" />
+            <ImageView
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:contentDescription="@null"
+                android:src="@drawable/mood_face_peaceful" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="앱에서 그림 보내기"
-            android:textColor="#B9A096"
-            android:textSize="10sp"
-            android:gravity="center" />
-    </LinearLayout>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:text="아직 받은\n그림이 없어요"
+                android:textColor="#2E2A33"
+                android:textSize="12sp"
+                android:textStyle="bold" />
 
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:background="@drawable/widget_pill_bg"
+                android:gravity="center"
+                android:paddingStart="8dp"
+                android:paddingTop="1dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="1dp"
+                android:text="앱에서 그림 보내기"
+                android:textColor="#4A3B52"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </FrameLayout>
 
 </FrameLayout>

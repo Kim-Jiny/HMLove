@@ -70,7 +70,7 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
         private const val PREF_KEY_FETCH_SUCCESS_PREFIX = "widgetFetchSuccess_"
 
         // Standalone holiday text color (theme-independent, 0xFFD32F2F).
-        private val HOLIDAY_RED: Int = 0xFFD32F2F.toInt()
+        private val HOLIDAY_RED: Int = 0xFFE5484D.toInt()
     }
 
     private fun launchAppIntent(context: Context): PendingIntent {
@@ -168,6 +168,13 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
         return dr * dr + dg * dg + db * db
     }
 
+    private fun blendWithWhite(color: Int, ratio: Float): Int {
+        val r = (Color.red(color) + (255 - Color.red(color)) * ratio).toInt()
+        val g = (Color.green(color) + (255 - Color.green(color)) * ratio).toInt()
+        val b = (Color.blue(color) + (255 - Color.blue(color)) * ratio).toInt()
+        return Color.rgb(r, g, b)
+    }
+
     private fun withAlpha(color: Int, alpha: Int): Int =
         (alpha.coerceIn(0, 255) shl 24) or (color and 0x00FFFFFF)
 
@@ -212,11 +219,15 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
             views.setTextColor(id, if (index == 0) theme.primary else theme.textSecondary)
         }
 
-        val navBg = withAlpha(theme.primary, 26)
-        tintBackground(views, R.id.cal_settings_btn, R.drawable.widget_calendar_nav_btn_bg, navBg)
-        tintBackground(views, R.id.cal_prev_month, R.drawable.widget_calendar_nav_btn_bg, navBg)
-        tintBackground(views, R.id.cal_today_month, R.drawable.widget_calendar_nav_btn_bg, navBg)
-        tintBackground(views, R.id.cal_next_month, R.drawable.widget_calendar_nav_btn_bg, navBg)
+        // 기본(러브) 테마는 잉크 외곽선 칩 드로어블을 그대로 사용하고,
+        // 그 외 테마만 테마색으로 틴트한다.
+        if (!isDefaultWidgetTheme(theme)) {
+            val navBg = withAlpha(theme.primary, 26)
+            tintBackground(views, R.id.cal_settings_btn, R.drawable.widget_calendar_nav_btn_bg, navBg)
+            tintBackground(views, R.id.cal_prev_month, R.drawable.widget_calendar_nav_btn_bg, navBg)
+            tintBackground(views, R.id.cal_today_month, R.drawable.widget_calendar_nav_btn_bg, navBg)
+            tintBackground(views, R.id.cal_next_month, R.drawable.widget_calendar_nav_btn_bg, navBg)
+        }
     }
 
     private fun hasWidgetSession(prefs: SharedPreferences): Boolean {
@@ -700,7 +711,7 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                     cellView.setTextViewText(R.id.cell_day, day.toString())
 
                     if (isToday) {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        if (!isDefaultWidgetTheme(theme) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                             cellView.setInt(
                                 R.id.cell_day,
                                 "setBackgroundResource",
@@ -743,16 +754,18 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
                             val barColor = try {
                                 Color.parseColor(event.color)
                             } catch (_: Exception) {
-                                Color.parseColor("#E91E63")
+                                Color.parseColor("#EC5F8E")
                             }
+                            // 파스텔 막대: 원색을 흰색 쪽으로 섞고 글자는 잉크색
+                            val pastel = blendWithWhite(barColor, 0.72f)
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                                 barView.setColorStateList(
                                     R.id.event_bar_text,
                                     "setBackgroundTintList",
-                                    ColorStateList.valueOf(barColor)
+                                    ColorStateList.valueOf(pastel)
                                 )
                             } else {
-                                barView.setInt(R.id.event_bar_text, "setBackgroundColor", barColor)
+                                barView.setInt(R.id.event_bar_text, "setBackgroundColor", pastel)
                             }
                             cellView.addView(R.id.cell_events_container, barView)
                         }
