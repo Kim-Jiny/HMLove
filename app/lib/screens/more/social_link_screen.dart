@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/social_auth_service.dart';
 import '../../core/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/cute/loader.dart';
+import '../../widgets/soft_ui.dart';
 
 class SocialLinkScreen extends ConsumerStatefulWidget {
   const SocialLinkScreen({super.key});
@@ -68,7 +70,9 @@ class _SocialLinkScreenState extends ConsumerState<SocialLinkScreen> {
             setState(() => _busy = false);
             return;
           }
-          error = await ref.read(authProvider.notifier).unlinkSocial(row.provider);
+          error = await ref
+              .read(authProvider.notifier)
+              .unlinkSocial(row.provider);
         }
       } else {
         error = await ref.read(authProvider.notifier).linkSocial(row.provider);
@@ -129,7 +133,7 @@ class _SocialLinkScreenState extends ConsumerState<SocialLinkScreen> {
         title: const Text('계정 연동'),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CuteLoader())
           : RefreshIndicator(
               onRefresh: _refresh,
               child: ListView(
@@ -138,8 +142,12 @@ class _SocialLinkScreenState extends ConsumerState<SocialLinkScreen> {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(8),
+                      color: AppTheme.primarySoft,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                      border: Border.all(
+                        color: AppTheme.ink,
+                        width: AppTheme.outlineWidth,
+                      ),
                     ),
                     child: const Text(
                       '연동된 소셜 계정으로도 로그인할 수 있어요. '
@@ -148,7 +156,7 @@ class _SocialLinkScreenState extends ConsumerState<SocialLinkScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Card(
+                  CartoonCard(
                     child: Column(
                       children: [
                         for (var i = 0; i < _rows.length; i++) ...[
@@ -173,11 +181,7 @@ class _LinkedRow {
   final SocialProvider provider;
   final bool linked;
   final String? email;
-  const _LinkedRow({
-    required this.provider,
-    required this.linked,
-    this.email,
-  });
+  const _LinkedRow({required this.provider, required this.linked, this.email});
 }
 
 class _LinkRow extends StatelessWidget {
@@ -218,6 +222,7 @@ class _LinkRow extends StatelessWidget {
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: _iconColor.withValues(alpha: 0.15),
+        foregroundColor: _iconColor,
         child: Icon(_icon, color: _iconColor),
       ),
       title: Text(row.provider.displayName),
@@ -228,7 +233,9 @@ class _LinkRow extends StatelessWidget {
       trailing: TextButton(
         onPressed: disabled ? null : onToggle,
         style: TextButton.styleFrom(
-          foregroundColor: row.linked ? AppTheme.errorColor : AppTheme.primaryColor,
+          foregroundColor: row.linked
+              ? AppTheme.errorColor
+              : AppTheme.primaryColor,
         ),
         child: Text(row.linked ? '해제' : '연동'),
       ),

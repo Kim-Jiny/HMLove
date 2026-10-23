@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'theme.dart';
 
 /// Shows a top snackbar notification below the status bar.
 void showTopSnackBar(
@@ -40,33 +41,40 @@ void showTopSnackBar(
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: isError
-                  ? const Color(0xFFD32F2F)
-                  : const Color(0xFF323232),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.15),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              color: isError ? AppTheme.errorColor : Colors.white,
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              border: Border.all(
+                color: AppTheme.ink,
+                width: AppTheme.outlineWidth,
+              ),
+              boxShadow: AppTheme.cartoonShadow,
             ),
             child: Row(
               children: [
-                Icon(
-                  isError ? Icons.error_outline : Icons.check_circle_outline,
-                  color: Colors.white,
-                  size: 20,
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: isError ? Colors.white : AppTheme.mintSoft,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppTheme.ink, width: 1.2),
+                  ),
+                  child: Icon(
+                    isError ? Icons.priority_high_rounded : Icons.check_rounded,
+                    color: isError
+                        ? AppTheme.errorColor
+                        : AppTheme.successColor,
+                    size: 16,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     message,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: isError ? Colors.white : AppTheme.textPrimary,
                       fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),

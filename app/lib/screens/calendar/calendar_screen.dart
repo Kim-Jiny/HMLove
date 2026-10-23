@@ -4,13 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
-import '../../core/mood_emojis.dart';
+import '../../widgets/cute/mood_face.dart';
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
 import '../../providers/calendar_provider.dart';
 import '../../providers/mission_provider.dart';
 import 'widgets/add_option_tile.dart';
 import 'widgets/device_calendar_settings_sheet.dart';
+import '../../widgets/soft_ui.dart';
 
 class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
@@ -29,6 +30,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   void initState() {
     super.initState();
     _selectedDay = DateTime.now();
+
     Future.microtask(() async {
       final yearMonth = DateFormat('yyyy-MM').format(_focusedDay);
       ref.read(calendarProvider.notifier).fetchEvents(yearMonth);
@@ -38,8 +40,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       await ref.read(calendarProvider.notifier).bootstrapHolidayOverlay();
     });
   }
-
-  String _moodKeyToEmoji(String key) => moodEmojis[key] ?? key;
 
   List<CalendarEvent> _getEventsForDay(DateTime day) {
     final calendarState = ref.read(calendarProvider);
@@ -84,9 +84,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (context) => DeviceCalendarSettingsSheet(
         notifier: ref.read(calendarProvider.notifier),
         isEnabled: ref.read(calendarProvider).deviceCalendarEnabled,
@@ -106,9 +103,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final action = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (context) => Padding(
         padding: EdgeInsets.only(
           left: 24,
@@ -123,7 +117,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: AppTheme.ink.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -145,7 +139,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               icon: Icons.mail_outline,
               title: '편지 쓰기',
               subtitle: '사랑하는 사람에게 편지를 보내세요',
-              color: const Color(0xFFFF9800),
+              color: AppTheme.peach,
               onTap: () => Navigator.pop(context, 'letter'),
             ),
             const SizedBox(height: 12),
@@ -181,9 +175,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (context) => Padding(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
         child: Column(
@@ -195,7 +186,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: AppTheme.ink.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -219,14 +210,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFCE4EC),
+                      color: AppTheme.primarySoft,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text(
                       '자동',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Color(0xFFE91E63),
+                        color: AppTheme.primaryColor,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -354,140 +345,140 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
     try {
       await showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-          return AnimatedPadding(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-            padding: EdgeInsets.only(bottom: bottomInset),
-            child: AlertDialog(
-              scrollable: true,
-              title: const Text(
-                '일정 수정',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: titleController,
-                      autofocus: true,
-                      decoration: const InputDecoration(
-                        labelText: '제목',
-                        hintText: '일정 제목을 입력하세요',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: descriptionController,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: '설명 (선택)',
-                        hintText: '일정에 대한 설명을 입력하세요',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Text('날짜: '),
-                        Text(
-                          DateFormat('yyyy년 M월 d일').format(event.date),
-                          style: const TextStyle(fontWeight: FontWeight.w600),
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) {
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            return AnimatedPadding(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(bottom: bottomInset),
+              child: AlertDialog(
+                scrollable: true,
+                title: const Text(
+                  '일정 수정',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: titleController,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          labelText: '제목',
+                          hintText: '일정 제목을 입력하세요',
+                          border: OutlineInputBorder(),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    CheckboxListTile(
-                      value: isAnniversary,
-                      onChanged: (v) =>
-                          setDialogState(() => isAnniversary = v ?? false),
-                      title: const Text(
-                        '기념일로 표시',
-                        style: TextStyle(fontSize: 14),
                       ),
-                      contentPadding: EdgeInsets.zero,
-                      controlAffinity: ListTileControlAffinity.leading,
-                    ),
-                    DropdownButtonFormField<String>(
-                      initialValue: repeatType,
-                      decoration: const InputDecoration(
-                        labelText: '반복',
-                        border: OutlineInputBorder(),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: descriptionController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: '설명 (선택)',
+                          hintText: '일정에 대한 설명을 입력하세요',
+                          border: OutlineInputBorder(),
+                        ),
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 'NONE', child: Text('반복 없음')),
-                        DropdownMenuItem(value: 'YEARLY', child: Text('매년')),
-                        DropdownMenuItem(value: 'MONTHLY', child: Text('매월')),
-                      ],
-                      onChanged: (v) =>
-                          setDialogState(() => repeatType = v ?? 'NONE'),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('취소'),
-                ),
-                FilledButton(
-                  onPressed: isSubmitting
-                      ? null
-                      : () async {
-                          final title = titleController.text.trim();
-                          if (title.isEmpty) return;
-
-                          setDialogState(() => isSubmitting = true);
-
-                          final success = await ref
-                              .read(calendarProvider.notifier)
-                              .updateEvent(
-                                id: event.id,
-                                title: title,
-                                description:
-                                    descriptionController.text.trim().isEmpty
-                                    ? null
-                                    : descriptionController.text.trim(),
-                                isAnniversary: isAnniversary,
-                                repeatType: repeatType,
-                              );
-
-                          if (context.mounted) {
-                            Navigator.pop(context);
-                            if (success) {
-                              showTopSnackBar(outerContext, '일정이 수정되었습니다');
-                            } else {
-                              final error = ref.read(calendarProvider).error;
-                              showTopSnackBar(
-                                outerContext,
-                                error ?? '일정 수정에 실패했습니다',
-                                isError: true,
-                              );
-                            }
-                          }
-                        },
-                  child: isSubmitting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Text('날짜: '),
+                          Text(
+                            DateFormat('yyyy년 M월 d일').format(event.date),
+                            style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
-                        )
-                      : const Text('수정'),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      CheckboxListTile(
+                        value: isAnniversary,
+                        onChanged: (v) =>
+                            setDialogState(() => isAnniversary = v ?? false),
+                        title: const Text(
+                          '기념일로 표시',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                      ),
+                      DropdownButtonFormField<String>(
+                        initialValue: repeatType,
+                        decoration: const InputDecoration(
+                          labelText: '반복',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'NONE', child: Text('반복 없음')),
+                          DropdownMenuItem(value: 'YEARLY', child: Text('매년')),
+                          DropdownMenuItem(value: 'MONTHLY', child: Text('매월')),
+                        ],
+                        onChanged: (v) =>
+                            setDialogState(() => repeatType = v ?? 'NONE'),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('취소'),
+                  ),
+                  FilledButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            final title = titleController.text.trim();
+                            if (title.isEmpty) return;
+
+                            setDialogState(() => isSubmitting = true);
+
+                            final success = await ref
+                                .read(calendarProvider.notifier)
+                                .updateEvent(
+                                  id: event.id,
+                                  title: title,
+                                  description:
+                                      descriptionController.text.trim().isEmpty
+                                      ? null
+                                      : descriptionController.text.trim(),
+                                  isAnniversary: isAnniversary,
+                                  repeatType: repeatType,
+                                );
+
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              if (success) {
+                                showTopSnackBar(outerContext, '일정이 수정되었습니다');
+                              } else {
+                                final error = ref.read(calendarProvider).error;
+                                showTopSnackBar(
+                                  outerContext,
+                                  error ?? '일정 수정에 실패했습니다',
+                                  isError: true,
+                                );
+                              }
+                            }
+                          },
+                    child: isSubmitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('수정'),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
     } finally {
       titleController.dispose();
       descriptionController.dispose();
@@ -508,196 +499,198 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
     try {
       await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-          return SafeArea(
-            child: AnimatedPadding(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-              padding: EdgeInsets.only(bottom: bottomInset),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      '새 일정',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: titleController,
-                      autofocus: true,
-                      decoration: const InputDecoration(
-                        labelText: '제목',
-                        hintText: '일정 제목을 입력하세요',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: descriptionController,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: '설명 (선택)',
-                        hintText: '일정에 대한 설명을 입력하세요',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Text('날짜: '),
-                        Text(
-                          _selectedDay != null
-                              ? DateFormat('yyyy년 M월 d일').format(_selectedDay!)
-                              : '선택 안 됨',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    CheckboxListTile(
-                      value: isAnniversary,
-                      onChanged: (v) =>
-                          setDialogState(() => isAnniversary = v ?? false),
-                      title: const Text(
-                        '기념일로 표시',
-                        style: TextStyle(fontSize: 14),
-                      ),
-                      contentPadding: EdgeInsets.zero,
-                      controlAffinity: ListTileControlAffinity.leading,
-                    ),
-                    DropdownButtonFormField<String>(
-                      initialValue: repeatType,
-                      decoration: const InputDecoration(
-                        labelText: '반복',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'NONE', child: Text('반복 없음')),
-                        DropdownMenuItem(value: 'YEARLY', child: Text('매년')),
-                        DropdownMenuItem(value: 'MONTHLY', child: Text('매월')),
-                      ],
-                      onChanged: (v) =>
-                          setDialogState(() => repeatType = v ?? 'NONE'),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 48,
-                            child: OutlinedButton(
-                              onPressed: () => Navigator.pop(context),
-                              style: OutlinedButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: const Text('취소'),
-                            ),
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) {
+            final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+            return SafeArea(
+              child: AnimatedPadding(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                padding: EdgeInsets.only(bottom: bottomInset),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppTheme.ink.withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: SizedBox(
-                            height: 48,
-                            child: FilledButton(
-                              style: FilledButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        '새 일정',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: titleController,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          labelText: '제목',
+                          hintText: '일정 제목을 입력하세요',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: descriptionController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: '설명 (선택)',
+                          hintText: '일정에 대한 설명을 입력하세요',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Text('날짜: '),
+                          Text(
+                            _selectedDay != null
+                                ? DateFormat(
+                                    'yyyy년 M월 d일',
+                                  ).format(_selectedDay!)
+                                : '선택 안 됨',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      CheckboxListTile(
+                        value: isAnniversary,
+                        onChanged: (v) =>
+                            setDialogState(() => isAnniversary = v ?? false),
+                        title: const Text(
+                          '기념일로 표시',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                      ),
+                      DropdownButtonFormField<String>(
+                        initialValue: repeatType,
+                        decoration: const InputDecoration(
+                          labelText: '반복',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'NONE', child: Text('반복 없음')),
+                          DropdownMenuItem(value: 'YEARLY', child: Text('매년')),
+                          DropdownMenuItem(value: 'MONTHLY', child: Text('매월')),
+                        ],
+                        onChanged: (v) =>
+                            setDialogState(() => repeatType = v ?? 'NONE'),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 48,
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: OutlinedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
+                                child: const Text('취소'),
                               ),
-                              onPressed: isSubmitting
-                                  ? null
-                                  : () async {
-                                      final title = titleController.text.trim();
-                                      if (title.isEmpty) return;
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: SizedBox(
+                              height: 48,
+                              child: FilledButton(
+                                style: FilledButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                onPressed: isSubmitting
+                                    ? null
+                                    : () async {
+                                        final title = titleController.text
+                                            .trim();
+                                        if (title.isEmpty) return;
 
-                                      setDialogState(() => isSubmitting = true);
+                                        setDialogState(
+                                          () => isSubmitting = true,
+                                        );
 
-                                      final date =
-                                          _selectedDay ?? DateTime.now();
-                                      final success = await ref
-                                          .read(calendarProvider.notifier)
-                                          .createEvent(
-                                            title: title,
-                                            date: date,
-                                            description:
-                                                descriptionController.text
-                                                    .trim()
-                                                    .isEmpty
-                                                ? null
-                                                : descriptionController.text
-                                                      .trim(),
-                                            isAnniversary: isAnniversary,
-                                            repeatType: repeatType,
-                                          );
+                                        final date =
+                                            _selectedDay ?? DateTime.now();
+                                        final success = await ref
+                                            .read(calendarProvider.notifier)
+                                            .createEvent(
+                                              title: title,
+                                              date: date,
+                                              description:
+                                                  descriptionController.text
+                                                      .trim()
+                                                      .isEmpty
+                                                  ? null
+                                                  : descriptionController.text
+                                                        .trim(),
+                                              isAnniversary: isAnniversary,
+                                              repeatType: repeatType,
+                                            );
 
-                                      if (context.mounted) {
-                                        Navigator.pop(context);
-                                        if (success) {
-                                          showTopSnackBar(
-                                            outerContext,
-                                            '일정이 추가되었습니다',
-                                          );
-                                        } else {
-                                          final error = ref
-                                              .read(calendarProvider)
-                                              .error;
-                                          showTopSnackBar(
-                                            outerContext,
-                                            error ?? '일정 추가에 실패했습니다',
-                                            isError: true,
-                                          );
+                                        if (context.mounted) {
+                                          Navigator.pop(context);
+                                          if (success) {
+                                            showTopSnackBar(
+                                              outerContext,
+                                              '일정이 추가되었습니다',
+                                            );
+                                          } else {
+                                            final error = ref
+                                                .read(calendarProvider)
+                                                .error;
+                                            showTopSnackBar(
+                                              outerContext,
+                                              error ?? '일정 추가에 실패했습니다',
+                                              isError: true,
+                                            );
+                                          }
                                         }
-                                      }
-                                    },
-                              child: isSubmitting
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Text('추가'),
+                                      },
+                                child: isSubmitting
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text('추가'),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        },
-      ),
-    );
+            );
+          },
+        ),
+      );
     } finally {
       titleController.dispose();
       descriptionController.dispose();
@@ -736,7 +729,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       body: Column(
         children: [
           // Calendar Widget
-          Card(
+          CartoonCard(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: TableCalendar<CalendarEvent>(
               firstDay: DateTime(2020, 1, 1),
@@ -752,26 +745,40 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 titleCentered: true,
                 titleTextStyle: const TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.ink,
                 ),
-                formatButtonTextStyle: const TextStyle(fontSize: 12),
+                formatButtonTextStyle: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.ink,
+                ),
                 formatButtonDecoration: BoxDecoration(
-                  border: Border.all(color: AppTheme.primaryColor),
-                  borderRadius: const BorderRadius.all(Radius.circular(8)),
+                  color: AppTheme.primarySoft,
+                  border: Border.all(
+                    color: AppTheme.ink,
+                    width: AppTheme.outlineWidth,
+                  ),
+                  borderRadius: const BorderRadius.all(Radius.circular(12)),
                 ),
               ),
               calendarStyle: CalendarStyle(
                 todayDecoration: BoxDecoration(
-                  color: AppTheme.primaryLight.withValues(alpha: 0.5),
+                  color: AppTheme.primarySoft,
                   shape: BoxShape.circle,
+                  border: Border.all(color: AppTheme.primaryColor, width: 1.5),
                 ),
                 todayTextStyle: const TextStyle(
-                  color: Colors.white,
+                  color: AppTheme.ink,
                   fontWeight: FontWeight.bold,
                 ),
-                selectedDecoration: const BoxDecoration(
+                selectedDecoration: BoxDecoration(
                   color: AppTheme.primaryColor,
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppTheme.ink,
+                    width: AppTheme.outlineWidth,
+                  ),
                 ),
                 selectedTextStyle: const TextStyle(
                   color: Colors.white,
@@ -787,7 +794,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     child: Text(
                       '${day.day}',
                       style: const TextStyle(
-                        color: Color(0xFFD32F2F),
+                        color: AppTheme.errorColor,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -798,8 +805,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   return Center(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryLight.withValues(alpha: 0.5),
+                        color: AppTheme.primarySoft,
                         shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppTheme.primaryColor,
+                          width: 1.5,
+                        ),
                       ),
                       width: 32,
                       height: 32,
@@ -807,7 +818,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       child: Text(
                         '${day.day}',
                         style: const TextStyle(
-                          color: Color(0xFFD32F2F),
+                          color: AppTheme.errorColor,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -832,19 +843,19 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                     );
                   }
                   if (types.contains('anniversary')) {
-                    dots.add(_buildDot(const Color(0xFFE91E63)));
+                    dots.add(_buildDot(AppTheme.primaryColor));
                   }
                   if (types.contains('schedule')) {
-                    dots.add(_buildDot(const Color(0xFF1976D2)));
+                    dots.add(_buildDot(AppTheme.sky));
                   }
                   if (types.contains('feed')) {
-                    dots.add(_buildDot(const Color(0xFFFF9800)));
+                    dots.add(_buildDot(AppTheme.peach));
                   }
                   if (types.contains('device')) {
-                    dots.add(_buildDot(const Color(0xFF4CAF50)));
+                    dots.add(_buildDot(AppTheme.mint));
                   }
                   if (types.contains('holiday')) {
-                    dots.add(_buildDot(const Color(0xFFD32F2F)));
+                    dots.add(_buildDot(AppTheme.errorColor));
                   }
 
                   return Positioned(
@@ -875,9 +886,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
               spacing: 12,
               runSpacing: 4,
               children: [
-                _buildLegend(const Color(0xFFE91E63), '기념일'),
-                _buildLegend(const Color(0xFF1976D2), '일정'),
-                _buildLegend(const Color(0xFFFF9800), '피드'),
+                _buildLegend(AppTheme.primaryColor, '기념일'),
+                _buildLegend(AppTheme.sky, '일정'),
+                _buildLegend(AppTheme.peach, '피드'),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: const [
@@ -893,9 +904,9 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   ],
                 ),
                 if (calendarState.deviceCalendarEnabled)
-                  _buildLegend(const Color(0xFF4CAF50), '기기'),
+                  _buildLegend(AppTheme.mint, '기기'),
                 if (calendarState.holidayOverlayEnabled)
-                  _buildLegend(const Color(0xFFD32F2F), '공휴일'),
+                  _buildLegend(AppTheme.errorColor, '공휴일'),
               ],
             ),
           ),
@@ -922,10 +933,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              _moodKeyToEmoji(mood.emoji),
-                              style: const TextStyle(fontSize: 20),
-                            ),
+                            MoodFace(moodKey: mood.emoji, size: 26),
                             const SizedBox(width: 6),
                             Text(
                               mood.nickname,
@@ -977,7 +985,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   Icon(
                     Icons.event_note_outlined,
                     size: 48,
-                    color: Colors.grey.shade300,
+                    color: AppTheme.ink.withValues(alpha: 0.25),
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -1010,28 +1018,28 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         IconData icon;
 
         if (event.eventType == 'holiday') {
-          iconBgColor = const Color(0xFFFFEBEE);
-          iconColor = const Color(0xFFD32F2F);
+          iconBgColor = AppTheme.primarySoft;
+          iconColor = AppTheme.errorColor;
           icon = Icons.flag;
         } else if (event.eventType == 'device') {
-          iconBgColor = const Color(0xFFE8F5E9);
-          iconColor = const Color(0xFF4CAF50);
+          iconBgColor = AppTheme.mintSoft;
+          iconColor = AppTheme.mint;
           icon = Icons.event_note;
         } else if (event.eventType == 'feed') {
-          iconBgColor = const Color(0xFFFFF3E0);
-          iconColor = const Color(0xFFFF9800);
+          iconBgColor = AppTheme.peachSoft;
+          iconColor = AppTheme.peach;
           icon = Icons.photo_library;
         } else if (isAutoAnniversary) {
-          iconBgColor = const Color(0xFFFCE4EC);
-          iconColor = const Color(0xFFE91E63);
+          iconBgColor = AppTheme.primarySoft;
+          iconColor = AppTheme.primaryColor;
           icon = event.title.contains('생일') ? Icons.cake : Icons.celebration;
         } else if (event.isAnniversary) {
           iconBgColor = AppTheme.primaryLight.withValues(alpha: 0.2);
           iconColor = AppTheme.primaryColor;
           icon = Icons.favorite;
         } else {
-          iconBgColor = const Color(0xFFE3F2FD);
-          iconColor = const Color(0xFF1976D2);
+          iconBgColor = AppTheme.skySoft;
+          iconColor = AppTheme.sky;
           icon = Icons.event;
         }
 
@@ -1042,7 +1050,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             event.eventType != 'device' &&
             event.eventType != 'holiday';
 
-        return Card(
+        return CartoonCard(
           child: ListTile(
             onTap: () => _showEventDetail(event),
             onLongPress: isUserEvent ? () => _showDeleteConfirm(event) : null,
@@ -1075,14 +1083,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       vertical: 1,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFCE4EC),
+                      color: AppTheme.primarySoft,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
                       '자동',
                       style: TextStyle(
                         fontSize: 9,
-                        color: Color(0xFFE91E63),
+                        color: AppTheme.primaryColor,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

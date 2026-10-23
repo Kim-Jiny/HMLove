@@ -86,3 +86,38 @@ export async function deleteFile(key) {
     Key: key,
   }));
 }
+
+/**
+ * 저장된 공개 URL 에서 스토리지 key 를 뽑는다.
+ * 이 서버의 스토리지 URL 이 아니거나(다른 도메인, PUBLIC_URL 변경 전 URL 등) 경로가
+ * 의심스러우면 null — 이 경우 삭제하지 않는다.
+ */
+export function keyFromUrl(url) {
+  if (typeof url !== 'string' || !url) return null;
+  const prefix = STORAGE_MODE === 'local'
+    ? `${PUBLIC_URL}/uploads/`
+    : `${PUBLIC_URL}/${BUCKET}/`;
+  if (!url.startsWith(prefix)) return null;
+  let key;
+  try {
+    key = decodeURIComponent(url.slice(prefix.length).split('?')[0]);
+  } catch {
+    return null;
+  }
+  if (!key || key.startsWith('/') || key.split('/').includes('..')) return null;
+  return key;
+}
+
+/**
+ * URL 목록의 파일을 모두 지운다. 일부가 실패해도 나머지는 계속 지우고,
+ * 호출한 요청을 막지 않도록 예외는 던지지 않는다. 지운 개수를 돌려준다.
+ */
+export async function deleteFilesByUrls(urls) {
+  const keys = [...new Set(urls.map(keyFromUrl).filter(Boolean))];
+  const results = await Promise.allSettled(keys.map((key) => deleteFile(key)));
+  const failed = results.filter((r) => r.status === 'rejected').length;
+  if (failed > 0) {
+    console.error(`[storage] ${failed}/${keys.length} files failed to delete`);
+  }
+  return keys.length - failed;
+}

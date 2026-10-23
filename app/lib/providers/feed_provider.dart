@@ -175,7 +175,7 @@ class FeedState {
 
 // Feed Notifier
 class FeedNotifier extends Notifier<FeedState> {
-  late final Dio _dio;
+  late Dio _dio;
 
   @override
   FeedState build() {

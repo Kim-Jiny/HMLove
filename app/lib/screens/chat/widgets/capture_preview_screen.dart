@@ -32,14 +32,17 @@ class _CapturePreviewScreenState extends State<CapturePreviewScreen> {
   Future<void> _saveCapture() async {
     setState(() => _saving = true);
     try {
-      final boundary = _repaintKey.currentContext!.findRenderObject()
-          as RenderRepaintBoundary;
+      final boundary =
+          _repaintKey.currentContext!.findRenderObject()
+              as RenderRepaintBoundary;
       final image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       final bytes = byteData!.buffer.asUint8List();
 
-      await ImageGallerySaverPlus.saveImage(bytes,
-          name: 'chat_capture_${DateTime.now().millisecondsSinceEpoch}');
+      await ImageGallerySaverPlus.saveImage(
+        bytes,
+        name: 'chat_capture_${DateTime.now().millisecondsSinceEpoch}',
+      );
 
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -85,8 +88,10 @@ class _CapturePreviewScreenState extends State<CapturePreviewScreen> {
               children: [
                 for (int i = 0; i < widget.messages.length; i++) ...[
                   if (i == 0 ||
-                      !_isSameDay(widget.messages[i - 1].createdAt,
-                          widget.messages[i].createdAt))
+                      !_isSameDay(
+                        widget.messages[i - 1].createdAt,
+                        widget.messages[i].createdAt,
+                      ))
                     DateHeader(date: widget.messages[i].createdAt),
                   MessageBubble(
                     message: widget.messages[i],

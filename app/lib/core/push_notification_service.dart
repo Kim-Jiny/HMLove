@@ -12,6 +12,7 @@ import 'in_app_notification.dart';
 import 'notification_sound_service.dart';
 import 'router.dart';
 import 'widget_service.dart';
+import 'store_mode.dart';
 
 /// 알림 타입 → Hive 설정 키 프리픽스 매핑
 const _typeToKeyPrefix = <String, String>{
@@ -70,6 +71,9 @@ class PushNotificationService {
     // 로그인 안 된 상태면 스킵
     final accessToken = ApiClient.getAccessToken();
     if (accessToken == null) return;
+
+    // 스토어 촬영 모드: 알림 권한 팝업이 화면을 가리지 않도록 건너뛴다.
+    if (storeModeEnabled) return;
 
     // 권한 요청
     final settings = await _messaging.requestPermission(

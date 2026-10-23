@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import '../../core/theme.dart';
+import '../../widgets/cute/loader.dart';
+import '../../widgets/cute/mood_face.dart';
+import '../../widgets/cute/motion.dart';
 import '../../providers/notification_provider.dart';
 
 class NotificationScreen extends ConsumerStatefulWidget {
@@ -155,10 +158,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
               onPressed: () {
                 ref.read(notificationProvider.notifier).markAllRead();
               },
-              child: const Text(
-                '모두 읽음',
-                style: TextStyle(fontSize: 13),
-              ),
+              child: const Text('모두 읽음', style: TextStyle(fontSize: 13)),
             ),
         ],
       ),
@@ -167,18 +167,20 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.notifications_none,
-                    size: 64,
-                    color: AppTheme.textHint,
-                  ),
+                  MoodFace(moodKey: 'peaceful', size: 80, pop: true),
                   SizedBox(height: 16),
                   Text(
                     '알림이 없습니다',
                     style: TextStyle(
                       fontSize: 16,
-                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.ink,
                     ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '새 소식이 오면 여기서 알려드릴게요',
+                    style: TextStyle(fontSize: 13, color: AppTheme.textHint),
                   ),
                 ],
               ),
@@ -198,21 +200,27 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                   if (index == nState.notifications.length) {
                     return const Padding(
                       padding: EdgeInsets.all(16),
-                      child: Center(child: CircularProgressIndicator()),
+                      child: Center(child: CuteLoader()),
                     );
                   }
 
                   final notification = nState.notifications[index];
                   final typeColor = _colorForType(notification.type);
 
-                  return InkWell(
+                  return Bouncy(
                     onTap: () => _onTapNotification(notification),
                     child: Container(
-                      color: notification.isRead
-                          ? null
-                          : AppTheme.primaryColor.withValues(alpha: 0.05),
-                      padding: const EdgeInsets.symmetric(
+                      margin: const EdgeInsets.symmetric(
                         horizontal: 16,
+                        vertical: 6,
+                      ),
+                      decoration: AppTheme.cardDecoration(
+                        color: notification.isRead
+                            ? Colors.white
+                            : AppTheme.primarySoft,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
                         vertical: 14,
                       ),
                       child: Row(
@@ -222,8 +230,12 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: typeColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(10),
+                              color: typeColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: AppTheme.ink,
+                                width: 1.3,
+                              ),
                             ),
                             child: Icon(
                               _iconForType(notification.type),

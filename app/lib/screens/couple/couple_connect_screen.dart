@@ -22,6 +22,7 @@ class CoupleConnectScreen extends ConsumerStatefulWidget {
 
 class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
   final _inviteCodeController = TextEditingController();
+  final _partnerNameController = TextEditingController();
   DateTime _startDate = DateTime.now();
   bool _showCreateView = true;
   Timer? _pollTimer;
@@ -30,13 +31,17 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
   void dispose() {
     _pollTimer?.cancel();
     _inviteCodeController.dispose();
+    _partnerNameController.dispose();
     super.dispose();
   }
 
   void _startPolling() {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
-      if (!mounted) { _pollTimer?.cancel(); return; }
+      if (!mounted) {
+        _pollTimer?.cancel();
+        return;
+      }
       // checkAuthStatus가 isCoupleComplete=true로 업데이트하면
       // GoRouter redirect가 자동으로 /home으로 이동시킴
       await ref.read(authProvider.notifier).checkAuthStatus();
@@ -60,9 +65,9 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-                  primary: AppTheme.primaryColor,
-                ),
+            colorScheme: Theme.of(
+              context,
+            ).colorScheme.copyWith(primary: AppTheme.primaryColor),
           ),
           child: child!,
         );
@@ -107,110 +112,32 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
   }
 
   Future<void> _handleCreateCouple() async {
-    final success = await ref.read(coupleProvider.notifier).createCouple(
+    // 성공하면 authProvider 의 coupleId 가 채워져 router 가 /home 으로 보낸다.
+    // 초대 코드는 홈의 "상대방 초대하기" 또는 더보기에서 확인할 수 있다.
+    await ref.read(coupleProvider.notifier).createCouple(startDate: _startDate);
+  }
+
+  Future<void> _handleStartWithoutPartner() async {
+    // 성공하면 authProvider 의 isSolo 가 true 가 되어 router 가 /home 으로 보낸다.
+    await ref
+        .read(coupleProvider.notifier)
+        .startWithoutPartner(
           startDate: _startDate,
+          partnerName: _partnerNameController.text,
         );
-
-    if (!mounted) return;
-
-    if (success) {
-      // Show the invite code
-      final inviteCode = ref.read(coupleProvider).generatedInviteCode;
-      if (inviteCode != null) {
-        _showInviteCodeDialog(inviteCode);
-      }
-    }
   }
 
   Future<void> _handleJoinCouple() async {
     final code = _inviteCodeController.text.trim();
     if (code.isEmpty) return;
 
-    await ref.read(coupleProvider.notifier).joinCouple(
-          inviteCode: code,
-        );
+    await ref.read(coupleProvider.notifier).joinCouple(inviteCode: code);
 
     if (!mounted) return;
 
     // joinCouple 내부에서 authProvider를 업데이트하므로
     // GoRouter redirect가 자동으로 /home으로 이동시킴
     // 실패 시에만 별도 처리 없음 (에러는 coupleState.error로 표시)
-  }
-
-  void _showInviteCodeDialog(String code) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          '커플 생성 완료!',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              '상대방에게 아래 초대 코드를 보내주세요',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              decoration: BoxDecoration(
-                color: AppTheme.backgroundColor,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.primaryLight),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    code,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryColor,
-                      letterSpacing: 4,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  IconButton(
-                    icon: const Icon(Icons.copy, color: AppTheme.primaryColor),
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: code));
-                      showTopSnackBar(context, '초대 코드가 복사되었습니다');
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              '상대방이 연결하면 자동으로 시작됩니다',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: AppTheme.textHint,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('확인'),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   bool _pollInitialized = false;
@@ -262,28 +189,50 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Icon(
-                Icons.favorite_border,
-                size: 64,
-                color: AppTheme.primaryColor,
+              Center(
+                child: Container(
+                  width: 96,
+                  height: 96,
+                  decoration: const BoxDecoration(
+                    color: AppTheme.primarySoft,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.favorite_rounded,
+                    size: 44,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               const Text(
                 '사랑하는 사람과\n연결하세요',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
                   height: 1.4,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '상대방이 아직 앱을 설치하지 않았어도\n먼저 시작해서 기록을 남길 수 있어요.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: AppTheme.textSecondary,
                 ),
               ),
               const SizedBox(height: 32),
 
               // Tab toggle
               Container(
+                padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppTheme.primarySoft,
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(
                   children: [
@@ -351,8 +300,11 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
                   ),
                   child: Column(
                     children: [
-                      const Icon(Icons.check_circle,
-                          color: AppTheme.primaryColor, size: 48),
+                      const Icon(
+                        Icons.check_circle,
+                        color: AppTheme.primaryColor,
+                        size: 48,
+                      ),
                       const SizedBox(height: 12),
                       const Text(
                         '커플이 생성되었어요!',
@@ -372,7 +324,9 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
                       const SizedBox(height: 20),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 24, vertical: 16),
+                          horizontal: 24,
+                          vertical: 16,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
@@ -391,11 +345,16 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
                             ),
                             const SizedBox(width: 12),
                             IconButton(
-                              icon: const Icon(Icons.copy,
-                                  color: AppTheme.primaryColor),
+                              icon: const Icon(
+                                Icons.copy,
+                                color: AppTheme.primaryColor,
+                              ),
                               onPressed: () {
-                                Clipboard.setData(ClipboardData(
-                                    text: coupleState.generatedInviteCode!));
+                                Clipboard.setData(
+                                  ClipboardData(
+                                    text: coupleState.generatedInviteCode!,
+                                  ),
+                                );
                                 showTopSnackBar(context, '초대 코드가 복사되었습니다');
                               },
                             ),
@@ -426,34 +385,37 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
                 // Create couple view
                 const Text(
                   '우리가 사귀기 시작한 날',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 12),
                 GestureDetector(
                   onTap: _selectStartDate,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFE0E0E0)),
+                      border: Border.all(color: AppTheme.borderColor),
                       borderRadius: BorderRadius.circular(12),
                       color: Colors.white,
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.calendar_today_outlined,
-                            color: AppTheme.primaryColor),
+                        const Icon(
+                          Icons.calendar_today_outlined,
+                          color: AppTheme.primaryColor,
+                        ),
                         const SizedBox(width: 12),
                         Text(
                           DateFormat('yyyy년 M월 d일').format(_startDate),
                           style: const TextStyle(fontSize: 16),
                         ),
                         const Spacer(),
-                        const Icon(Icons.arrow_drop_down,
-                            color: AppTheme.textSecondary),
+                        const Icon(
+                          Icons.arrow_drop_down,
+                          color: AppTheme.textSecondary,
+                        ),
                       ],
                     ),
                   ),
@@ -462,8 +424,9 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
                 SizedBox(
                   height: 50,
                   child: ElevatedButton(
-                    onPressed:
-                        coupleState.isLoading ? null : _handleCreateCouple,
+                    onPressed: coupleState.isLoading
+                        ? null
+                        : _handleCreateCouple,
                     child: coupleState.isLoading
                         ? const SizedBox(
                             width: 20,
@@ -480,19 +443,14 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
                 // Join couple view
                 const Text(
                   '초대 코드',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _inviteCodeController,
                   textAlign: TextAlign.center,
                   textCapitalization: TextCapitalization.characters,
-                  inputFormatters: [
-                    _UpperCaseTextFormatter(),
-                  ],
+                  inputFormatters: [_UpperCaseTextFormatter()],
                   style: const TextStyle(
                     fontSize: 20,
                     letterSpacing: 4,
@@ -511,8 +469,7 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
                 SizedBox(
                   height: 50,
                   child: ElevatedButton(
-                    onPressed:
-                        coupleState.isLoading ? null : _handleJoinCouple,
+                    onPressed: coupleState.isLoading ? null : _handleJoinCouple,
                     child: coupleState.isLoading
                         ? const SizedBox(
                             width: 20,
@@ -523,6 +480,63 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
                             ),
                           )
                         : const Text('연결하기'),
+                  ),
+                ),
+              ],
+
+              // 상대 없이 먼저 시작 — 어느 탭에서든 보인다. (커플 만들기 탭이면 상대 애칭도 입력)
+              if (coupleState.generatedInviteCode == null &&
+                  ref.watch(currentUserProvider)?.coupleId == null) ...[
+                const SizedBox(height: 16),
+                if (_showCreateView) ...[
+                  TextField(
+                    controller: _partnerNameController,
+                    maxLength: 20,
+                    textInputAction: TextInputAction.done,
+                    decoration: const InputDecoration(
+                      labelText: '상대방 이름 또는 애칭 (선택)',
+                      hintText: '예: 자기, 지수',
+                      counterText: '',
+                      prefixIcon: Icon(Icons.favorite_border_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ] else ...[
+                  const Row(
+                    children: [
+                      Expanded(child: Divider()),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Text(
+                          '또는',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textHint,
+                          ),
+                        ),
+                      ),
+                      Expanded(child: Divider()),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                SizedBox(
+                  height: 50,
+                  child: OutlinedButton(
+                    onPressed: coupleState.isLoading
+                        ? null
+                        : _handleStartWithoutPartner,
+                    child: const Text('상대방 없이 먼저 시작하기'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '일기·편지·일정을 먼저 남겨두고,\n더보기에서 언제든 상대방을 초대할 수 있어요.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.5,
+                    color: AppTheme.textSecondary,
                   ),
                 ),
               ],
@@ -545,13 +559,18 @@ class _CoupleConnectScreenState extends ConsumerState<CoupleConnectScreen> {
                 const SizedBox(height: 24),
                 const Divider(),
                 const SizedBox(height: 8),
+                SizedBox(
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () => context.go('/home'),
+                    child: const Text('메인으로 들어가기'),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 const Text(
                   '이미 생성한 커플이 있습니다.\n해제 후 다시 시도해주세요.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppTheme.textSecondary,
-                  ),
+                  style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(

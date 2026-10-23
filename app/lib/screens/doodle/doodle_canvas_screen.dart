@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/theme.dart';
+import '../../widgets/cute/motion.dart';
 import '../../core/top_snackbar.dart';
 import '../../providers/doodle_provider.dart';
 
@@ -35,10 +36,10 @@ class DoodleCanvasScreen extends ConsumerStatefulWidget {
 class _DoodleCanvasScreenState extends ConsumerState<DoodleCanvasScreen> {
   static const _palette = <Color>[
     Color(0xFF333333),
-    Color(0xFFE91E63),
-    Color(0xFFE53935),
-    Color(0xFF1E88E5),
-    Color(0xFFFFB300),
+    AppTheme.primaryColor,
+    AppTheme.errorColor,
+    AppTheme.sky,
+    AppTheme.butter,
   ];
 
   static const _widths = <double>[3.0, 6.0, 12.0];
@@ -49,6 +50,10 @@ class _DoodleCanvasScreenState extends ConsumerState<DoodleCanvasScreen> {
   double _currentWidth = _widths[1];
   bool _isEraser = false;
   bool _quietSend = false;
+
+  /// 이미지 변환~전송 전체 구간의 중복 탭 방지. provider 의 isSending 은 업로드가
+  /// 시작된 뒤에야 true 가 되어, 변환 중 두 번 누르면 그림이 두 번 전송된다.
+  bool _busy = false;
 
   // 배경 사진 + 변환 상태. 사진은 RepaintBoundary 안의 Stack 맨 아래 레이어에
   // 그리고 ClipRRect 로 캔버스 크기 밖은 자동으로 잘림.
@@ -154,37 +159,44 @@ class _DoodleCanvasScreenState extends ConsumerState<DoodleCanvasScreen> {
   }
 
   Future<void> _send() async {
+    if (_busy) return;
     if (_strokes.isEmpty && _bgImageBytes == null) {
       showTopSnackBar(context, '먼저 그림이나 사진을 추가해주세요.', isError: true);
       return;
     }
 
-    final pngBytes = await _exportPng();
-    if (pngBytes == null) {
-      if (mounted) showTopSnackBar(context, '그림을 변환하지 못했어요.', isError: true);
-      return;
-    }
+    setState(() => _busy = true);
+    try {
+      final pngBytes = await _exportPng();
+      if (pngBytes == null) {
+        if (mounted) showTopSnackBar(context, '그림을 변환하지 못했어요.', isError: true);
+        return;
+      }
 
-    final doodle = await ref
-        .read(doodleProvider.notifier)
-        .sendDoodle(pngBytes, quiet: _quietSend);
-    if (!mounted) return;
-    if (doodle == null) {
-      final err = ref.read(doodleProvider).error;
-      showTopSnackBar(context, err ?? '그림 전송에 실패했습니다.', isError: true);
-      return;
+      final doodle = await ref
+          .read(doodleProvider.notifier)
+          .sendDoodle(pngBytes, quiet: _quietSend);
+      if (!mounted) return;
+      if (doodle == null) {
+        final err = ref.read(doodleProvider).error;
+        showTopSnackBar(context, err ?? '그림 전송에 실패했습니다.', isError: true);
+        return;
+      }
+      showTopSnackBar(context, '그림을 보냈어요!');
+      context.pop(true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-    showTopSnackBar(context, '🎨 그림을 보냈어요!');
-    context.pop(true);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isSending = ref.watch(doodleProvider.select((s) => s.isSending));
+    final isSending =
+        ref.watch(doodleProvider.select((s) => s.isSending)) || _busy;
     final hasImage = _bgImageBytes != null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF6F2),
+      backgroundColor: AppTheme.backgroundColor,
       appBar: AppBar(
         title: const Text('그림 보내기'),
         actions: [
@@ -223,13 +235,11 @@ class _DoodleCanvasScreenState extends ConsumerState<DoodleCanvasScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                        border: Border.all(
+                          color: AppTheme.ink,
+                          width: AppTheme.outlineWidth,
+                        ),
+                        boxShadow: AppTheme.cartoonShadow,
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(20),
@@ -356,46 +366,59 @@ class _QuietSendOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onChanged == null ? null : () => onChanged!(!value),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFF1E6DF)),
-          ),
-          child: Row(
-            children: [
-              Checkbox(
-                value: value,
-                onChanged: onChanged == null
-                    ? null
-                    : (checked) => onChanged!(checked ?? false),
-                activeColor: AppTheme.primaryColor,
-                visualDensity: VisualDensity.compact,
-              ),
-              const SizedBox(width: 4),
-              const Expanded(
-                child: Text(
-                  '조용히 보내기',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF4A3A35),
+    return Bouncy(
+      onTap: onChanged == null ? null : () => onChanged!(!value),
+      pressedScale: 0.98,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: value ? AppTheme.lavenderSoft : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.ink, width: 1.3),
+        ),
+        child: Row(
+          children: [
+            Checkbox(
+              value: value,
+              onChanged: onChanged == null
+                  ? null
+                  : (checked) => onChanged!(checked ?? false),
+              activeColor: AppTheme.primaryColor,
+              visualDensity: VisualDensity.compact,
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '조용히 보내기',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                   ),
-                ),
+                  const SizedBox(height: 2),
+                  // 조용한 푸시는 OS(특히 iOS)가 제한할 수 있어 위젯 반영이 늦어질 수 있다.
+                  Text(
+                    value
+                        ? '알림 없이 위젯만 바꿔요. 상대 기기 상태에 따라 반영이 늦을 수 있어요'
+                        : '켜면 알림 없이 상대 위젯에만 보여요',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      height: 1.4,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
               ),
-              const Icon(
-                Icons.notifications_off_outlined,
-                size: 20,
-                color: Color(0xFF8E6B75),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              value
+                  ? Icons.notifications_off_rounded
+                  : Icons.notifications_active_outlined,
+              size: 20,
+              color: value ? AppTheme.lavender : AppTheme.textHint,
+            ),
+          ],
         ),
       ),
     );
@@ -409,9 +432,13 @@ class _DoodlePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // 선만 따로 그리는 레이어. 지우개는 이 레이어에서 BlendMode.clear 로 픽셀을
+    // 비워서, 아래의 사진/흰 배경이 그대로 드러나게 한다(흰색으로 덧칠하지 않는다).
+    canvas.saveLayer(Offset.zero & size, Paint());
     for (final stroke in strokes) {
       final paint = Paint()
-        ..color = stroke.isEraser ? Colors.white : stroke.color
+        ..color = stroke.isEraser ? Colors.black : stroke.color
+        ..blendMode = stroke.isEraser ? BlendMode.clear : BlendMode.srcOver
         ..strokeWidth = stroke.width
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
@@ -432,6 +459,7 @@ class _DoodlePainter extends CustomPainter {
       }
       canvas.drawPath(path, paint);
     }
+    canvas.restore();
   }
 
   @override
@@ -463,7 +491,7 @@ class _TransformBanner extends StatelessWidget {
           children: [
             const Expanded(
               child: Text(
-                '✋ 사진 조정 중\n두 손가락으로 회전·확대',
+                '사진 조정 중\n두 손가락으로 회전·확대',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 11,
@@ -542,7 +570,7 @@ class _Toolbar extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFF1E6DF)),
+        border: Border.all(color: AppTheme.borderColor),
       ),
       child: Column(
         children: [
@@ -662,7 +690,7 @@ class _WidthDot extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(
-            color: selected ? AppTheme.primaryColor : const Color(0xFFE0E0E0),
+            color: selected ? AppTheme.primaryColor : AppTheme.borderColor,
             width: selected ? 2 : 1,
           ),
         ),
@@ -702,7 +730,7 @@ class _IconButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected
               ? AppTheme.primaryColor.withValues(alpha: 0.12)
-              : const Color(0xFFF7F2EE),
+              : AppTheme.backgroundColor,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: selected ? AppTheme.primaryColor : Colors.transparent,

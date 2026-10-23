@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../providers/letter_provider.dart';
+import '../../widgets/cute/loader.dart';
 
 class LetterReadScreen extends ConsumerStatefulWidget {
   final String letterId;
@@ -51,14 +52,12 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
     final letter = letterState.selectedLetter;
 
     // selectedLetter 가 아직 이 화면의 편지가 아니면(이전 선택 잔존 포함) 로딩 처리.
-    if (letterState.isLoading || letter == null || letter.id != widget.letterId) {
+    if (letterState.isLoading ||
+        letter == null ||
+        letter.id != widget.letterId) {
       return Scaffold(
         appBar: AppBar(title: const Text('편지')),
-        body: const Center(
-          child: CircularProgressIndicator(
-            color: AppTheme.primaryColor,
-          ),
-        ),
+        body: const Center(child: CuteLoader()),
       );
     }
 
@@ -105,10 +104,7 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFFFF8F0),
-              Color(0xFFFFF5F7),
-            ],
+            colors: [AppTheme.backgroundColor, AppTheme.backgroundColor],
           ),
         ),
         child: Column(
@@ -150,42 +146,26 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
             // Countdown
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 40),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 20,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.08),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                border: Border.all(
+                  color: AppTheme.ink,
+                  width: AppTheme.outlineWidth,
+                ),
+                boxShadow: AppTheme.cartoonShadow,
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _CountdownUnit(
-                    value: days.toString(),
-                    label: '일',
-                  ),
-                  Container(
-                    width: 1,
-                    height: 40,
-                    color: const Color(0xFFF0F0F0),
-                  ),
+                  _CountdownUnit(value: days.toString(), label: '일'),
+                  Container(width: 1, height: 40, color: AppTheme.borderColor),
                   _CountdownUnit(
                     value: hours.toString().padLeft(2, '0'),
                     label: '시간',
                   ),
-                  Container(
-                    width: 1,
-                    height: 40,
-                    color: const Color(0xFFF0F0F0),
-                  ),
+                  Container(width: 1, height: 40, color: AppTheme.borderColor),
                   _CountdownUnit(
                     value: minutes.toString().padLeft(2, '0'),
                     label: '분',
@@ -263,10 +243,7 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFFFF8F0),
-              Color(0xFFFFF5F7),
-            ],
+            colors: [AppTheme.backgroundColor, AppTheme.backgroundColor],
           ),
         ),
         child: FadeTransition(
@@ -277,19 +254,13 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
               width: double.infinity,
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFFDF5),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.brown.withValues(alpha: 0.1),
-                    blurRadius: 24,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: const Color(0xFFE8DDD0),
-                  width: 0.5,
+                  color: AppTheme.ink,
+                  width: AppTheme.outlineWidth,
                 ),
+                boxShadow: AppTheme.cartoonShadow,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,8 +273,7 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
                           width: 36,
                           height: 36,
                           decoration: BoxDecoration(
-                            color:
-                                AppTheme.primaryLight.withValues(alpha: 0.2),
+                            color: AppTheme.primaryLight.withValues(alpha: 0.2),
                             shape: BoxShape.circle,
                           ),
                           child: Center(
@@ -358,18 +328,16 @@ class _LetterReadScreenState extends ConsumerState<LetterReadScreen>
 
                   // Delivery date
                   Text(
-                    DateFormat('yyyy년 M월 d일 HH:mm')
-                        .format(letter.deliveryDate.toLocal()),
+                    DateFormat(
+                      'yyyy년 M월 d일 HH:mm',
+                    ).format(letter.deliveryDate.toLocal()),
                     style: const TextStyle(
                       fontSize: 13,
                       color: AppTheme.textSecondary,
                     ),
                   ),
 
-                  const Divider(
-                    color: Color(0xFFE8DDD0),
-                    height: 32,
-                  ),
+                  const Divider(color: AppTheme.borderColor, height: 32),
 
                   // Content
                   Text(
@@ -405,10 +373,7 @@ class _CountdownUnit extends StatelessWidget {
   final String value;
   final String label;
 
-  const _CountdownUnit({
-    required this.value,
-    required this.label,
-  });
+  const _CountdownUnit({required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -425,10 +390,7 @@ class _CountdownUnit extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppTheme.textSecondary,
-          ),
+          style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
         ),
       ],
     );

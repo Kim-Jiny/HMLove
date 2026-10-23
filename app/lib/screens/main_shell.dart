@@ -6,13 +6,13 @@ import 'package:go_router/go_router.dart';
 import '../core/connectivity_service.dart';
 import '../core/push_notification_service.dart';
 import '../core/router.dart';
-import '../core/theme.dart';
 import '../providers/auth_provider.dart';
 import '../providers/badge_provider.dart';
 import '../providers/calendar_provider.dart';
 import '../providers/chat_provider.dart';
 import '../providers/couple_provider.dart';
 import '../providers/letter_provider.dart';
+import 'cute_nav_bar.dart';
 
 class MainShell extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -59,6 +59,12 @@ class _MainShellState extends ConsumerState<MainShell>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      // 상대 연결 전이라면 그 사이 상대가 합류했을 수 있다. 합류했으면 채팅 탭이
+      // 열리고 상대 이름이 실제 닉네임으로 바뀌도록 인증·커플 정보를 갱신한다.
+      if (ref.read(isSoloProvider)) {
+        ref.read(authProvider.notifier).checkAuthStatus();
+        ref.read(coupleProvider.notifier).fetchCouple();
+      }
       // 앱 포그라운드 복귀 시 기존 transport를 신뢰하지 않고 소켓을 새로 만든다.
       ref.read(chatProvider.notifier).refreshConnectionOnResume();
       // 위젯이 백그라운드에서 prev/next로 이동했을 수 있다. EventKit에 접근할 수
@@ -104,9 +110,29 @@ class _MainShellState extends ConsumerState<MainShell>
     }
   }
 
+  void _selectBranch(int index) {
+    final badgesNotifier = ref.read(badgeProvider.notifier);
+    // 탭 이동 시 뱃지 클리어
+    if (index == 1) {
+      badgesNotifier.clearChatBadge();
+    } else if (index == 3) {
+      badgesNotifier.clearFeedBadge();
+    }
+
+    // 채팅 탭 활성 상태 관리 (indexedStack은 dispose 안 되므로 여기서 제어)
+    ref.read(chatProvider.notifier).setChatScreenActive(index == 1);
+
+    // Navigator.push로 열린 하위 화면들 pop (탭 루트로 복귀)
+    shellBranchKeys[index]?.currentState?.popUntil((route) => route.isFirst);
+    widget.navigationShell.goBranch(index, initialLocation: true);
+  }
+
   @override
   Widget build(BuildContext context) {
     final badges = ref.watch(badgeProvider);
+    final isSolo = ref.watch(isSoloProvider);
+    // 상대가 연결되면 홈이 한가운데 오도록 5탭, 연결 전엔 채팅(branch 1)을 뺀 4탭.
+    final visibleBranches = isSolo ? const [0, 2, 3, 4] : const [2, 1, 0, 3, 4];
 
     return PopScope(
       canPop: false,
@@ -151,98 +177,48 @@ class _MainShellState extends ConsumerState<MainShell>
             Expanded(child: widget.navigationShell),
           ],
         ),
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 10,
-                offset: const Offset(0, -2),
-              ),
-            ],
-          ),
-          child: BottomNavigationBar(
-            currentIndex: widget.navigationShell.currentIndex,
-            onTap: (index) {
-              // 탭 이동 시 뱃지 클리어
-              if (index == 1) {
-                ref.read(badgeProvider.notifier).clearChatBadge();
-              } else if (index == 3) {
-                ref.read(badgeProvider.notifier).clearFeedBadge();
-              }
-
-              // 채팅 탭 활성 상태 관리 (indexedStack은 dispose 안 되므로 여기서 제어)
-              final chatNotifier = ref.read(chatProvider.notifier);
-              chatNotifier.setChatScreenActive(index == 1);
-
-              // Navigator.push로 열린 하위 화면들 pop (탭 루트로 복귀)
-              shellBranchKeys[index]?.currentState?.popUntil(
-                (route) => route.isFirst,
-              );
-              widget.navigationShell.goBranch(index, initialLocation: true);
-            },
-            items: [
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.home_outlined),
-                activeIcon: Icon(Icons.home),
-                label: '홈',
-              ),
-              BottomNavigationBarItem(
-                icon: _BadgeIcon(
-                  icon: Icons.chat_bubble_outline,
-                  count: badges.unreadChatCount,
+        bottomNavigationBar: CuteNavBar(
+          selectedBranch: widget.navigationShell.currentIndex,
+          entries: [
+            for (final branch in visibleBranches)
+              switch (branch) {
+                0 => const NavEntry(
+                  branch: 0,
+                  label: '홈',
+                  icon: Icons.home_outlined,
+                  activeIcon: Icons.home_rounded,
                 ),
-                activeIcon: _BadgeIcon(
-                  icon: Icons.chat_bubble,
-                  count: badges.unreadChatCount,
+                1 => NavEntry(
+                  branch: 1,
+                  label: '채팅',
+                  icon: Icons.chat_bubble_outline_rounded,
+                  activeIcon: Icons.chat_bubble_rounded,
+                  badge: badges.unreadChatCount,
                 ),
-                label: '채팅',
-              ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.calendar_today_outlined),
-                activeIcon: Icon(Icons.calendar_today),
-                label: '캘린더',
-              ),
-              BottomNavigationBarItem(
-                icon: _BadgeIcon(
-                  icon: Icons.feed_outlined,
-                  count: badges.unseenFeedCount,
+                2 => const NavEntry(
+                  branch: 2,
+                  label: '캘린더',
+                  icon: Icons.calendar_month_outlined,
+                  activeIcon: Icons.calendar_month_rounded,
                 ),
-                activeIcon: _BadgeIcon(
-                  icon: Icons.feed,
-                  count: badges.unseenFeedCount,
+                3 => NavEntry(
+                  branch: 3,
+                  label: '피드',
+                  icon: Icons.auto_stories_outlined,
+                  activeIcon: Icons.auto_stories_rounded,
+                  badge: badges.unseenFeedCount,
                 ),
-                label: '피드',
-              ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.more_horiz),
-                activeIcon: Icon(Icons.more_horiz),
-                label: '더보기',
-              ),
-            ],
-          ),
+                _ => const NavEntry(
+                  branch: 4,
+                  label: '더보기',
+                  icon: Icons.grid_view_outlined,
+                  activeIcon: Icons.grid_view_rounded,
+                ),
+              },
+          ],
+          onSelect: _selectBranch,
         ),
       ),
-    );
-  }
-}
-
-class _BadgeIcon extends StatelessWidget {
-  final IconData icon;
-  final int count;
-
-  const _BadgeIcon({required this.icon, required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    if (count <= 0) return Icon(icon);
-
-    return Badge(
-      label: count > 99
-          ? const Text('99+', style: TextStyle(fontSize: 9))
-          : Text('$count', style: const TextStyle(fontSize: 10)),
-      backgroundColor: AppTheme.primaryColor,
-      child: Icon(icon),
     );
   }
 }

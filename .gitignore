@@ -23,3 +23,10 @@ app/.flutter-plugins-dependencies
 .vscode/
 *.iml
 .DS_Store
+
+# 릴리스 산출물(aab/ipa) 보관 폴더, 스토어 이미지 결과물(compose.py 로 재생성 가능)
+releases/
+app/design/store/out/
+
+# Gradle 빌드 리포트
+app/android/build/

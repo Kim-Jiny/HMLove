@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 네이티브 스플래시 배경. 앱 안의 SplashScreen 배경색과 같게 유지할 것 -->
+    <color name="launch_background">#FFFBE4F0</color>
+</resources>

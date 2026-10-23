@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/theme.dart';
+import '../../widgets/cute/loader.dart';
 
 class LocationPickerResult {
   final double latitude;
@@ -84,7 +85,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       }
 
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
 
       if (!mounted) return;
@@ -131,18 +134,27 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         '?format=json&lat=${point.latitude}&lon=${point.longitude}'
         '&zoom=18&addressdetails=1&accept-language=ko',
       );
-      final response = await http.get(url, headers: {
-        'User-Agent': 'HMLoveApp/1.0',
-      });
+      final response = await http.get(
+        url,
+        headers: {'User-Agent': 'HMLoveApp/1.0'},
+      );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final address = data['address'] as Map<String, dynamic>?;
         if (address != null && mounted) {
           final parts = <String>[];
           final city = address['city'] ?? address['county'] ?? address['state'];
-          final district = address['borough'] ?? address['suburb'] ?? address['town'] ?? address['village'];
-          final road = address['road'] ?? address['pedestrian'] ?? address['neighbourhood'];
-          final detail = address['building'] ?? address['amenity'] ?? address['shop'];
+          final district =
+              address['borough'] ??
+              address['suburb'] ??
+              address['town'] ??
+              address['village'];
+          final road =
+              address['road'] ??
+              address['pedestrian'] ??
+              address['neighbourhood'];
+          final detail =
+              address['building'] ?? address['amenity'] ?? address['shop'];
           if (city != null) parts.add(city.toString());
           if (district != null) parts.add(district.toString());
           if (road != null) parts.add(road.toString());
@@ -150,7 +162,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           if (parts.isEmpty) {
             final displayName = data['display_name'] as String?;
             if (displayName != null) {
-              final segments = displayName.split(',').map((e) => e.trim()).toList();
+              final segments = displayName
+                  .split(',')
+                  .map((e) => e.trim())
+                  .toList();
               parts.addAll(segments.take(2));
             }
           }
@@ -184,7 +199,9 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   void _goToMyLocation() async {
     try {
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
       final target = NLatLng(position.latitude, position.longitude);
       _mapController?.updateCamera(
@@ -196,9 +213,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('위치 선택'),
-      ),
+      appBar: AppBar(title: const Text('위치 선택')),
       body: Stack(
         children: [
           NaverMap(
@@ -219,11 +234,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             const Center(
               child: Padding(
                 padding: EdgeInsets.only(bottom: 48),
-                child: Icon(
-                  Icons.location_on,
-                  color: Colors.red,
-                  size: 48,
-                ),
+                child: Icon(Icons.location_on, color: Colors.red, size: 48),
               ),
             ),
           // Pin shadow (at map center point)
@@ -249,8 +260,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
               child: const Icon(Icons.my_location, color: AppTheme.textPrimary),
             ),
           ),
-          if (_isLoading)
-            const Center(child: CircularProgressIndicator()),
+          if (_isLoading) const Center(child: CuteLoader()),
           // Bottom info bar
           Positioned(
             left: 0,
@@ -263,22 +273,25 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                 top: 16,
                 bottom: MediaQuery.of(context).padding.bottom + 16,
               ),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, -2),
+                border: Border(
+                  top: BorderSide(
+                    color: AppTheme.ink,
+                    width: AppTheme.outlineWidth,
                   ),
-                ],
+                ),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.location_on, color: Colors.red, size: 24),
+                      const Icon(
+                        Icons.location_on,
+                        color: Colors.red,
+                        size: 24,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -330,7 +343,10 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
                       ),
                       child: const Text(
                         '이 위치 전송',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),

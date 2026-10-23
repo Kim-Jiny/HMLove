@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,6 +25,7 @@ import 'core/pending_route.dart';
 import 'core/push_notification_service.dart';
 import 'core/router.dart';
 import 'core/social_auth_service.dart';
+import 'core/store_mode.dart';
 import 'core/theme.dart';
 import 'core/widget_service.dart';
 import 'firebase_options.dart';
@@ -68,11 +70,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       final baseUrl = await HomeWidget.getWidgetData<String>('apiBaseUrl');
       if (token != null && baseUrl != null) {
         final now = DateTime.now();
-        final currentYm =
-            '${now.year}-${now.month.toString().padLeft(2, '0')}';
+        final currentYm = '${now.year}-${now.month.toString().padLeft(2, '0')}';
         // 위젯이 실제 표시 중인 월(prev/next 네비게이션 반영)도 같이 갱신
-        final displayedYm =
-            await HomeWidget.getWidgetData<String>('calendarYearMonth');
+        final displayedYm = await HomeWidget.getWidgetData<String>(
+          'calendarYearMonth',
+        );
         final months = <String>{
           currentYm,
           if (displayedYm != null && displayedYm.isNotEmpty) displayedYm,
@@ -100,7 +102,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
                       return {
                         'date': (event['date'] as String).substring(0, 10),
                         'title': event['title'],
-                        'color': event['color'] ??
+                        'color':
+                            event['color'] ??
                             _defaultWidgetEventColor(eventType, isAnniversary),
                         'isAnniversary': isAnniversary,
                         'eventType': eventType,
@@ -108,10 +111,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
                     })
                     .toList();
                 final encoded = jsonEncode(widgetEvents);
-                await HomeWidget.saveWidgetData(
-                  'calendarEvents_$ym',
-                  encoded,
-                );
+                await HomeWidget.saveWidgetData('calendarEvents_$ym', encoded);
                 if (ym == currentYm) {
                   await HomeWidget.saveWidgetData('calendarEvents', encoded);
                 }
@@ -156,6 +156,15 @@ Future<void> _guardedInit(
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // 홈 히어로·스플래시처럼 AppBar 없이 연한 배경이 상태바까지 올라오는 화면에서도
+  // 상태바 아이콘이 보이도록 어두운 아이콘으로 고정한다. (Android: Icon, iOS: Status)
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+    ),
+  );
 
   // 필수: Hive + 로케일은 스플래시/라우터가 바로 의존하므로 runApp 이전에 완료.
   // Hive는 타임아웃 없이 반드시 완료해야 함 (auth 체크에 필수).
@@ -185,9 +194,7 @@ void main() async {
   // 카카오 SDK 초기화 — 키가 비어있으면 SDK 호출 시점에 사용자 친화적 에러 처리.
   if (AppConstants.kakaoNativeAppKey.isNotEmpty) {
     await _guardedInit('Kakao', () async {
-      SocialAuthService.initKakao(
-        nativeAppKey: AppConstants.kakaoNativeAppKey,
-      );
+      SocialAuthService.initKakao(nativeAppKey: AppConstants.kakaoNativeAppKey);
     });
   }
 
@@ -196,11 +203,7 @@ void main() async {
   // setAppGroupId는 단순 문자열 저장이라 빠르고, 실패해도 _guardedInit가 흡수.
   await _guardedInit('home_widget', WidgetService.initialize);
 
-  runApp(
-    const ProviderScope(
-      child: HMLoveApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: HMLoveApp()));
 
   // 스플래시 빠져나온 뒤 백그라운드로 나머지 초기화. 실패해도 앱은 진행.
   // 순서: FCM 억제 → 사운드 → AdMob → NaverMap
@@ -215,10 +218,7 @@ Future<void> _initDeferred() async {
     'FCM suppressForeground',
     PushNotificationService.suppressForegroundNotifications,
   );
-  await _guardedInit(
-    'notificationSound',
-    NotificationSoundService.initialize,
-  );
+  await _guardedInit('notificationSound', NotificationSoundService.initialize);
   await _guardedInit(
     'AdMob',
     AdService.initialize,
@@ -228,9 +228,8 @@ Future<void> _initDeferred() async {
     'NaverMap',
     () => FlutterNaverMap().init(
       clientId: AppConstants.naverMapClientId,
-      onAuthFailed: (ex) => debugPrint(
-        '[NaverMap] Auth failed: ${ex.code} - ${ex.message}',
-      ),
+      onAuthFailed: (ex) =>
+          debugPrint('[NaverMap] Auth failed: ${ex.code} - ${ex.message}'),
     ),
     timeout: const Duration(seconds: 8),
   );
@@ -251,6 +250,9 @@ class _HMLoveAppState extends ConsumerState<HMLoveApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    // 스토어 촬영 모드에서만 동작 (일반 빌드에서는 즉시 반환)
+    startStoreRouteWatcher(ref.read(routerProvider));
 
     // Wire the API client's force-logout callback to the auth provider so
     // persistent server failures can kick the user back to /login.
@@ -300,6 +302,26 @@ class _HMLoveAppState extends ConsumerState<HMLoveApp>
         return '/calendar';
       case 'doodle':
         return '/doodle';
+      case 'home':
+        return '/home';
+      case 'feed':
+        return '/feed';
+      case 'more':
+        return '/more';
+      case 'chat':
+        return '/chat';
+      case 'letter':
+        return '/letter';
+      case 'question':
+        return '/question';
+      case 'wishlist':
+        return '/wishlist';
+      case 'fortune':
+        return '/fortune';
+      case 'anniversary':
+        return '/anniversary';
+      case 'photo-map':
+        return '/photo-map';
       default:
         return null;
     }
@@ -334,10 +356,7 @@ class _HMLoveAppState extends ConsumerState<HMLoveApp>
         routerConfig: router,
         debugShowCheckedModeBanner: false,
         locale: const Locale('ko', 'KR'),
-        supportedLocales: const [
-          Locale('ko', 'KR'),
-          Locale('en', 'US'),
-        ],
+        supportedLocales: const [Locale('ko', 'KR'), Locale('en', 'US')],
         localizationsDelegates: const [
           GlobalMaterialLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,

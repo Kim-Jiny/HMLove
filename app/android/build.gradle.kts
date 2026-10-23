@@ -33,6 +33,15 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+// 일부 플러그인(home_widget 등)은 Kotlin 을 기본 JVM target 1.8 로 컴파일하는데, 의존하는
+// glance 의 inline 함수는 JVM 11 바이트코드라 "Cannot inline bytecode built with JVM target 11"
+// 로 실패한다. 서브프로젝트의 Kotlin 컴파일 타깃을 11 로 올려 맞춘다.
+subprojects {
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+    }
+}
+
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }

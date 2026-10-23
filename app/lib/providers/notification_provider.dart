@@ -81,7 +81,7 @@ class NotificationState {
 }
 
 class NotificationNotifier extends Notifier<NotificationState> {
-  late final Dio _dio;
+  late Dio _dio;
 
   @override
   NotificationState build() {

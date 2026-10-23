@@ -95,7 +95,7 @@ class LetterState {
 
 // Letter Notifier
 class LetterNotifier extends Notifier<LetterState> {
-  late final Dio _dio;
+  late Dio _dio;
 
   @override
   LetterState build() {

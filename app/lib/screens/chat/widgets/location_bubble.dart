@@ -18,7 +18,12 @@ class LocationBubble extends StatelessWidget {
   final bool isMe;
   final bool interactive;
 
-  const LocationBubble({super.key, required this.data, required this.isMe, this.interactive = true});
+  const LocationBubble({
+    super.key,
+    required this.data,
+    required this.isMe,
+    this.interactive = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +33,9 @@ class LocationBubble extends StatelessWidget {
         '?lat=${data.lat}&lng=${data.lng}&w=600&h=300&zoom=15';
 
     return GestureDetector(
-      onTap: interactive ? () => _openInMaps(data.lat, data.lng, data.label) : null,
+      onTap: interactive
+          ? () => _openInMaps(data.lat, data.lng, data.label)
+          : null,
       child: Container(
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.65,
@@ -41,13 +48,7 @@ class LocationBubble extends StatelessWidget {
             bottomLeft: Radius.circular(isMe ? 16 : 4),
             bottomRight: Radius.circular(isMe ? 4 : 16),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            ),
-          ],
+          border: Border.all(color: AppTheme.ink, width: 1.3),
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -67,11 +68,18 @@ class LocationBubble extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.location_on, color: Colors.red, size: 36),
+                          const Icon(
+                            Icons.location_on,
+                            color: Colors.red,
+                            size: 36,
+                          ),
                           const SizedBox(height: 4),
                           Text(
                             '${data.lat.toStringAsFixed(4)}, ${data.lng.toStringAsFixed(4)}',
-                            style: const TextStyle(fontSize: 10, color: AppTheme.textHint),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.textHint,
+                            ),
                           ),
                         ],
                       ),
@@ -95,7 +103,10 @@ class LocationBubble extends StatelessWidget {
                     top: 6,
                     left: 8,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF1EC800),
                         borderRadius: BorderRadius.circular(4),
@@ -141,7 +152,11 @@ class LocationBubble extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Icon(Icons.chevron_right, size: 18, color: AppTheme.textHint),
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: AppTheme.textHint,
+                  ),
                 ],
               ),
             ),

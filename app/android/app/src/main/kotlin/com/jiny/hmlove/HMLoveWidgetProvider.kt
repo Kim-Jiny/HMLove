@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.os.Build
+import android.view.View
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetPlugin
 import android.graphics.Color
@@ -83,13 +84,59 @@ internal fun applyWidgetBackground(
     }
 }
 
+internal fun isDefaultWidgetTheme(theme: CalendarWidgetThemeOption): Boolean =
+    theme.id == CalendarWidgetSettingsActivity.THEMES.first().id
+
+private val LEGACY_MOOD_EMOJI_TO_KEY = mapOf(
+    "\uD83D\uDE0A" to "happy",
+    "\uD83E\uDD70" to "love",
+    "\uD83E\uDD29" to "excited",
+    "\uD83D\uDE4F" to "grateful",
+    "\uD83D\uDE0C" to "peaceful",
+    "\uD83D\uDE0E" to "proud",
+    "\uD83E\uDD7A" to "missing",
+    "\uD83D\uDE10" to "bored",
+    "\uD83D\uDE22" to "sad",
+    "\uD83D\uDE24" to "angry",
+    "\uD83D\uDE34" to "tired",
+    "\uD83D\uDE29" to "stressed"
+)
+
+/** 기분 키(우선) 또는 레거시 이모지 → 얼굴 벡터 드로어블. 없으면 neutral. */
+internal fun moodFaceResFor(moodKey: String?, legacyEmoji: String?): Int {
+    var key = moodKey?.trim().orEmpty()
+    if (key.isEmpty()) {
+        val emoji = legacyEmoji?.replace("\uFE0F", "")?.trim().orEmpty()
+        key = LEGACY_MOOD_EMOJI_TO_KEY[emoji] ?: ""
+    }
+    return when (key) {
+        "happy" -> R.drawable.mood_face_happy
+        "love" -> R.drawable.mood_face_love
+        "excited" -> R.drawable.mood_face_excited
+        "grateful" -> R.drawable.mood_face_grateful
+        "peaceful" -> R.drawable.mood_face_peaceful
+        "proud" -> R.drawable.mood_face_proud
+        "missing" -> R.drawable.mood_face_missing
+        "bored" -> R.drawable.mood_face_bored
+        "sad" -> R.drawable.mood_face_sad
+        "angry" -> R.drawable.mood_face_angry
+        "tired" -> R.drawable.mood_face_tired
+        "stressed" -> R.drawable.mood_face_stressed
+        else -> R.drawable.mood_face_neutral
+    }
+}
+
 internal fun applyCoupleWidgetTheme(views: RemoteViews, theme: CalendarWidgetThemeOption) {
     views.setTextColor(R.id.couple_names, theme.primary)
     views.setTextColor(R.id.days_together, theme.primary)
     views.setTextColor(R.id.start_date, withAlpha(theme.primary, 128))
     views.setTextColor(R.id.next_anniversary, theme.textSecondary)
     views.setTextColor(R.id.widget_settings_btn, theme.primary)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    if (!isDefaultWidgetTheme(theme)) {
+        // 기본(러브) 테마만 파스텔 알약 배경을 유지하고, 그 외 테마는 배경 없이 텍스트 색만 사용.
+        views.setInt(R.id.next_anniversary, "setBackgroundResource", 0)
+    }
+    if (!isDefaultWidgetTheme(theme) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         views.setInt(
             R.id.widget_settings_btn,
             "setBackgroundResource",
@@ -107,7 +154,7 @@ internal fun applyMediumWidgetExtrasTheme(
     views: RemoteViews,
     theme: CalendarWidgetThemeOption
 ) {
-    views.setTextColor(R.id.mood_row, theme.primary)
+    views.setTextColor(R.id.mood_heart, theme.primary)
     views.setTextColor(R.id.today_schedule, theme.textPrimary)
 }
 
@@ -122,7 +169,6 @@ internal fun buildNotConnectedWidgetViews(
     runCatching {
         applyWidgetBackground(views, prefs)
         val theme = selectedWidgetTheme(prefs)
-        views.setTextColor(R.id.widget_not_connected_emoji, theme.primary)
         views.setTextColor(R.id.widget_not_connected_title, theme.primary)
         views.setTextColor(R.id.widget_not_connected_message, theme.textSecondary)
     }
@@ -178,14 +224,21 @@ class HMLoveWidgetProvider : AppWidgetProvider() {
             prefs.getSafeLong("nextAnniversaryDaysLeft", 0)
         } else null
 
-        val myMoodEmoji = prefs.getString("myMoodEmoji", "\uD83D\uDE36") ?: "\uD83D\uDE36"
-        val partnerMoodEmoji = prefs.getString("partnerMoodEmoji", "\uD83D\uDE36") ?: "\uD83D\uDE36"
+        val myMoodFace = moodFaceResFor(
+            prefs.getString("myMoodKey", null),
+            prefs.getString("myMoodEmoji", null)
+        )
+        val partnerMoodFace = moodFaceResFor(
+            prefs.getString("partnerMoodKey", null),
+            prefs.getString("partnerMoodEmoji", null)
+        )
         val todaySchedule = prefs.getString("todaySchedule", "") ?: ""
 
         views.setTextViewText(R.id.couple_names, "$myName ♥ $partnerName")
         views.setTextViewText(R.id.days_together, "${daysTogether}일째")
         views.setTextViewText(R.id.start_date, "$startDate ~")
-        views.setTextViewText(R.id.mood_row, "$myMoodEmoji ♥ $partnerMoodEmoji")
+        views.setImageViewResource(R.id.mood_my_face, myMoodFace)
+        views.setImageViewResource(R.id.mood_partner_face, partnerMoodFace)
 
         if (todaySchedule.isNotEmpty()) {
             views.setTextViewText(R.id.today_schedule, todaySchedule)
@@ -200,6 +253,7 @@ class HMLoveWidgetProvider : AppWidgetProvider() {
             )
         } else {
             views.setTextViewText(R.id.next_anniversary, "")
+            views.setViewVisibility(R.id.next_anniversary, View.GONE)
         }
 
         return views

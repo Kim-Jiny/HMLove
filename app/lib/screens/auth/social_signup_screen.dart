@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import '../../core/social_auth_service.dart';
 import '../../core/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/cute/motion.dart';
+import 'widgets/auth_widgets.dart';
 
 class SocialSignupScreen extends ConsumerStatefulWidget {
   const SocialSignupScreen({super.key});
@@ -17,6 +19,7 @@ class SocialSignupScreen extends ConsumerStatefulWidget {
 class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nicknameController = TextEditingController();
+  final _birthDateController = TextEditingController();
   DateTime? _birthDate;
   bool _initialized = false;
 
@@ -25,7 +28,8 @@ class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
     super.didChangeDependencies();
     if (!_initialized) {
       final pending = ref.read(authProvider).pendingSocialSignup;
-      if (pending?.suggestedName != null && pending!.suggestedName!.isNotEmpty) {
+      if (pending?.suggestedName != null &&
+          pending!.suggestedName!.isNotEmpty) {
         _nicknameController.text = pending.suggestedName!;
       }
       _initialized = true;
@@ -35,6 +39,7 @@ class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
   @override
   void dispose() {
     _nicknameController.dispose();
+    _birthDateController.dispose();
     super.dispose();
   }
 
@@ -51,23 +56,28 @@ class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-                  primary: AppTheme.primaryColor,
-                ),
+            colorScheme: Theme.of(
+              context,
+            ).colorScheme.copyWith(primary: AppTheme.primaryColor),
           ),
           child: child!,
         );
       },
     );
     if (picked != null) {
-      setState(() => _birthDate = picked);
+      setState(() {
+        _birthDate = picked;
+        _birthDateController.text = DateFormat('yyyy년 M월 d일').format(picked);
+      });
     }
   }
 
   Future<void> _handleSubmit(SocialLoginNeedsSignup pending) async {
     if (!_formKey.currentState!.validate()) return;
 
-    final ok = await ref.read(authProvider.notifier).completeSocialSignup(
+    final ok = await ref
+        .read(authProvider.notifier)
+        .completeSocialSignup(
           signupToken: pending.signupToken,
           nickname: _nicknameController.text.trim(),
           birthDate: _birthDate,
@@ -99,7 +109,7 @@ class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
       return Scaffold(
         appBar: AppBar(
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios),
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
             onPressed: () => context.go('/login'),
           ),
         ),
@@ -115,37 +125,27 @@ class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: _cancelAndPop,
         ),
-        title: const Text('회원가입'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Form(
             key: _formKey,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 24),
-                Text(
-                  '${pending.provider.displayName} 계정으로 시작하기',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.textPrimary,
-                  ),
+              children: staggered([
+                AuthHero(
+                  compact: true,
+                  leftMood: 'happy',
+                  rightMood: 'love',
+                  title: '${pending.provider.displayName} 계정으로 시작하기',
+                  subtitle: '닉네임과 생년월일만 입력하면 끝나요',
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  '닉네임과 생년월일만 입력하면 끝나요',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 28),
 
                 if (pending.email != null && pending.email!.isNotEmpty)
                   Container(
@@ -155,17 +155,25 @@ class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
                     ),
                     margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(8),
+                      color: AppTheme.primarySoft,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                      border: Border.all(color: AppTheme.ink, width: 1.3),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.email_outlined, size: 18),
+                        const Icon(
+                          Icons.email_outlined,
+                          size: 18,
+                          color: AppTheme.primaryColor,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             pending.email!,
-                            style: const TextStyle(fontSize: 13),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -174,9 +182,12 @@ class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
 
                 TextFormField(
                   controller: _nicknameController,
+                  maxLength: 12,
+                  textInputAction: TextInputAction.done,
                   decoration: const InputDecoration(
                     labelText: '닉네임',
-                    hintText: '사용할 닉네임을 입력하세요',
+                    hintText: '2~12자',
+                    counterText: '',
                     prefixIcon: Icon(Icons.person_outline),
                   ),
                   validator: (v) {
@@ -185,22 +196,18 @@ class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
                 GestureDetector(
                   onTap: _selectBirthDate,
                   child: AbsorbPointer(
                     child: TextFormField(
+                      controller: _birthDateController,
                       decoration: const InputDecoration(
                         labelText: '생년월일 (선택)',
                         hintText: '별자리/운세에 사용돼요',
                         prefixIcon: Icon(Icons.cake_outlined),
-                        suffixIcon: Icon(Icons.calendar_today_outlined),
-                      ),
-                      controller: TextEditingController(
-                        text: _birthDate != null
-                            ? DateFormat('yyyy년 M월 d일').format(_birthDate!)
-                            : '',
+                        suffixIcon: Icon(Icons.calendar_month_rounded),
                       ),
                     ),
                   ),
@@ -209,38 +216,19 @@ class _SocialSignupScreenState extends ConsumerState<SocialSignupScreen> {
 
                 if (authState.error != null)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(
-                      authState.error!,
-                      style: const TextStyle(
-                        color: AppTheme.errorColor,
-                        fontSize: 13,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: ErrorBanner(message: authState.error!),
                   ),
 
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: 50,
-                  child: ElevatedButton(
-                    onPressed: authState.isLoading
-                        ? null
-                        : () => _handleSubmit(pending),
-                    child: authState.isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text('가입 완료'),
-                  ),
+                AuthPrimaryButton(
+                  label: '가입 완료',
+                  loading: authState.isLoading,
+                  onPressed: authState.isLoading
+                      ? null
+                      : () => _handleSubmit(pending),
                 ),
                 const SizedBox(height: 32),
-              ],
+              ]),
             ),
           ),
         ),

@@ -7,6 +7,7 @@ import '../../core/api_client.dart';
 import '../../core/constants.dart';
 import '../../core/notification_sound_service.dart';
 import '../../core/theme.dart';
+import '../../widgets/soft_ui.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -168,7 +169,7 @@ class _NotificationSettingsScreenState
           const _SectionHeader(title: '카테고리별 알림'),
           _NotificationCategory(
             icon: Icons.chat_bubble_outline,
-            iconColor: const Color(0xFF2196F3),
+            iconColor: AppTheme.sky,
             title: '새 메시지',
             subtitle: '상대방이 메시지를 보내면 알림',
             enabledKey: 'noti_chat',
@@ -183,7 +184,7 @@ class _NotificationSettingsScreenState
           ),
           _NotificationCategory(
             icon: Icons.photo_outlined,
-            iconColor: const Color(0xFF4CAF50),
+            iconColor: AppTheme.mint,
             title: '새 피드',
             subtitle: '상대방이 피드를 올리면 알림',
             enabledKey: 'noti_feed',
@@ -198,7 +199,7 @@ class _NotificationSettingsScreenState
           ),
           _NotificationCategory(
             icon: Icons.calendar_today_outlined,
-            iconColor: const Color(0xFFFF9800),
+            iconColor: AppTheme.peach,
             title: '새 일정',
             subtitle: '상대방이 일정을 추가하면 알림',
             enabledKey: 'noti_calendar',
@@ -213,7 +214,7 @@ class _NotificationSettingsScreenState
           ),
           _NotificationCategory(
             icon: Icons.cake_outlined,
-            iconColor: const Color(0xFFE91E63),
+            iconColor: AppTheme.primaryColor,
             title: '기념일 리마인드',
             subtitle: '기념일 알림 시점을 선택하세요',
             enabledKey: 'noti_anniversary',
@@ -283,7 +284,7 @@ class _NotificationSettingsScreenState
             ),
           _NotificationCategory(
             icon: Icons.mail_outline,
-            iconColor: const Color(0xFF9C27B0),
+            iconColor: AppTheme.lavender,
             title: '편지 도착',
             subtitle: '상대방이 편지를 보내면 알림',
             enabledKey: 'noti_letter',
@@ -298,7 +299,7 @@ class _NotificationSettingsScreenState
           ),
           _NotificationCategory(
             icon: Icons.draw_outlined,
-            iconColor: const Color(0xFFE07A5F),
+            iconColor: AppTheme.peach,
             title: '그림 도착',
             subtitle: '상대방이 그림을 보내면 알림',
             enabledKey: 'noti_doodle',
@@ -313,7 +314,7 @@ class _NotificationSettingsScreenState
           ),
           _NotificationCategory(
             icon: Icons.emoji_emotions_outlined,
-            iconColor: const Color(0xFFFF5722),
+            iconColor: AppTheme.peach,
             title: '기분 기록',
             subtitle: '상대방이 기분을 기록하면 알림',
             enabledKey: 'noti_mood',
@@ -328,7 +329,7 @@ class _NotificationSettingsScreenState
           ),
           _NotificationCategory(
             icon: Icons.thunderstorm_outlined,
-            iconColor: const Color(0xFF607D8B),
+            iconColor: AppTheme.ink,
             title: '다툼 기록/해결',
             subtitle: '다툼이 기록되거나 해결되면 알림',
             enabledKey: 'noti_fight',
@@ -482,9 +483,10 @@ class _NotificationCategory extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          _currentSound?.emoji ?? '🔔',
-                          style: const TextStyle(fontSize: 14),
+                        Icon(
+                          soundIcon(_currentSound?.id),
+                          size: 16,
+                          color: AppTheme.primaryColor,
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -585,14 +587,13 @@ class _AnniversaryMilestoneSelector extends StatelessWidget {
                   onChanged(newValues);
                 },
                 selectedColor: AppTheme.primaryColor,
-                backgroundColor: Colors.grey.shade100,
+                backgroundColor: Colors.white,
                 checkmarkColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                   side: BorderSide(
-                    color: isSelected
-                        ? AppTheme.primaryColor
-                        : Colors.grey.shade300,
+                    color: isSelected ? AppTheme.ink : AppTheme.borderColor,
+                    width: isSelected ? 1.3 : 1,
                   ),
                 ),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -669,14 +670,13 @@ class _AnniversaryRemindDaysSelector extends StatelessWidget {
                   onChanged(newDays);
                 },
                 selectedColor: AppTheme.primaryColor,
-                backgroundColor: Colors.grey.shade100,
+                backgroundColor: Colors.white,
                 checkmarkColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                   side: BorderSide(
-                    color: isSelected
-                        ? AppTheme.primaryColor
-                        : Colors.grey.shade300,
+                    color: isSelected ? AppTheme.ink : AppTheme.borderColor,
+                    width: isSelected ? 1.3 : 1,
                   ),
                 ),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -711,12 +711,11 @@ class _SubToggle extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: value
-              ? AppTheme.primaryColor.withValues(alpha: 0.1)
-              : Colors.grey.shade100,
+          color: value ? AppTheme.primarySoft : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: value ? AppTheme.primaryColor : Colors.grey.shade300,
+            color: value ? AppTheme.ink : AppTheme.borderColor,
+            width: value ? 1.3 : 1,
           ),
         ),
         child: Row(
@@ -886,7 +885,7 @@ class _SoundPickerSheetState extends State<_SoundPickerSheet> {
             height: 4,
             margin: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.grey.shade300,
+              color: AppTheme.borderColor,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -1028,7 +1027,12 @@ class _SoundTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Text(sound.emoji, style: const TextStyle(fontSize: 22)),
+      leading: IconBadge(
+        icon: soundIcon(sound.id),
+        color: AppTheme.primaryColor,
+        background: AppTheme.primarySoft,
+        size: 40,
+      ),
       title: Text(
         sound.label,
         style: TextStyle(
@@ -1047,7 +1051,7 @@ class _SoundTile extends StatelessWidget {
                 size: 22,
                 color: isSelected
                     ? AppTheme.primaryColor
-                    : Colors.grey.shade500,
+                    : AppTheme.textSecondary,
               ),
               onPressed: () => NotificationSoundService.preview(sound.id),
               tooltip: '미리듣기',
@@ -1057,7 +1061,7 @@ class _SoundTile extends StatelessWidget {
               icon: Icon(
                 Icons.delete_outline,
                 size: 20,
-                color: Colors.grey.shade400,
+                color: AppTheme.textHint,
               ),
               onPressed: onDelete,
             ),
@@ -1070,7 +1074,7 @@ class _SoundTile extends StatelessWidget {
           else
             Icon(
               Icons.radio_button_unchecked,
-              color: Colors.grey.shade300,
+              color: AppTheme.borderColor,
               size: 22,
             ),
         ],
@@ -1154,3 +1158,18 @@ class _RecordingIndicator extends StatelessWidget {
     );
   }
 }
+
+/// 알림음 id → 아이콘. 목록에 없는 id(사용자 녹음 등)는 마이크.
+IconData soundIcon(String? id) => switch (id) {
+      'none' => Icons.notifications_off_rounded,
+      'default' => Icons.notifications_rounded,
+      'bell' => Icons.notifications_active_rounded,
+      'heart' => Icons.favorite_rounded,
+      'star' => Icons.star_rounded,
+      'droplet' => Icons.water_drop_rounded,
+      'chime' => Icons.music_note_rounded,
+      'pop' => Icons.bubble_chart_rounded,
+      'ding' => Icons.volume_up_rounded,
+      null => Icons.notifications_rounded,
+      _ => Icons.mic_rounded,
+    };

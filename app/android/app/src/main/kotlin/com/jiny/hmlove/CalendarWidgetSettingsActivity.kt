@@ -42,10 +42,10 @@ class CalendarWidgetSettingsActivity : Activity() {
             CalendarWidgetThemeOption(
                 id = "blush",
                 name = "러브",
-                bgRgb = 0xFFFFF5F8.toInt(),
-                primary = 0xFFE91E63.toInt(),
-                textPrimary = 0xFF424242.toInt(),
-                textSecondary = 0xFF8E6B75.toInt()
+                bgRgb = 0xFFFFF8FA.toInt(),
+                primary = 0xFFEC5F8E.toInt(),
+                textPrimary = 0xFF2E2A33.toInt(),
+                textSecondary = 0xFF7A7480.toInt()
             ),
             CalendarWidgetThemeOption(
                 id = "clean",
@@ -216,9 +216,9 @@ class CalendarWidgetSettingsActivity : Activity() {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             setColor(theme.bgRgb)
-            cornerRadius = dpToPx(8f).toFloat()
-            val strokeWidth = dpToPx(if (selected) 3f else 1f)
-            val strokeColor = if (selected) theme.primary else 0xFFBDBDBD.toInt()
+            cornerRadius = dpToPx(14f).toFloat()
+            val strokeWidth = dpToPx(if (selected) 3f else 1.5f)
+            val strokeColor = if (selected) 0xFF4A3B52.toInt() else 0xFFD9CCD4.toInt()
             setStroke(strokeWidth, strokeColor)
         }
     }
@@ -229,7 +229,8 @@ class CalendarWidgetSettingsActivity : Activity() {
         val bg = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             setColor(argb)
-            cornerRadius = dpToPx(10f).toFloat()
+            cornerRadius = dpToPx(14f).toFloat()
+            setStroke(dpToPx(1.5f), 0xFF4A3B52.toInt())
         }
         previewBox.background = bg
 

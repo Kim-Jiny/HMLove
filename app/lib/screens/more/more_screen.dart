@@ -1,6 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -14,6 +12,12 @@ import '../../providers/couple_provider.dart';
 import '../../providers/session_reset.dart';
 import '../../providers/inquiry_provider.dart';
 import '../../providers/letter_provider.dart';
+import '../couple/invite_code_dialog.dart';
+import '../../widgets/cute/profile_avatar.dart';
+import '../../widgets/soft_ui.dart';
+import '../../widgets/cute/sticker.dart';
+import '../../widgets/cute/mood_face.dart';
+import '../../widgets/cute/motion.dart';
 import 'inquiry_screen.dart';
 import 'notification_settings_screen.dart';
 import 'privacy_policy_screen.dart';
@@ -42,78 +46,41 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
     });
   }
 
-  void _showInviteCode(BuildContext context, String code) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.link, color: AppTheme.primaryColor, size: 24),
-            SizedBox(width: 8),
-            Text('초대 코드', style: TextStyle(fontSize: 18)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              '아래 코드를 상대방에게 공유하세요.\n상대방이 코드를 입력하면 자동으로 연결됩니다.',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppTheme.textSecondary,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    code,
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryColor,
-                      letterSpacing: 6,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  IconButton(
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: code));
-                      showTopSnackBar(ctx, '초대 코드가 복사되었습니다');
-                    },
-                    icon: const Icon(
-                      Icons.copy,
-                      color: AppTheme.primaryColor,
-                      size: 20,
-                    ),
-                    tooltip: '복사',
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('닫기'),
+  Future<void> _editPartnerName(BuildContext context, String? current) async {
+    final controller = TextEditingController(text: current ?? '');
+    try {
+      final name = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('상대방 이름/애칭'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLength: 20,
+            decoration: const InputDecoration(hintText: '예: 자기, 지수'),
           ),
-        ],
-      ),
-    );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, controller.text),
+              child: const Text('저장'),
+            ),
+          ],
+        ),
+      );
+      if (name == null || !context.mounted) return;
+      final ok = await ref
+          .read(coupleProvider.notifier)
+          .updatePartnerName(name);
+      if (context.mounted) {
+        showTopSnackBar(context, ok ? '저장되었습니다' : '저장에 실패했습니다', isError: !ok);
+      }
+    } finally {
+      controller.dispose();
+    }
   }
 
   void _showAppInfo(BuildContext context) async {
@@ -231,55 +198,58 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
     final bool? step2;
     try {
       step2 = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setState) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: const Text(
-              '최종 확인',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  '확인을 위해 아래에 "탈퇴"를 입력해주세요.',
-                  style: TextStyle(height: 1.5),
+        context: context,
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (ctx, setState) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Text(
+                '최종 확인',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: controller,
-                  autofocus: true,
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    hintText: '탈퇴',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    '확인을 위해 아래에 "탈퇴"를 입력해주세요.',
+                    style: TextStyle(height: 1.5),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: '탈퇴',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('취소'),
+                ),
+                FilledButton(
+                  onPressed: controller.text.trim() == '탈퇴'
+                      ? () => Navigator.pop(ctx, true)
+                      : null,
+                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('회원탈퇴'),
                 ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: controller.text.trim() == '탈퇴'
-                    ? () => Navigator.pop(ctx, true)
-                    : null,
-                style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('회원탈퇴'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+          );
+        },
+      );
     } finally {
       controller.dispose();
     }
@@ -313,6 +283,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
     } catch (_) {}
 
     final isLastMember = memberCount <= 1;
+    final isSolo = ref.read(currentUserProvider)?.isSolo ?? false;
 
     if (!context.mounted) return;
 
@@ -329,7 +300,9 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
           ],
         ),
         content: Text(
-          isLastMember
+          isSolo
+              ? '아직 상대방이 연결되지 않았어요.\n해제하면 그동안 남긴 모든 기록이 삭제됩니다.'
+              : isLastMember
               ? '상대방이 이미 커플을 해제한 상태입니다.\n커플 해제 시 모든 데이터가 삭제됩니다.'
               : '커플 연결을 해제하시겠습니까?\n상대방은 해제 전까지 데이터를 볼 수 있습니다.',
         ),
@@ -419,58 +392,58 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
       final bool? step3;
       try {
         step3 = await showDialog<bool>(
-        context: context,
-        builder: (ctx) {
-          return StatefulBuilder(
-            builder: (ctx, setState) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: const Text(
-                '최종 확인',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontWeight: FontWeight.bold,
+          context: context,
+          builder: (ctx) {
+            return StatefulBuilder(
+              builder: (ctx, setState) => AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    '정말로 커플을 해제하고 모든 데이터를 삭제하시겠습니까?\n\n확인을 위해 아래에 "해제"를 입력해주세요.',
-                    style: TextStyle(height: 1.5),
+                title: const Text(
+                  '최종 확인',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: controller,
-                    autofocus: true,
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      hintText: '해제',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      '정말로 커플을 해제하고 모든 데이터를 삭제하시겠습니까?\n\n확인을 위해 아래에 "해제"를 입력해주세요.',
+                      style: TextStyle(height: 1.5),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: controller,
+                      autofocus: true,
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: '해제',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('취소'),
+                  ),
+                  FilledButton(
+                    onPressed: controller.text.trim() == '해제'
+                        ? () => Navigator.pop(ctx, true)
+                        : null,
+                    style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                    child: const Text('커플 해제'),
                   ),
                 ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('취소'),
-                ),
-                FilledButton(
-                  onPressed: controller.text.trim() == '해제'
-                      ? () => Navigator.pop(ctx, true)
-                      : null,
-                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                  child: const Text('커플 해제'),
-                ),
-              ],
-            ),
-          );
-        },
-      );
+            );
+          },
+        );
       } finally {
         controller.dispose();
       }
@@ -498,6 +471,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
     final unreadLetters = ref.watch(unreadLettersCountProvider);
     final unreadInquiries = ref.watch(unreadInquiryCountProvider);
     final partner = coupleState.couple?.getPartner(user?.id ?? '');
+    final isSolo = ref.watch(isSoloProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('더보기')),
@@ -506,88 +480,78 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
         child: Column(
           children: [
             // Profile Card
-            Card(
-              child: InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ProfileEditScreen(),
-                    ),
-                  );
-                },
-                borderRadius: BorderRadius.circular(16),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 30,
-                        backgroundColor: AppTheme.primaryLight.withValues(
-                          alpha: 0.3,
-                        ),
-                        backgroundImage: user?.profileImage != null
-                            ? CachedNetworkImageProvider(user!.profileImage!)
-                            : null,
-                        child: user?.profileImage == null
-                            ? Text(
-                                user?.nickname.isNotEmpty == true
-                                    ? user!.nickname[0]
-                                    : '?',
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  color: AppTheme.primaryColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              )
-                            : null,
+            CartoonShadow(
+              child: Card(
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ProfileEditScreen(),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              user?.nickname ?? '사용자',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFFFFEEF3), Color(0xFFF3F0FF)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        ProfileAvatar(
+                          imageUrl: user?.profileImage,
+                          seed: user?.id ?? user?.nickname ?? '',
+                          size: 68,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                user?.nickname ?? '사용자',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.3,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              user?.email ?? '',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: AppTheme.textSecondary,
+                              const SizedBox(height: 2),
+                              Text(
+                                user?.email ?? '',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textSecondary,
+                                ),
                               ),
-                            ),
-                            if (partner != null) ...[
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.favorite,
-                                    size: 14,
-                                    color: AppTheme.primaryColor,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    partner.nickname,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: AppTheme.primaryColor,
-                                      fontWeight: FontWeight.w500,
+                              const SizedBox(height: 8),
+                              _RelationChip(
+                                partnerName: coupleState.couple
+                                    ?.partnerDisplayName(
+                                      user?.id ?? '',
+                                      fallback: '',
                                     ),
-                                  ),
-                                ],
+                                connected: partner != null,
+                                daysTogether: ref.watch(daysSinceStartProvider),
                               ),
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                      const Icon(Icons.chevron_right, color: AppTheme.textHint),
-                    ],
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppTheme.textHint,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -596,7 +560,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
 
             // 상대방 없을 때 초대 코드
             if (partner == null && coupleState.couple != null) ...[
-              Card(
+              CartoonCard(
                 color: AppTheme.primaryColor.withValues(alpha: 0.05),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -619,7 +583,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               '상대방을 초대하세요',
                               style: TextStyle(
                                 fontSize: 15,
@@ -628,17 +592,50 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '초대 코드를 공유하여 다시 연결하세요',
+                              isSolo
+                                  ? '초대 코드로 연결하면 먼저 남긴 기록을 함께 봐요'
+                                  : '초대 코드를 공유하여 다시 연결하세요',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: AppTheme.textSecondary,
                               ),
                             ),
+                            if (isSolo) ...[
+                              const SizedBox(height: 6),
+                              GestureDetector(
+                                onTap: () => _editPartnerName(
+                                  context,
+                                  coupleState.couple?.pendingPartnerName,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        '상대 이름: ${coupleState.couple?.pendingPartnerName ?? '미설정'}',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.primaryColor,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(
+                                      Icons.edit_rounded,
+                                      size: 13,
+                                      color: AppTheme.primaryColor,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
                       FilledButton(
-                        onPressed: () => _showInviteCode(
+                        onPressed: () => showInviteCodeDialog(
                           context,
                           coupleState.couple!.inviteCode,
                         ),
@@ -660,61 +657,80 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
               const SizedBox(height: 16),
             ],
 
-            // Couple Features
-            const _SectionTitle(title: '커플 기능'),
-            Card(
-              child: Column(
-                children: [
-                  _MenuTile(
-                    icon: Icons.celebration_outlined,
-                    title: '기념일',
-                    subtitle: '기념일을 확인하고 추가하세요',
-                    color: const Color(0xFFE91E63),
-                    onTap: () => context.push('/anniversary'),
+            // 기능 그리드
+            const _SectionTitle(title: '우리의 기능'),
+            GridView.count(
+              crossAxisCount: 3,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 14,
+              childAspectRatio: 0.92,
+              padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+              children: [
+                _GridTile(
+                  label: '기념일',
+                  background: AppTheme.primarySoft,
+                  icon: const Icon(
+                    Icons.celebration_rounded,
+                    color: AppTheme.primaryColor,
+                    size: 30,
                   ),
-                  const Divider(height: 1, indent: 72),
-                  _MenuTile(
-                    icon: Icons.local_fire_department_outlined,
-                    title: '다툼 기록',
-                    subtitle: '다툼을 기록하고 함께 성장해요',
-                    color: const Color(0xFFFF5722),
-                    onTap: () => context.push('/fight'),
+                  onTap: () => context.push('/anniversary'),
+                ),
+                _GridTile(
+                  label: '편지함',
+                  background: AppTheme.lavenderSoft,
+                  badge: unreadLetters,
+                  icon: const Sticker(StickerKind.gift, size: 34),
+                  onTap: () => context.push('/letter'),
+                ),
+                _GridTile(
+                  label: '위시리스트',
+                  background: AppTheme.peachSoft,
+                  icon: const Sticker(StickerKind.heart, size: 32),
+                  onTap: () => context.push('/wishlist'),
+                ),
+                _GridTile(
+                  label: '오늘의 질문',
+                  background: AppTheme.skySoft,
+                  icon: const Icon(
+                    Icons.quiz_rounded,
+                    color: AppTheme.sky,
+                    size: 30,
                   ),
-                  const Divider(height: 1, indent: 72),
-                  _MenuTile(
-                    icon: Icons.mail_outline,
-                    title: '편지함',
-                    subtitle: '주고받은 편지를 모아보세요',
-                    color: const Color(0xFFFF9800),
-                    badge: unreadLetters,
-                    onTap: () => context.push('/letter'),
+                  onTap: () => context.push('/question'),
+                ),
+                _GridTile(
+                  label: '오늘의 운세',
+                  background: AppTheme.butterSoft,
+                  icon: const Sticker(StickerKind.sparkle, size: 34),
+                  onTap: () => context.push('/fortune'),
+                ),
+                _GridTile(
+                  label: '다툼 기록',
+                  background: AppTheme.mintSoft,
+                  icon: const MoodFace(moodKey: 'angry', size: 38),
+                  onTap: () => context.push('/fight'),
+                ),
+                _GridTile(
+                  label: '포토맵',
+                  background: AppTheme.primarySoft,
+                  icon: const Sticker(StickerKind.pin, size: 32),
+                  onTap: () => context.push('/photo-map'),
+                ),
+                if (!isSolo)
+                  _GridTile(
+                    label: '그림 보내기',
+                    background: AppTheme.mintSoft,
+                    icon: const Icon(
+                      Icons.brush_rounded,
+                      color: AppTheme.mint,
+                      size: 30,
+                    ),
+                    onTap: () => context.push('/doodle'),
                   ),
-                  const Divider(height: 1, indent: 72),
-                  _MenuTile(
-                    icon: Icons.favorite_outline,
-                    title: '위시리스트',
-                    subtitle: '함께 하고 싶은 것들을 모아보세요',
-                    color: const Color(0xFF00BCD4),
-                    onTap: () => context.push('/wishlist'),
-                  ),
-                  const Divider(height: 1, indent: 72),
-                  _MenuTile(
-                    icon: Icons.quiz_outlined,
-                    title: '오늘의 질문',
-                    subtitle: '매일 새로운 질문으로 대화해요',
-                    color: const Color(0xFF3F51B5),
-                    onTap: () => context.push('/question'),
-                  ),
-                  const Divider(height: 1, indent: 72),
-                  _MenuTile(
-                    icon: Icons.auto_awesome,
-                    title: '오늘의 운세',
-                    subtitle: '커플 운세를 확인하세요',
-                    color: const Color(0xFF9C27B0),
-                    onTap: () => context.push('/fortune'),
-                  ),
-                ],
-              ),
+              ],
             ),
             const SizedBox(height: 16),
 
@@ -724,14 +740,14 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
 
             // Settings
             const _SectionTitle(title: '설정'),
-            Card(
+            CartoonCard(
               child: Column(
                 children: [
                   _MenuTile(
                     icon: Icons.notifications_outlined,
                     title: '알림 설정',
                     subtitle: '알림을 관리하세요',
-                    color: const Color(0xFF2196F3),
+                    color: AppTheme.sky,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -746,7 +762,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                     icon: Icons.help_outline,
                     title: '문의하기',
                     subtitle: '버그 신고 및 건의사항',
-                    color: const Color(0xFF4CAF50),
+                    color: AppTheme.mint,
                     badge: unreadInquiries,
                     onTap: () => _openInquiry(context),
                   ),
@@ -755,7 +771,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                     icon: Icons.shield_outlined,
                     title: '개인정보처리방침',
                     subtitle: '개인정보 보호 정책 확인',
-                    color: const Color(0xFF1976D2),
+                    color: AppTheme.sky,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -780,14 +796,14 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
 
             // Account
             const _SectionTitle(title: '계정'),
-            Card(
+            CartoonCard(
               child: Column(
                 children: [
                   _MenuTile(
                     icon: Icons.link,
                     title: '계정 연동',
                     subtitle: '구글·애플·카카오 계정 연결',
-                    color: const Color(0xFF7C4DFF),
+                    color: AppTheme.lavender,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -802,7 +818,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                     icon: Icons.heart_broken_outlined,
                     title: '커플 해제',
                     subtitle: '커플 연결을 해제합니다',
-                    color: const Color(0xFFE53935),
+                    color: AppTheme.errorColor,
                     onTap: () => _showLeaveCouple(context, ref),
                   ),
                   const Divider(height: 1, indent: 72),
@@ -810,7 +826,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                     icon: Icons.person_off_outlined,
                     title: '회원탈퇴',
                     subtitle: '계정과 모든 데이터를 삭제합니다',
-                    color: const Color(0xFF757575),
+                    color: AppTheme.textSecondary,
                     onTap: () => _showDeleteAccount(context, ref),
                   ),
                 ],
@@ -951,11 +967,11 @@ class _MenuTile extends StatelessWidget {
               clipBehavior: Clip.none,
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    color: color.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(icon, color: color, size: 22),
                 ),
@@ -1008,7 +1024,11 @@ class _MenuTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppTheme.textHint, size: 20),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppTheme.textHint,
+              size: 22,
+            ),
           ],
         ),
       ),
@@ -1031,6 +1051,116 @@ class _DeleteItem extends StatelessWidget {
           const SizedBox(width: 8),
           Text(text, style: const TextStyle(fontSize: 13)),
         ],
+      ),
+    );
+  }
+}
+
+/// 프로필 카드의 연애 상태 칩: "OO · D+123" 또는 "연결 대기 중".
+class _RelationChip extends StatelessWidget {
+  final String? partnerName;
+  final bool connected;
+  final int? daysTogether;
+
+  const _RelationChip({
+    required this.partnerName,
+    required this.connected,
+    required this.daysTogether,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasName = partnerName != null && partnerName!.isNotEmpty;
+    final label = connected
+        ? '${hasName ? partnerName : '우리'} · D+${daysTogether ?? '-'}'
+        : hasName
+        ? '$partnerName 연결 대기 중'
+        : '상대방 연결 대기 중';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.ink, width: 1.2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            connected ? Icons.favorite_rounded : Icons.hourglass_top_rounded,
+            size: 13,
+            color: AppTheme.primaryColor,
+          ),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.primaryColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 더보기 그리드 한 칸: 스티커 아이콘 + 이름.
+class _GridTile extends StatelessWidget {
+  final String label;
+  final Widget icon;
+  final Color background;
+  final int badge;
+  final VoidCallback onTap;
+
+  const _GridTile({
+    required this.label,
+    required this.icon,
+    required this.background,
+    required this.onTap,
+    this.badge = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Bouncy(
+      onTap: onTap,
+      pressedScale: 0.92,
+      child: Container(
+        decoration: AppTheme.cardDecoration(),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Badge(
+              isLabelVisible: badge > 0,
+              label: Text(badge > 9 ? '9+' : '$badge'),
+              backgroundColor: AppTheme.primaryColor,
+              child: Container(
+                width: 54,
+                height: 54,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: background,
+                  shape: BoxShape.circle,
+                ),
+                child: icon,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

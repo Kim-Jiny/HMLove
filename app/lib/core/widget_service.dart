@@ -116,6 +116,8 @@ class WidgetService {
       HomeWidget.saveWidgetData<int?>('nextAnniversaryDaysLeft', null),
       HomeWidget.saveWidgetData<String?>('myMoodEmoji', null),
       HomeWidget.saveWidgetData<String?>('partnerMoodEmoji', null),
+      HomeWidget.saveWidgetData<String?>('myMoodKey', null),
+      HomeWidget.saveWidgetData<String?>('partnerMoodKey', null),
       HomeWidget.saveWidgetData<String?>('todaySchedule', null),
       HomeWidget.saveWidgetData<String?>('doodleImageUrl', null),
       HomeWidget.saveWidgetData<String?>('doodleReceivedAt', null),
@@ -164,6 +166,10 @@ class WidgetService {
     await Future.wait([
       HomeWidget.saveWidgetData('myMoodEmoji', myEmoji),
       HomeWidget.saveWidgetData('partnerMoodEmoji', partnerEmoji),
+      // 네이티브 위젯이 직접 그린 얼굴을 보여줄 수 있도록 기분 키도 함께 저장한다.
+      // (키가 없으면 위젯은 기존 이모지 글자로 폴백)
+      HomeWidget.saveWidgetData<String?>('myMoodKey', myMoodKey),
+      HomeWidget.saveWidgetData<String?>('partnerMoodKey', partnerMoodKey),
     ]);
     await _refresh();
   }
@@ -200,9 +206,7 @@ class WidgetService {
           );
           request.headers.set('Authorization', 'Bearer $token');
           final response = await request.close();
-          _devLog(
-            '[Doodle refresh] /doodle/latest → ${response.statusCode}',
-          );
+          _devLog('[Doodle refresh] /doodle/latest → ${response.statusCode}');
           if (response.statusCode == 200) {
             final body = await response.transform(utf8.decoder).join();
             final data = jsonDecode(body) as Map<String, dynamic>;

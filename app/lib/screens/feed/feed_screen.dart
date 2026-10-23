@@ -6,7 +6,10 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
+import '../../widgets/cute/motion.dart';
 import '../../core/top_snackbar.dart';
+import '../../widgets/cute/loader.dart';
+import '../../widgets/cute/mood_face.dart';
 import '../../providers/feed_provider.dart';
 import 'widgets/comments_screen.dart';
 import 'widgets/feed_card.dart';
@@ -30,6 +33,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _scrollController.addListener(_onScroll);
+
     Future.microtask(() {
       ref.read(feedProvider.notifier).fetchFeeds(refresh: true);
     });
@@ -73,9 +77,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
       if (remaining <= 0) return;
       picked = await picker.pickMultiImage(limit: remaining);
     } else {
-      final single = await picker.pickImage(
-        source: ImageSource.camera,
-      );
+      final single = await picker.pickImage(source: ImageSource.camera);
       if (single != null) picked = [single];
     }
     if (picked.isEmpty) return;
@@ -85,10 +87,12 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
       final dio = ref.read(dioProvider);
       final formData = FormData();
       for (final file in picked) {
-        formData.files.add(MapEntry(
-          'images',
-          await MultipartFile.fromFile(file.path, filename: file.name),
-        ));
+        formData.files.add(
+          MapEntry(
+            'images',
+            await MultipartFile.fromFile(file.path, filename: file.name),
+          ),
+        );
       }
       final res = await dio.post(
         '/feed/upload',
@@ -119,11 +123,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
         final message = data is Map<String, dynamic>
             ? (data['message'] ?? data['error']) as String?
             : null;
-        showTopSnackBar(
-          context,
-          message ?? '이미지 업로드에 실패했습니다',
-          isError: true,
-        );
+        showTopSnackBar(context, message ?? '이미지 업로드에 실패했습니다', isError: true);
       }
     } catch (e) {
       setModalState(() => _isUploadingImages = false);
@@ -142,181 +142,225 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
 
     try {
       await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 16,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    '새 게시물',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setModalState) => Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 16,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.ink.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  TextButton(
-                    onPressed: _isUploadingImages
-                        ? null
-                        : () async {
-                            final text = contentController.text.trim();
-                            if (text.isEmpty && imageUrls.isEmpty) return;
-
-                            final success = await ref
-                                .read(feedProvider.notifier)
-                                .createFeed(
-                                  content: text,
-                                  imageUrls: imageUrls,
-                                );
-
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                              if (!success) {
-                                final error = ref.read(feedProvider).error;
-                                showTopSnackBar(context, error ?? '피드 작성에 실패했습니다', isError: true);
-                              }
-                            }
-                          },
-                    child: const Text(
-                      '게시',
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      '오늘의 이야기',
                       style: TextStyle(
-                        color: AppTheme.primaryColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // Image previews
-              if (imageUrls.isNotEmpty)
-                SizedBox(
-                  height: 100,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: imageUrls.length,
-                    itemBuilder: (context, index) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: CachedNetworkImage(
-                                imageUrl: imageUrls[index],
-                                width: 100,
-                                height: 100,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                            Positioned(
-                              top: 4,
-                              right: 4,
-                              child: GestureDetector(
-                                onTap: () => setModalState(
-                                    () => imageUrls.removeAt(index)),
-                                child: Container(
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.black54,
-                                    shape: BoxShape.circle,
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: Size.zero,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 22,
+                          vertical: 10,
+                        ),
+                      ),
+                      onPressed: _isUploadingImages
+                          ? null
+                          : () async {
+                              final text = contentController.text.trim();
+                              if (text.isEmpty && imageUrls.isEmpty) return;
+
+                              final success = await ref
+                                  .read(feedProvider.notifier)
+                                  .createFeed(
+                                    content: text,
+                                    imageUrls: imageUrls,
+                                  );
+
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                if (!success) {
+                                  final error = ref.read(feedProvider).error;
+                                  showTopSnackBar(
+                                    context,
+                                    error ?? '피드 작성에 실패했습니다',
+                                    isError: true,
+                                  );
+                                }
+                              }
+                            },
+                      child: const Text('게시', style: TextStyle(fontSize: 15)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                // Image previews
+                if (imageUrls.isNotEmpty)
+                  SizedBox(
+                    height: 100,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: imageUrls.length,
+                      itemBuilder: (context, index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: Stack(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: AppTheme.ink,
+                                    width: 1.3,
                                   ),
-                                  child: const Icon(Icons.close,
-                                      color: Colors.white, size: 14),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: CachedNetworkImage(
+                                  imageUrl: imageUrls[index],
+                                  width: 100,
+                                  height: 100,
+                                  fit: BoxFit.cover,
                                 ),
                               ),
-                            ),
-                          ],
+                              Positioned(
+                                top: 4,
+                                right: 4,
+                                child: GestureDetector(
+                                  onTap: () => setModalState(
+                                    () => imageUrls.removeAt(index),
+                                  ),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: AppTheme.ink,
+                                        width: 1.2,
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.close_rounded,
+                                      color: AppTheme.ink,
+                                      size: 14,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                if (imageUrls.isNotEmpty) const SizedBox(height: 12),
+                if (_isUploadingImages)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: Row(
+                      children: [
+                        CuteLoader(size: 12),
+                        SizedBox(width: 10),
+                        Text(
+                          '사진을 올리는 중이에요',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                          ),
                         ),
-                      );
-                    },
+                      ],
+                    ),
+                  ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.backgroundColor,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppTheme.ink, width: 1.3),
+                  ),
+                  child: TextField(
+                    controller: contentController,
+                    maxLines: 5,
+                    minLines: 4,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      hintText: '오늘 있었던 일, 하고 싶은 말을 적어보세요',
+                      filled: false,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                    ),
                   ),
                 ),
-              if (imageUrls.isNotEmpty) const SizedBox(height: 12),
-              if (_isUploadingImages)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: LinearProgressIndicator(
-                    color: AppTheme.primaryColor,
-                  ),
-                ),
-              TextField(
-                controller: contentController,
-                maxLines: 4,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: '오늘의 이야기를 작성하세요...',
-                  border: InputBorder.none,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.photo_library_outlined,
-                        color: AppTheme.primaryColor),
-                    onPressed: _isUploadingImages || imageUrls.length >= 5
-                        ? null
-                        : () => _pickAndUploadImages(
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    _AttachChip(
+                      icon: Icons.photo_library_rounded,
+                      label: '사진',
+                      onTap: _isUploadingImages || imageUrls.length >= 5
+                          ? null
+                          : () => _pickAndUploadImages(
                               ImageSource.gallery,
                               imageUrls,
                               setModalState,
                             ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.camera_alt_outlined,
-                        color: AppTheme.primaryColor),
-                    onPressed: _isUploadingImages || imageUrls.length >= 5
-                        ? null
-                        : () => _pickAndUploadImages(
+                    ),
+                    const SizedBox(width: 8),
+                    _AttachChip(
+                      icon: Icons.camera_alt_rounded,
+                      label: '카메라',
+                      onTap: _isUploadingImages || imageUrls.length >= 5
+                          ? null
+                          : () => _pickAndUploadImages(
                               ImageSource.camera,
                               imageUrls,
                               setModalState,
                             ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${imageUrls.length}/5',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: imageUrls.length >= 5
-                          ? Colors.red
-                          : AppTheme.textHint,
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    const Spacer(),
+                    Text(
+                      '${imageUrls.length}/5',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: imageUrls.length >= 5
+                            ? AppTheme.errorColor
+                            : AppTheme.textHint,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
     } finally {
       contentController.dispose();
     }
@@ -388,19 +432,20 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.photo_camera_outlined,
-                      size: 64, color: Colors.grey.shade300),
+                  const MoodFace(moodKey: 'peaceful', size: 80, pop: true),
                   const SizedBox(height: 16),
                   const Text(
                     '아직 게시물이 없어요',
                     style: TextStyle(
-                        fontSize: 16, color: AppTheme.textSecondary),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.ink,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   const Text(
                     '첫 번째 이야기를 공유해보세요!',
-                    style:
-                        TextStyle(fontSize: 13, color: AppTheme.textHint),
+                    style: TextStyle(fontSize: 13, color: AppTheme.textHint),
                   ),
                 ],
               ),
@@ -408,9 +453,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
           : RefreshIndicator(
               color: AppTheme.primaryColor,
               onRefresh: () async {
-                await ref
-                    .read(feedProvider.notifier)
-                    .fetchFeeds(refresh: true);
+                await ref.read(feedProvider.notifier).fetchFeeds(refresh: true);
               },
               child: _isGridView
                   ? _buildGridView(feeds, feedState.isLoading)
@@ -434,27 +477,18 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
             mainAxisSpacing: 2,
             crossAxisSpacing: 2,
           ),
-          delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              final feed = feeds[index];
-              return GestureDetector(
-                onTap: () => _openFeedDetail(index),
-                child: FeedGridTile(feed: feed),
-              );
-            },
-            childCount: feeds.length,
-          ),
+          delegate: SliverChildBuilderDelegate((context, index) {
+            final feed = feeds[index];
+            return GestureDetector(
+              onTap: () => _openFeedDetail(index),
+              child: FeedGridTile(feed: feed),
+            );
+          }, childCount: feeds.length),
         ),
         if (isLoading)
           const SliverToBoxAdapter(
             child: Center(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppTheme.primaryColor,
-                ),
-              ),
+              child: Padding(padding: EdgeInsets.all(16), child: CuteLoader()),
             ),
           ),
       ],
@@ -468,21 +502,14 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
       itemBuilder: (context, index) {
         if (index == feeds.length) {
           return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: AppTheme.primaryColor,
-              ),
-            ),
+            child: Padding(padding: EdgeInsets.all(16), child: CuteLoader()),
           );
         }
 
         final feed = feeds[index];
         return FeedCard(
           feed: feed,
-          onLike: () =>
-              ref.read(feedProvider.notifier).toggleLike(feed.id),
+          onLike: () => ref.read(feedProvider.notifier).toggleLike(feed.id),
           onComment: () => _openComments(feed),
           onDelete: () => _showDeleteConfirm(feed),
         );
@@ -493,8 +520,48 @@ class _FeedScreenState extends ConsumerState<FeedScreen>
   void _openComments(Feed feed) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => CommentsScreen(feed: feed),
+      MaterialPageRoute(builder: (_) => CommentsScreen(feed: feed)),
+    );
+  }
+}
+
+/// 게시글 작성 시트의 사진/카메라 버튼.
+class _AttachChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  const _AttachChip({required this.icon, required this.label, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return Opacity(
+      opacity: enabled ? 1 : 0.4,
+      child: Bouncy(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: AppTheme.primarySoft,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppTheme.ink, width: 1.3),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 17, color: AppTheme.primaryColor),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

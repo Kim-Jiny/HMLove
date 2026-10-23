@@ -3,8 +3,9 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import sharp from 'sharp';
+import { collectUserFileUrls } from '../utils/storageCleanup.js';
 import prisma from '../utils/prisma.js';
-import { uploadFile } from '../utils/storage.js';
+import { uploadFile, deleteFilesByUrls } from '../utils/storage.js';
 import { getZodiacSign, getChineseZodiac } from '../utils/zodiac.js';
 import { authenticate } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimit.js';
@@ -107,7 +108,7 @@ router.post('/login', authLimiter, async (req, res) => {
 
     const user = await prisma.user.findUnique({
       where: { email },
-      include: { couple: { select: { inviteCode: true, _count: { select: { users: true } } } } },
+      include: { couple: { select: { inviteCode: true, isSolo: true, _count: { select: { users: true } } } } },
     });
     if (!user) {
       return res.status(401).json({ error: '이메일 또는 비밀번호가 올바르지 않습니다.' });
@@ -122,6 +123,8 @@ router.post('/login', authLimiter, async (req, res) => {
     const refreshToken = generateRefreshToken(user.id);
 
     const isCoupleComplete = user.couple ? user.couple._count.users >= 2 : false;
+    // 상대가 아직 없는 커플(먼저 시작/만들기만 한 대기/상대 이탈)은 모두 메인에 들어갈 수 있다.
+    const isSolo = !!user.couple && !isCoupleComplete;
     const pendingInviteCode = (user.couple && !isCoupleComplete) ? user.couple.inviteCode : null;
 
     // 커플이 있지만 상대가 나간 경우, 기존 데이터 존재 여부 확인
@@ -151,6 +154,7 @@ router.post('/login', authLimiter, async (req, res) => {
         zodiacSign: user.zodiacSign,
         chineseZodiac: user.chineseZodiac,
         isCoupleComplete,
+        isSolo,
         hasExistingCoupleData,
         pendingInviteCode,
         createdAt: user.createdAt,
@@ -189,7 +193,7 @@ router.get('/me', async (req, res) => {
         coupleId: true,
         createdAt: true,
         updatedAt: true,
-        couple: { select: { inviteCode: true, _count: { select: { users: true } } } },
+        couple: { select: { inviteCode: true, isSolo: true, _count: { select: { users: true } } } },
       },
     });
 
@@ -199,6 +203,7 @@ router.get('/me', async (req, res) => {
 
     const { couple, ...userData } = user;
     const isCoupleComplete = couple ? couple._count.users >= 2 : false;
+    const isSolo = !!couple && !isCoupleComplete;
     const pendingInviteCode = (couple && !isCoupleComplete) ? couple.inviteCode : null;
 
     // 커플이 있지만 상대가 나간 경우, 기존 데이터 존재 여부 확인
@@ -217,7 +222,7 @@ router.get('/me', async (req, res) => {
       hasExistingCoupleData = !!dataCheck;
     }
 
-    res.json({ ...userData, isCoupleComplete, hasExistingCoupleData, pendingInviteCode });
+    res.json({ ...userData, isCoupleComplete, isSolo, hasExistingCoupleData, pendingInviteCode });
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: '토큰이 만료되었습니다.' });
@@ -387,9 +392,13 @@ router.delete('/account', authenticate, async (req, res) => {
     const id = req.user.id;
     const user = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, coupleId: true },
+      select: { id: true, coupleId: true, profileImage: true },
     });
     if (!user) return res.status(404).json({ error: '유저를 찾을 수 없습니다.' });
+
+    // 지워질 행의 파일 URL 을 먼저 모아둔다 (삭제 성공 후 스토리지에서 지움)
+    const fileUrls = await collectUserFileUrls(id);
+    if (user.profileImage) fileUrls.push(user.profileImage);
 
     // 커플 연결 해제
     if (user.coupleId) {
@@ -409,6 +418,8 @@ router.delete('/account', authenticate, async (req, res) => {
       prisma.calendarEvent.deleteMany({ where: { authorId: id } }),
       prisma.user.delete({ where: { id } }),
     ]);
+
+    deleteFilesByUrls(fileUrls).catch((err) => console.error('[Account] file cleanup error:', err));
 
     res.json({ message: '회원탈퇴가 완료되었습니다.' });
   } catch (err) {

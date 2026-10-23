@@ -8,6 +8,8 @@ import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
 import '../../providers/calendar_provider.dart';
 import '../../widgets/banner_ad_widget.dart';
+import '../../widgets/cute/loader.dart';
+import '../../widgets/soft_ui.dart';
 
 class AnniversaryScreen extends ConsumerStatefulWidget {
   const AnniversaryScreen({super.key});
@@ -44,23 +46,27 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
       final data = response.data as Map<String, dynamic>;
 
       final autoList = (data['auto'] as List<dynamic>)
-          .map((e) => {
-                'title': e['title'] as String,
-                'date': DateTime.parse(e['date'] as String),
-                'type': 'auto',
-                'repeatType': e['repeatType'] as String? ?? 'NONE',
-              })
+          .map(
+            (e) => {
+              'title': e['title'] as String,
+              'date': DateTime.parse(e['date'] as String),
+              'type': 'auto',
+              'repeatType': e['repeatType'] as String? ?? 'NONE',
+            },
+          )
           .toList();
 
       final customList = (data['custom'] as List<dynamic>)
-          .map((e) => {
-                'id': e['id'] as String,
-                'title': e['title'] as String,
-                'date': DateTime.parse(e['date'] as String),
-                'description': e['description'] as String?,
-                'repeatType': e['repeatType'] as String? ?? 'NONE',
-                'type': 'custom',
-              })
+          .map(
+            (e) => {
+              'id': e['id'] as String,
+              'title': e['title'] as String,
+              'date': DateTime.parse(e['date'] as String),
+              'description': e['description'] as String?,
+              'repeatType': e['repeatType'] as String? ?? 'NONE',
+              'type': 'custom',
+            },
+          )
           .toList();
 
       setState(() {
@@ -118,8 +124,9 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
       }
     }
 
-    all.sort((a, b) =>
-        (a['date'] as DateTime).compareTo(b['date'] as DateTime));
+    all.sort(
+      (a, b) => (a['date'] as DateTime).compareTo(b['date'] as DateTime),
+    );
     return all;
   }
 
@@ -149,8 +156,9 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
       }
     }
 
-    all.sort((a, b) =>
-        (b['date'] as DateTime).compareTo(a['date'] as DateTime));
+    all.sort(
+      (a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime),
+    );
     return all;
   }
 
@@ -164,171 +172,189 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
 
     try {
       await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            20,
-            20,
-            MediaQuery.of(context).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                '기념일 추가',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: titleController,
-                decoration: InputDecoration(
-                  labelText: '기념일 이름',
-                  hintText: '예: 결혼기념일, 첫 데이트',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descController,
-                decoration: InputDecoration(
-                  labelText: '메모 (선택)',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Date picker
-              InkWell(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: selectedDate,
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                    builder: (context, child) => Theme(
-                      data: Theme.of(context).copyWith(
-                        colorScheme: Theme.of(context).colorScheme.copyWith(
-                              primary: AppTheme.primaryColor,
-                            ),
-                      ),
-                      child: child!,
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setModalState) => Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              MediaQuery.of(context).viewInsets.bottom + 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppTheme.ink.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                  );
-                  if (picked != null) {
-                    setModalState(() => selectedDate = picked);
-                  }
-                },
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade400),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calendar_today,
-                          size: 20, color: AppTheme.textSecondary),
-                      const SizedBox(width: 12),
-                      Text(
-                        DateFormat('yyyy년 M월 d일').format(selectedDate),
-                        style: const TextStyle(fontSize: 15),
-                      ),
-                    ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              // Repeat type
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade400),
-                  borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 16),
+                const Text(
+                  '기념일 추가',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    isExpanded: true,
-                    value: repeatType,
-                    items: const [
-                      DropdownMenuItem(value: 'NONE', child: Text('반복 없음')),
-                      DropdownMenuItem(
-                          value: 'YEARLY', child: Text('매년 반복')),
-                      DropdownMenuItem(
-                          value: 'MONTHLY', child: Text('매월 반복')),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) setModalState(() => repeatType = v);
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    if (titleController.text.trim().isEmpty) {
-                      showTopSnackBar(context, '기념일 이름을 입력해주세요.', isError: true);
-                      return;
-                    }
-                    Navigator.pop(context);
-                    final success =
-                        await ref.read(calendarProvider.notifier).createEvent(
-                              title: titleController.text.trim(),
-                              date: selectedDate,
-                              description: descController.text.trim().isEmpty
-                                  ? null
-                                  : descController.text.trim(),
-                              isAnniversary: true,
-                              repeatType: repeatType,
-                            );
-                    if (success) {
-                      _fetchAnniversaries();
-                      if (screenContext.mounted) {
-                        showTopSnackBar(screenContext, '기념일이 추가되었습니다.');
-                      }
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
+                const SizedBox(height: 20),
+                TextField(
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    labelText: '기념일 이름',
+                    hintText: '예: 결혼기념일, 첫 데이트',
+                    border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('추가하기',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descController,
+                  decoration: InputDecoration(
+                    labelText: '메모 (선택)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Date picker
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                      builder: (context, child) => Theme(
+                        data: Theme.of(context).copyWith(
+                          colorScheme: Theme.of(context).colorScheme.copyWith(
+                            primary: AppTheme.primaryColor,
+                          ),
+                        ),
+                        child: child!,
+                      ),
+                    );
+                    if (picked != null) {
+                      setModalState(() => selectedDate = picked);
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: AppTheme.ink,
+                        width: AppTheme.outlineWidth,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today,
+                          size: 20,
+                          color: AppTheme.textSecondary,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          DateFormat('yyyy년 M월 d일').format(selectedDate),
+                          style: const TextStyle(fontSize: 15),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Repeat type
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: AppTheme.ink,
+                      width: AppTheme.outlineWidth,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: repeatType,
+                      items: const [
+                        DropdownMenuItem(value: 'NONE', child: Text('반복 없음')),
+                        DropdownMenuItem(value: 'YEARLY', child: Text('매년 반복')),
+                        DropdownMenuItem(
+                          value: 'MONTHLY',
+                          child: Text('매월 반복'),
+                        ),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) setModalState(() => repeatType = v);
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      if (titleController.text.trim().isEmpty) {
+                        showTopSnackBar(
+                          context,
+                          '기념일 이름을 입력해주세요.',
+                          isError: true,
+                        );
+                        return;
+                      }
+                      Navigator.pop(context);
+                      final success = await ref
+                          .read(calendarProvider.notifier)
+                          .createEvent(
+                            title: titleController.text.trim(),
+                            date: selectedDate,
+                            description: descController.text.trim().isEmpty
+                                ? null
+                                : descController.text.trim(),
+                            isAnniversary: true,
+                            repeatType: repeatType,
+                          );
+                      if (success) {
+                        _fetchAnniversaries();
+                        if (screenContext.mounted) {
+                          showTopSnackBar(screenContext, '기념일이 추가되었습니다.');
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      '추가하기',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
     } finally {
       titleController.dispose();
       descController.dispose();
@@ -355,8 +381,9 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
           TextButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
-              final success =
-                  await ref.read(calendarProvider.notifier).deleteEvent(id);
+              final success = await ref
+                  .read(calendarProvider.notifier)
+                  .deleteEvent(id);
               if (success) {
                 _fetchAnniversaries();
                 if (screenContext.mounted) {
@@ -364,8 +391,10 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
                 }
               }
             },
-            child: const Text('삭제',
-                style: TextStyle(color: AppTheme.errorColor)),
+            child: const Text(
+              '삭제',
+              style: TextStyle(color: AppTheme.errorColor),
+            ),
           ),
         ],
       ),
@@ -394,13 +423,10 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
         child: const Icon(Icons.add, color: Colors.white),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CuteLoader())
           : TabBarView(
               controller: _tabController,
-              children: [
-                _buildUpcomingList(),
-                _buildPastList(),
-              ],
+              children: [_buildUpcomingList(), _buildPastList()],
             ),
     );
   }
@@ -413,11 +439,16 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.celebration_outlined,
-                size: 64, color: AppTheme.textHint),
+            Icon(
+              Icons.celebration_outlined,
+              size: 64,
+              color: AppTheme.textHint,
+            ),
             SizedBox(height: 12),
-            Text('올해 남은 기념일이 없어요',
-                style: TextStyle(color: AppTheme.textSecondary)),
+            Text(
+              '올해 남은 기념일이 없어요',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
           ],
         ),
       );
@@ -462,8 +493,10 @@ class _AnniversaryScreenState extends ConsumerState<AnniversaryScreen>
           children: [
             Icon(Icons.history, size: 64, color: AppTheme.textHint),
             SizedBox(height: 12),
-            Text('지난 기념일이 없어요',
-                style: TextStyle(color: AppTheme.textSecondary)),
+            Text(
+              '지난 기념일이 없어요',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
           ],
         ),
       );
@@ -524,8 +557,7 @@ class _AnniversaryTile extends StatelessWidget {
     final daysLeft = targetDay.difference(today).inDays;
 
     final isCustom = type == 'custom';
-    final iconColor =
-        isCustom ? const Color(0xFFE91E63) : AppTheme.primaryColor;
+    final iconColor = isCustom ? AppTheme.primaryColor : AppTheme.primaryColor;
     final icon = isCustom ? Icons.favorite : Icons.celebration;
 
     String repeatLabel = '';
@@ -535,7 +567,7 @@ class _AnniversaryTile extends StatelessWidget {
       repeatLabel = '매월';
     }
 
-    return Card(
+    return CartoonCard(
       child: InkWell(
         onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(12),
@@ -573,10 +605,13 @@ class _AnniversaryTile extends StatelessWidget {
                           const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryLight
-                                  .withValues(alpha: 0.2),
+                              color: AppTheme.primaryLight.withValues(
+                                alpha: 0.2,
+                              ),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -626,10 +661,10 @@ class _AnniversaryTile extends StatelessWidget {
                       fontSize: isPast ? 14 : 18,
                       fontWeight: FontWeight.bold,
                       color: daysLeft == 0
-                          ? const Color(0xFFE91E63)
+                          ? AppTheme.primaryColor
                           : isPast
-                              ? AppTheme.textSecondary
-                              : AppTheme.primaryColor,
+                          ? AppTheme.textSecondary
+                          : AppTheme.primaryColor,
                     ),
                   ),
                   if (!isPast && daysLeft > 0)

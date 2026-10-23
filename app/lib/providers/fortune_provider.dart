@@ -98,7 +98,7 @@ class FortuneState {
 
 // Fortune Notifier
 class FortuneNotifier extends Notifier<FortuneState> {
-  late final Dio _dio;
+  late Dio _dio;
 
   @override
   FortuneState build() {

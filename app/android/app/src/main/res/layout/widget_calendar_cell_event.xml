@@ -12,8 +12,9 @@
         android:layout_width="20dp"
         android:layout_height="20dp"
         android:gravity="center"
-        android:textColor="#424242"
-        android:textSize="12sp" />
+        android:textColor="#2E2A33"
+        android:textSize="12sp"
+        android:textStyle="bold" />
 
     <LinearLayout
         android:id="@+id/cell_events_container"

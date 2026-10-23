@@ -4,7 +4,10 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:padding="12dp">
+    android:paddingStart="12dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="14dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -16,8 +19,10 @@
             android:id="@+id/couple_names"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:singleLine="true"
             android:text="나 ♥ 상대방"
-            android:textColor="#E91E63"
+            android:textColor="#EC5F8E"
             android:textSize="13sp"
             android:textStyle="bold" />
 
@@ -26,28 +31,38 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
+            android:fontFamily="sans-serif-black"
+            android:includeFontPadding="false"
+            android:singleLine="true"
             android:text="365일"
-            android:textColor="#C2185B"
-            android:textSize="42sp"
+            android:textColor="#EC5F8E"
+            android:textSize="38sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/start_date"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="3dp"
             android:text="2025.02.26 ~"
-            android:textColor="#80E91E63"
+            android:textColor="#B9B3BE"
             android:textSize="12sp" />
 
         <TextView
             android:id="@+id/next_anniversary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/widget_pill_bg"
+            android:ellipsize="end"
+            android:paddingStart="8dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="2dp"
+            android:singleLine="true"
             android:text="500일 D-135"
-            android:textColor="#9E9E9E"
-            android:textSize="12sp"
+            android:textColor="#4A3B52"
+            android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -56,10 +71,10 @@
         android:layout_width="24dp"
         android:layout_height="24dp"
         android:layout_gravity="top|end"
+        android:background="@drawable/widget_calendar_nav_btn_bg"
         android:gravity="center"
         android:text="⚙"
-        android:textColor="#E91E63"
-        android:textSize="14sp"
-        android:background="@drawable/widget_calendar_nav_btn_bg" />
+        android:textColor="#EC5F8E"
+        android:textSize="14sp" />
 
 </FrameLayout>

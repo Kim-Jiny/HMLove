@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import '../core/store_mode.dart';
 import '../providers/ad_provider.dart';
 
 class BannerAdWidget extends ConsumerStatefulWidget {
@@ -23,6 +24,7 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> {
   }
 
   void _loadAd() {
+    if (storeModeEnabled) return; // 스토어 촬영 모드: 광고 없이
     _bannerAd = BannerAd(
       adUnitId: widget.adUnitId,
       size: AdSize.banner,

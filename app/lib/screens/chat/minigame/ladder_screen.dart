@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api_client.dart';
 import '../../../providers/couple_provider.dart';
+import '../../../core/theme.dart';
 
 class LadderScreen extends ConsumerStatefulWidget {
   const LadderScreen({super.key});
@@ -27,7 +28,8 @@ class _LadderScreenState extends ConsumerState<LadderScreen>
   // Ladder data
   List<String> _players = [];
   List<String> _goals = [];
-  List<List<int>> _rungs = []; // rungs[row] = list of col indices with a rung to the right
+  List<List<int>> _rungs =
+      []; // rungs[row] = list of col indices with a rung to the right
   Map<String, String> _resultMap = {};
 
   // Paths for animation: paths[playerIndex] = list of Offsets
@@ -47,7 +49,8 @@ class _LadderScreenState extends ConsumerState<LadderScreen>
   void _initControllers() {
     final currentUserId = ApiClient.getUserId() ?? '';
     final couple = ref.read(coupleProvider).couple;
-    final myName = couple?.users
+    final myName =
+        couple?.users
             .where((u) => u.id == currentUserId)
             .firstOrNull
             ?.nickname ??
@@ -252,9 +255,10 @@ class _LadderScreenState extends ConsumerState<LadderScreen>
                           child: Text(
                             '${i + 1}',
                             style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold),
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
@@ -265,7 +269,9 @@ class _LadderScreenState extends ConsumerState<LadderScreen>
                           decoration: InputDecoration(
                             hintText: '참가자 ${i + 1}',
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -274,7 +280,11 @@ class _LadderScreenState extends ConsumerState<LadderScreen>
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Icon(Icons.arrow_forward, size: 16, color: Colors.grey),
+                      const Icon(
+                        Icons.arrow_forward,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
                       const SizedBox(width: 6),
                       Expanded(
                         child: TextField(
@@ -282,7 +292,9 @@ class _LadderScreenState extends ConsumerState<LadderScreen>
                           decoration: InputDecoration(
                             hintText: '목표 ${i + 1}',
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -292,8 +304,11 @@ class _LadderScreenState extends ConsumerState<LadderScreen>
                       ),
                       if (_playerCount > 2)
                         IconButton(
-                          icon: const Icon(Icons.remove_circle_outline,
-                              color: Colors.red, size: 22),
+                          icon: const Icon(
+                            Icons.remove_circle_outline,
+                            color: Colors.red,
+                            size: 22,
+                          ),
                           onPressed: () => _removePlayer(i),
                         ),
                     ],
@@ -326,13 +341,13 @@ class _LadderScreenState extends ConsumerState<LadderScreen>
   }
 
   static const _ladderColors = [
-    Color(0xFFE91E63),
-    Color(0xFF2196F3),
-    Color(0xFF4CAF50),
-    Color(0xFFFF9800),
-    Color(0xFF9C27B0),
-    Color(0xFF00BCD4),
-    Color(0xFFFF5722),
+    AppTheme.primaryColor,
+    AppTheme.sky,
+    AppTheme.mint,
+    AppTheme.peach,
+    AppTheme.lavender,
+    AppTheme.mint,
+    AppTheme.peach,
     Color(0xFF607D8B),
   ];
 
@@ -444,8 +459,10 @@ class _LadderPainter extends CustomPainter {
 
     for (int col = 0; col < numCols; col++) {
       final top = Offset(leftPadding + col * colSpacing, topPadding);
-      final bottom =
-          Offset(leftPadding + col * colSpacing, size.height - bottomPadding);
+      final bottom = Offset(
+        leftPadding + col * colSpacing,
+        size.height - bottomPadding,
+      );
       canvas.drawLine(top, bottom, vertPaint);
     }
 
@@ -466,18 +483,27 @@ class _LadderPainter extends CustomPainter {
     // Draw player names (top)
     for (int i = 0; i < numCols; i++) {
       final x = leftPadding + i * colSpacing;
-      _drawText(canvas, players[i], Offset(x, topPadding - 10),
-          colors[i % colors.length],
-          fontSize: 13, above: true);
+      _drawText(
+        canvas,
+        players[i],
+        Offset(x, topPadding - 10),
+        colors[i % colors.length],
+        fontSize: 13,
+        above: true,
+      );
     }
 
     // Draw goals (bottom)
     for (int i = 0; i < numCols; i++) {
       final x = leftPadding + i * colSpacing;
       _drawText(
-          canvas, goals[i], Offset(x, size.height - bottomPadding + 10),
-          Colors.grey.shade700,
-          fontSize: 12, above: false);
+        canvas,
+        goals[i],
+        Offset(x, size.height - bottomPadding + 10),
+        Colors.grey.shade700,
+        fontSize: 12,
+        above: false,
+      );
     }
 
     // Draw animated paths
@@ -532,8 +558,14 @@ class _LadderPainter extends CustomPainter {
     }
   }
 
-  void _drawText(Canvas canvas, String text, Offset position, Color color,
-      {double fontSize = 13, bool above = true}) {
+  void _drawText(
+    Canvas canvas,
+    String text,
+    Offset position,
+    Color color, {
+    double fontSize = 13,
+    bool above = true,
+  }) {
     final tp = TextPainter(
       text: TextSpan(
         text: text,

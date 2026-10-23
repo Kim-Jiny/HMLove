@@ -59,7 +59,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       final authState = ref.read(authProvider);
       final status = authState.status;
       final isLoggedIn = status == AuthStatus.authenticated;
-      final hasCouple = (authState.user?.isCoupleComplete ?? false) ||
+      // 커플이 하나라도 있으면(상대가 아직 연결 전이어도) 메인에 들어갈 수 있다.
+      final hasCouple =
+          authState.user?.coupleId != null ||
+          (authState.user?.isCoupleComplete ?? false) ||
           (authState.user?.hasExistingCoupleData ?? false);
       // 소셜 신규 가입 진행 중인지. socialLogin 이 needsSignup 응답을 받으면
       // 이 값이 set 되고 _AuthChangeNotifier 가 redirect 를 재평가시킨다.
@@ -81,11 +84,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         final target = state.uri.host.isNotEmpty
             ? state.uri.host
             : (state.uri.pathSegments.isNotEmpty
-                ? state.uri.pathSegments.first
-                : '');
+                  ? state.uri.pathSegments.first
+                  : '');
         final widgetTarget = switch (target) {
           'calendar' => '/calendar',
           'doodle' => '/doodle',
+          'home' => '/home',
+          'feed' => '/feed',
+          'more' => '/more',
+          'chat' => '/chat',
+          'letter' => '/letter',
+          'question' => '/question',
+          'wishlist' => '/wishlist',
+          'fortune' => '/fortune',
+          'anniversary' => '/anniversary',
+          'photo-map' => '/photo-map',
           _ => null,
         };
         if (widgetTarget != null) {
@@ -165,10 +178,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       // Auth routes
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
@@ -215,9 +225,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/letter/:id',
-        builder: (context, state) => LetterReadScreen(
-          letterId: state.pathParameters['id']!,
-        ),
+        builder: (context, state) =>
+            LetterReadScreen(letterId: state.pathParameters['id']!),
       ),
 
       // Fortune

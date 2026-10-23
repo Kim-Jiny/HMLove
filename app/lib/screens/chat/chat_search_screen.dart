@@ -67,8 +67,7 @@ class _ChatSearchScreenState extends State<ChatSearchScreen> {
         if (_nextCursor != null) 'cursor': _nextCursor,
       };
 
-      final response =
-          await _dio.get('/chat/search', queryParameters: params);
+      final response = await _dio.get('/chat/search', queryParameters: params);
       if (!mounted) return;
       final data = response.data as Map<String, dynamic>;
       final messages = (data['messages'] as List)
@@ -116,7 +115,9 @@ class _ChatSearchScreenState extends State<ChatSearchScreen> {
               child: Text(
                 _lastQuery.isEmpty ? '검색어를 입력하세요' : '검색 결과가 없습니다',
                 style: const TextStyle(
-                    color: AppTheme.textSecondary, fontSize: 15),
+                  color: AppTheme.textSecondary,
+                  fontSize: 15,
+                ),
               ),
             )
           : ListView.builder(
@@ -140,12 +141,12 @@ class _ChatSearchScreenState extends State<ChatSearchScreen> {
                   leading: CircleAvatar(
                     backgroundColor: isMe
                         ? AppTheme.primaryColor
-                        : Colors.grey.shade300,
+                        : AppTheme.lavenderSoft,
                     radius: 18,
                     child: Text(
                       name.isNotEmpty ? name.characters.first : '?',
                       style: TextStyle(
-                        color: isMe ? Colors.white : AppTheme.textPrimary,
+                        color: AppTheme.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
@@ -160,7 +161,9 @@ class _ChatSearchScreenState extends State<ChatSearchScreen> {
                   subtitle: Text(
                     '$name · ${DateFormat('M/d a h:mm', 'ko').format(msg.createdAt)}',
                     style: const TextStyle(
-                        fontSize: 12, color: AppTheme.textHint),
+                      fontSize: 12,
+                      color: AppTheme.textHint,
+                    ),
                   ),
                 );
               },

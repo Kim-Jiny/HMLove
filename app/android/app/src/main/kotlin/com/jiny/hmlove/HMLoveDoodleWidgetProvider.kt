@@ -47,9 +47,10 @@ class HMLoveDoodleWidgetProvider : AppWidgetProvider() {
         private const val FETCH_FAIL_COOLDOWN_MS = 15 * 60 * 1000L
         private const val PREF_KEY_FETCH_FAIL = "doodleFetchFail"
 
-        // 성공 후 짧은 cooldown — 활성 사용 중 broadcast 가 여러 번 fire 돼도
-        // 같은 latest 를 반복 fetch 하지 않도록.
-        private const val FETCH_SUCCESS_COOLDOWN_MS = 5 * 60 * 1000L
+        // 성공 후 짧은 cooldown — 한 번의 푸시로 broadcast 가 연달아 fire 돼도
+        // 같은 latest 를 반복 fetch 하지 않도록. 길게 두면 5분 안에 온 두 번째
+        // 그림이 위젯에 안 뜨므로 중복 방지용으로만 짧게 유지한다.
+        private const val FETCH_SUCCESS_COOLDOWN_MS = 15 * 1000L
         private const val PREF_KEY_FETCH_SUCCESS = "doodleFetchSuccess"
 
         // AppWidgetProvider 는 broadcast 마다 새 인스턴스로 생성되므로, executor 를
@@ -186,7 +187,12 @@ class HMLoveDoodleWidgetProvider : AppWidgetProvider() {
         // 이미지 캐시 확인/다운로드
         val cached = cacheFileFor(context, imageUrl)
         if (!cached.exists() || cached.length() == 0L) {
-            val ok = downloadToCache(imageUrl, cached, token)
+            // 토큰은 API 와 같은 호스트일 때만 보낸다(이미지가 다른 도메인이면 토큰이 새지 않게).
+            val ok = downloadToCache(
+                imageUrl,
+                cached,
+                if (isSameHost(imageUrl, baseUrl)) token else null,
+            )
             if (!ok) {
                 devLogW(TAG,"fetchLatest: image download failed for $imageUrl")
             }
@@ -282,6 +288,12 @@ class HMLoveDoodleWidgetProvider : AppWidgetProvider() {
         val dir = File(context.cacheDir, "doodle").also { it.mkdirs() }
         val name = urlString.hashCode().toString() + ".png"
         return File(dir, name)
+    }
+
+    private fun isSameHost(a: String, b: String): Boolean = try {
+        URL(a).host == URL(b).host
+    } catch (_: Throwable) {
+        false
     }
 
     private fun downloadToCache(urlString: String, target: File, token: String?): Boolean {

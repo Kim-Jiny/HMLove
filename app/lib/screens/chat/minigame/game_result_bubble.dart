@@ -66,18 +66,24 @@ class _RouletteBubble extends StatelessWidget {
   final bool isMe;
   final String? senderName;
 
-  const _RouletteBubble({required this.data, required this.isMe, this.senderName});
+  const _RouletteBubble({
+    required this.data,
+    required this.isMe,
+    this.senderName,
+  });
 
   @override
   Widget build(BuildContext context) {
     // 타입이 어긋난 payload(예: options 가 String)에서도 캐스트 throw 로 메시지
     // 목록 전체가 크래시하지 않도록 방어적으로 읽는다.
     final rawOptions = data['options'];
-    final options =
-        rawOptions is List ? rawOptions.whereType<String>().toList() : <String>[];
+    final options = rawOptions is List
+        ? rawOptions.whereType<String>().toList()
+        : <String>[];
     final result = data['result'] is String ? data['result'] as String : '';
     // 신뢰 가능한 발신자명 우선, 없으면 payload 값 폴백.
-    final senderName = this.senderName ??
+    final senderName =
+        this.senderName ??
         (data['senderName'] is String ? data['senderName'] as String : '');
 
     return Container(
@@ -92,13 +98,7 @@ class _RouletteBubble extends StatelessWidget {
           bottomLeft: Radius.circular(isMe ? 16 : 4),
           bottomRight: Radius.circular(isMe ? 4 : 16),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
+        border: Border.all(color: AppTheme.ink, width: 1.3),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -109,7 +109,7 @@ class _RouletteBubble extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Color(0xFF9C27B0), Color(0xFFE040FB)],
+                colors: [AppTheme.lavender, AppTheme.lavender],
               ),
             ),
             child: const Row(
@@ -136,8 +136,10 @@ class _RouletteBubble extends StatelessWidget {
               children: options.map((opt) {
                 final isWinner = opt == result;
                 return Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: isWinner
                         ? AppTheme.primaryColor.withValues(alpha: 0.1)
@@ -154,8 +156,9 @@ class _RouletteBubble extends StatelessWidget {
                       color: isWinner
                           ? AppTheme.primaryColor
                           : AppTheme.textSecondary,
-                      fontWeight:
-                          isWinner ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight: isWinner
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   ),
                 );
@@ -187,10 +190,7 @@ class _RouletteBubble extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
             child: Text(
               '$senderName님이 돌린 룰렛',
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppTheme.textHint,
-              ),
+              style: const TextStyle(fontSize: 11, color: AppTheme.textHint),
             ),
           ),
         ],
@@ -204,20 +204,26 @@ class _LadderBubble extends StatelessWidget {
   final bool isMe;
   final String? senderName;
 
-  const _LadderBubble({required this.data, required this.isMe, this.senderName});
+  const _LadderBubble({
+    required this.data,
+    required this.isMe,
+    this.senderName,
+  });
 
   @override
   Widget build(BuildContext context) {
     // 방어적 읽기 — 타입 어긋난 payload 에서도 크래시하지 않도록.
     final rawPlayers = data['players'];
-    final players =
-        rawPlayers is List ? rawPlayers.whereType<String>().toList() : <String>[];
+    final players = rawPlayers is List
+        ? rawPlayers.whereType<String>().toList()
+        : <String>[];
     final rawResult = data['result'];
     final resultMap = <String, String>{
       if (rawResult is Map)
         for (final e in rawResult.entries) '${e.key}': '${e.value}',
     };
-    final senderName = this.senderName ??
+    final senderName =
+        this.senderName ??
         (data['senderName'] is String ? data['senderName'] as String : '');
 
     return Container(
@@ -232,13 +238,7 @@ class _LadderBubble extends StatelessWidget {
           bottomLeft: Radius.circular(isMe ? 16 : 4),
           bottomRight: Radius.circular(isMe ? 4 : 16),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
+        border: Border.all(color: AppTheme.ink, width: 1.3),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -248,9 +248,7 @@ class _LadderBubble extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF1565C0), Color(0xFF42A5F5)],
-              ),
+              gradient: LinearGradient(colors: [AppTheme.sky, AppTheme.sky]),
             ),
             child: const Row(
               children: [
@@ -279,7 +277,9 @@ class _LadderBubble extends StatelessWidget {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppTheme.primaryColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
@@ -295,16 +295,20 @@ class _LadderBubble extends StatelessWidget {
                       ),
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 8),
-                        child: Icon(Icons.arrow_forward,
-                            size: 14, color: AppTheme.textHint),
+                        child: Icon(
+                          Icons.arrow_forward,
+                          size: 14,
+                          color: AppTheme.textHint,
+                        ),
                       ),
                       Flexible(
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1565C0)
-                                .withValues(alpha: 0.1),
+                            color: AppTheme.sky.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -312,7 +316,7 @@ class _LadderBubble extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF1565C0),
+                              color: AppTheme.sky,
                             ),
                           ),
                         ),
@@ -328,10 +332,7 @@ class _LadderBubble extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
             child: Text(
               '$senderName님이 만든 사다리',
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppTheme.textHint,
-              ),
+              style: const TextStyle(fontSize: 11, color: AppTheme.textHint),
             ),
           ),
         ],

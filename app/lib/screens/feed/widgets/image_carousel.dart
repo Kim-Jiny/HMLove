@@ -38,10 +38,13 @@ class _ImageCarouselState extends State<ImageCarousel> {
           fit: BoxFit.cover,
           errorWidget: (_, _, _) => Container(
             height: 300,
-            color: Colors.grey.shade100,
+            color: AppTheme.primarySoft,
             child: const Center(
-              child: Icon(Icons.image_not_supported_outlined,
-                  color: AppTheme.textHint, size: 48),
+              child: Icon(
+                Icons.image_not_supported_outlined,
+                color: AppTheme.textHint,
+                size: 48,
+              ),
             ),
           ),
         ),
@@ -70,10 +73,13 @@ class _ImageCarouselState extends State<ImageCarousel> {
                     width: double.infinity,
                     fit: BoxFit.cover,
                     errorWidget: (_, _, _) => Container(
-                      color: Colors.grey.shade100,
+                      color: AppTheme.primarySoft,
                       child: const Center(
-                        child: Icon(Icons.image_not_supported_outlined,
-                            color: AppTheme.textHint, size: 48),
+                        child: Icon(
+                          Icons.image_not_supported_outlined,
+                          color: AppTheme.textHint,
+                          size: 48,
+                        ),
                       ),
                     ),
                   ),

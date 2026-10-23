@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
+import '../../widgets/cute/motion.dart';
+import '../../widgets/cute/sticker.dart';
 import '../../core/top_snackbar.dart';
 import '../../models/wish_item.dart';
 import '../../providers/wishlist_provider.dart';
+import '../../widgets/cute/loader.dart';
+import '../../widgets/cute/mood_face.dart';
+import '../../widgets/soft_ui.dart';
 
 class WishlistScreen extends ConsumerStatefulWidget {
   const WishlistScreen({super.key});
@@ -17,6 +22,7 @@ class _WishlistScreenState extends ConsumerState<WishlistScreen> {
   @override
   void initState() {
     super.initState();
+
     Future.microtask(() {
       ref.read(wishlistProvider.notifier).fetchItems();
     });
@@ -29,9 +35,6 @@ class _WishlistScreenState extends ConsumerState<WishlistScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
       builder: (_) => _AddWishSheet(
         initialCategory: initialCategory,
         onAdd: (title, memo, category) async {
@@ -81,7 +84,8 @@ class _WishlistScreenState extends ConsumerState<WishlistScreen> {
                   (cat) => Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: _FilterChip(
-                      label: '${cat.emoji} ${cat.label}',
+                      label: cat.label,
+                      leading: Sticker(stickerFor(cat), size: 18),
                       isSelected: state.filterCategory == cat,
                       onTap: () =>
                           ref.read(wishlistProvider.notifier).setFilter(cat),
@@ -98,11 +102,7 @@ class _WishlistScreenState extends ConsumerState<WishlistScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 48,
-                          color: Colors.grey.shade300,
-                        ),
+                        const MoodFace(moodKey: 'sad', size: 72, pop: true),
                         const SizedBox(height: 12),
                         Text(
                           state.error!,
@@ -122,17 +122,13 @@ class _WishlistScreenState extends ConsumerState<WishlistScreen> {
                     ),
                   )
                 : state.isLoading && items.isEmpty
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: CuteLoader())
                 : items.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.favorite_border,
-                          size: 48,
-                          color: Colors.grey.shade300,
-                        ),
+                        const Sticker(StickerKind.heart, size: 72),
                         const SizedBox(height: 12),
                         Text(
                           '아직 위시가 없어요\n함께 하고 싶은 것들을 추가해보세요!',
@@ -230,35 +226,44 @@ class _WishlistScreenState extends ConsumerState<WishlistScreen> {
 
 class _FilterChip extends StatelessWidget {
   final String label;
+  final Widget? leading;
   final bool isSelected;
   final VoidCallback onTap;
 
   const _FilterChip({
     required this.label,
+    this.leading,
     required this.isSelected,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Bouncy(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryColor : Colors.grey.shade100,
+          color: isSelected ? AppTheme.primaryColor : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? AppTheme.primaryColor : Colors.grey.shade300,
-          ),
+          border: Border.all(color: AppTheme.ink, width: 1.3),
+          boxShadow: isSelected ? AppTheme.cartoonShadow : null,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: isSelected ? Colors.white : AppTheme.textSecondary,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (leading != null) ...[leading!, const SizedBox(width: 6)],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? Colors.white : AppTheme.textSecondary,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -280,7 +285,7 @@ class _WishCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
       child: InkWell(
         onTap: onToggle,
         borderRadius: BorderRadius.circular(16),
@@ -300,8 +305,8 @@ class _WishCard extends StatelessWidget {
                   border: Border.all(
                     color: item.isCompleted
                         ? AppTheme.primaryColor
-                        : Colors.grey.shade400,
-                    width: 2,
+                        : AppTheme.ink,
+                    width: 1.5,
                   ),
                 ),
                 child: item.isCompleted
@@ -316,10 +321,7 @@ class _WishCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          item.category.emoji,
-                          style: const TextStyle(fontSize: 14),
-                        ),
+                        Sticker(stickerFor(item.category), size: 18),
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -379,8 +381,8 @@ class _WishCard extends StatelessWidget {
                           : Icons.favorite_border_rounded,
                       size: 22,
                       color: item.isFavorite
-                          ? const Color(0xFFE07A5F)
-                          : Colors.grey.shade400,
+                          ? AppTheme.peach
+                          : AppTheme.textHint,
                     ),
                     tooltip: item.isFavorite ? '즐겨찾기 해제' : '즐겨찾기',
                     onPressed: onFavoriteToggle,
@@ -389,7 +391,7 @@ class _WishCard extends StatelessWidget {
                     icon: Icon(
                       Icons.delete_outline,
                       size: 20,
-                      color: Colors.grey.shade400,
+                      color: AppTheme.textHint,
                     ),
                     onPressed: onDelete,
                   ),
@@ -408,10 +410,7 @@ class _AddWishSheet extends StatefulWidget {
   final Future<void> Function(String title, String? memo, WishCategory category)
   onAdd;
 
-  const _AddWishSheet({
-    required this.initialCategory,
-    required this.onAdd,
-  });
+  const _AddWishSheet({required this.initialCategory, required this.onAdd});
 
   @override
   State<_AddWishSheet> createState() => _AddWishSheetState();
@@ -449,7 +448,7 @@ class _AddWishSheetState extends State<_AddWishSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: AppTheme.ink.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -466,7 +465,14 @@ class _AddWishSheetState extends State<_AddWishSheet> {
             children: WishCategory.values.map((cat) {
               final selected = _category == cat;
               return ChoiceChip(
-                label: Text('${cat.emoji} ${cat.label}'),
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Sticker(stickerFor(cat), size: 16),
+                    const SizedBox(width: 4),
+                    Text(cat.label),
+                  ],
+                ),
                 selected: selected,
                 selectedColor: AppTheme.primaryColor,
                 labelStyle: TextStyle(

@@ -7,16 +7,14 @@ import '../../../core/api_client.dart';
 import '../../../core/theme.dart';
 import '../../../core/top_snackbar.dart';
 import '../../../providers/feed_provider.dart';
+import '../../../widgets/cute/loader.dart';
 
 // ─── Comments Screen ───
 
 class CommentsScreen extends ConsumerStatefulWidget {
   final Feed feed;
 
-  const CommentsScreen({
-    super.key,
-    required this.feed,
-  });
+  const CommentsScreen({super.key, required this.feed});
 
   @override
   ConsumerState<CommentsScreen> createState() => _CommentsScreenState();
@@ -40,8 +38,6 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
     _focusNode.dispose();
     super.dispose();
   }
-
-
 
   Future<void> _fetchComments() async {
     setState(() => _isLoading = true);
@@ -68,11 +64,13 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
     _controller.clear();
     try {
       final dio = ApiClient.createDio();
-      final res = await dio.post('/feed/${widget.feed.id}/comments', data: {
-        'content': text,
-      });
-      final comment =
-          FeedComment.fromJson(res.data['comment'] as Map<String, dynamic>);
+      final res = await dio.post(
+        '/feed/${widget.feed.id}/comments',
+        data: {'content': text},
+      );
+      final comment = FeedComment.fromJson(
+        res.data['comment'] as Map<String, dynamic>,
+      );
       setState(() => _comments.add(comment));
       ref.read(feedProvider.notifier).addComment(widget.feed.id, comment);
     } catch (e) {
@@ -108,8 +106,12 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
   Widget build(BuildContext context) {
     // 소켓으로 들어온 댓글 변경을 실시간 반영
     ref.listen<FeedState>(feedProvider, (prev, next) {
-      final prevFeed = prev?.feeds.where((f) => f.id == widget.feed.id).firstOrNull;
-      final nextFeed = next.feeds.where((f) => f.id == widget.feed.id).firstOrNull;
+      final prevFeed = prev?.feeds
+          .where((f) => f.id == widget.feed.id)
+          .firstOrNull;
+      final nextFeed = next.feeds
+          .where((f) => f.id == widget.feed.id)
+          .firstOrNull;
       if (nextFeed == null || prevFeed == null) return;
       if (prevFeed.commentCount != nextFeed.commentCount && !_isLoading) {
         _fetchComments();
@@ -124,118 +126,126 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
         children: [
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: CuteLoader())
                 : _comments.isEmpty
-                    ? const Center(
-                        child: Text(
-                          '아직 댓글이 없어요\n첫 댓글을 남겨보세요!',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: AppTheme.textSecondary),
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        itemCount: _comments.length,
-                        itemBuilder: (context, index) {
-                          final c = _comments[index];
-                          final name = c.authorNickname ?? '알 수 없음';
-                          final avatar = c.authorProfileImage;
-                          final isMe = c.authorId == currentUserId;
+                ? const Center(
+                    child: Text(
+                      '아직 댓글이 없어요\n첫 댓글을 남겨보세요!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppTheme.textSecondary),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    itemCount: _comments.length,
+                    itemBuilder: (context, index) {
+                      final c = _comments[index];
+                      final name = c.authorNickname ?? '알 수 없음';
+                      final avatar = c.authorProfileImage;
+                      final isMe = c.authorId == currentUserId;
 
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                CircleAvatar(
-                                  radius: 14,
-                                  backgroundColor: AppTheme.primaryLight
-                                      .withValues(alpha: 0.3),
-                                  backgroundImage: avatar != null
-                                      ? CachedNetworkImageProvider(avatar)
-                                      : null,
-                                  child: avatar == null
-                                      ? Text(
-                                          name.isNotEmpty ? name[0] : '?',
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundColor: AppTheme.primaryLight.withValues(
+                                alpha: 0.3,
+                              ),
+                              backgroundImage: avatar != null
+                                  ? CachedNetworkImageProvider(avatar)
+                                  : null,
+                              child: avatar == null
+                                  ? Text(
+                                      name.isNotEmpty ? name[0] : '?',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.primaryColor,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  RichText(
+                                    text: TextSpan(
+                                      style: DefaultTextStyle.of(context).style,
+                                      children: [
+                                        TextSpan(
+                                          text: '$name ',
                                           style: const TextStyle(
-                                            fontSize: 12,
-                                            color: AppTheme.primaryColor,
-                                            fontWeight: FontWeight.bold,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13,
                                           ),
-                                        )
-                                      : null,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                        ),
+                                        TextSpan(
+                                          text: c.content,
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
                                     children: [
-                                      RichText(
-                                        text: TextSpan(
-                                          style: DefaultTextStyle.of(context)
-                                              .style,
-                                          children: [
-                                            TextSpan(
-                                              text: '$name ',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 13,
-                                              ),
-                                            ),
-                                            TextSpan(
-                                              text: c.content,
-                                              style: const TextStyle(
-                                                  fontSize: 13),
-                                            ),
-                                          ],
+                                      Text(
+                                        _formatTime(c.createdAt),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppTheme.textHint,
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: [
-                                          Text(
-                                            _formatTime(c.createdAt),
-                                            style: const TextStyle(
+                                      if (isMe) ...[
+                                        const SizedBox(width: 12),
+                                        GestureDetector(
+                                          onTap: () => _deleteComment(c),
+                                          child: const Text(
+                                            '삭제',
+                                            style: TextStyle(
                                               fontSize: 11,
-                                              color: AppTheme.textHint,
+                                              color: AppTheme.textSecondary,
+                                              fontWeight: FontWeight.w500,
                                             ),
                                           ),
-                                          if (isMe) ...[
-                                            const SizedBox(width: 12),
-                                            GestureDetector(
-                                              onTap: () =>
-                                                  _deleteComment(c),
-                                              child: const Text(
-                                                '삭제',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color:
-                                                      AppTheme.textSecondary,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ],
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          );
-                        },
-                      ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
           ),
           // Comment input
           Container(
             decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: Colors.grey.shade200)),
+              border: Border(
+                top: BorderSide(
+                  color: AppTheme.ink,
+                  width: AppTheme.outlineWidth,
+                ),
+              ),
+              color: Colors.white,
             ),
             padding: EdgeInsets.fromLTRB(
-                16, 8, 8, MediaQuery.of(context).padding.bottom + 8),
+              16,
+              8,
+              8,
+              MediaQuery.of(context).padding.bottom + 8,
+            ),
             child: Row(
               children: [
                 Expanded(
@@ -245,21 +255,30 @@ class _CommentsScreenState extends ConsumerState<CommentsScreen> {
                     decoration: InputDecoration(
                       hintText: '댓글 달기...',
                       hintStyle: const TextStyle(
-                          color: AppTheme.textHint, fontSize: 14),
+                        color: AppTheme.textHint,
+                        fontSize: 14,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+                        borderSide: const BorderSide(
+                          color: AppTheme.ink,
+                          width: AppTheme.outlineWidth,
+                        ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10),
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                     ),
                     onSubmitted: (_) => _addComment(),
                   ),
                 ),
                 const SizedBox(width: 4),
                 IconButton(
-                  icon: const Icon(Icons.send_rounded,
-                      color: AppTheme.primaryColor),
+                  icon: const Icon(
+                    Icons.send_rounded,
+                    color: AppTheme.primaryColor,
+                  ),
                   onPressed: _addComment,
                 ),
               ],

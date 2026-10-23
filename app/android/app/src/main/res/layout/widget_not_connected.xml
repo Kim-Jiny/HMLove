@@ -6,14 +6,17 @@
     android:background="@drawable/widget_background"
     android:gravity="center"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:paddingStart="16dp"
+    android:paddingTop="12dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="16dp">
 
-    <TextView
-        android:id="@+id/widget_not_connected_emoji"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="💕"
-        android:textSize="36sp" />
+    <ImageView
+        android:id="@+id/widget_not_connected_face"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:contentDescription="@null"
+        android:src="@drawable/mood_face_love" />
 
     <TextView
         android:id="@+id/widget_not_connected_title"
@@ -21,7 +24,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
         android:text="우리연애"
-        android:textColor="#C2185B"
+        android:textColor="#EC5F8E"
         android:textSize="16sp"
         android:textStyle="bold" />
 
@@ -32,7 +35,7 @@
         android:layout_marginTop="4dp"
         android:gravity="center"
         android:text="앱에서 로그인하고\n커플을 연결해보세요"
-        android:textColor="#9E9E9E"
+        android:textColor="#7A7480"
         android:textSize="13sp" />
 
 </LinearLayout>

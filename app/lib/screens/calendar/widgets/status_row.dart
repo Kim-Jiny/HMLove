@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme.dart';
 
 class StatusRow extends StatelessWidget {
   final bool ok;
@@ -13,7 +14,7 @@ class StatusRow extends StatelessWidget {
         Icon(
           ok ? Icons.check_circle : Icons.cancel,
           size: 18,
-          color: ok ? const Color(0xFF388E3C) : const Color(0xFFD32F2F),
+          color: ok ? AppTheme.mint : AppTheme.errorColor,
         ),
         const SizedBox(width: 8),
         Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),

@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -102,7 +103,7 @@ class AuthState {
 
 // Auth Notifier
 class AuthNotifier extends Notifier<AuthState> {
-  late final Dio _dio;
+  late Dio _dio;
 
   @override
   AuthState build() {
@@ -315,11 +316,20 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> logout() async {
     ref.read(chatProvider.notifier).disconnect();
     clearPendingWidgetRoute();
-    resetFeatureProviders(ref);
     await ApiClient.clearTokens();
     await WidgetService.clearData();
     PushNotificationService.reset();
     state = const AuthState(status: AuthStatus.unauthenticated);
+    await _resetAfterRouteLeaves();
+  }
+
+  /// 라우터가 로그인 화면으로 넘어간 뒤에 feature 상태를 비운다.
+  /// 먼저 비우면 아직 보이는 홈/더보기가 빈 상태로 다시 그려져 화면이 깨져 보인다.
+  Future<void> _resetAfterRouteLeaves() async {
+    await WidgetsBinding.instance.endOfFrame;
+    // 전환 애니메이션이 끝날 때까지 기다린 뒤 초기화
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    resetFeatureProviders(ref);
   }
 
   /// Force logout triggered by persistent server/auth failure (e.g. the
@@ -341,7 +351,6 @@ class AuthNotifier extends Notifier<AuthState> {
     }
     ref.read(chatProvider.notifier).disconnect();
     clearPendingWidgetRoute();
-    resetFeatureProviders(ref);
     await ApiClient.clearTokens();
     await WidgetService.clearData();
     PushNotificationService.reset();
@@ -349,6 +358,7 @@ class AuthNotifier extends Notifier<AuthState> {
       status: AuthStatus.unauthenticated,
       forceLogoutReason: reason,
     );
+    await _resetAfterRouteLeaves();
   }
 
   /// Read-and-clear the force-logout reason. Called by the login screen
@@ -587,6 +597,15 @@ final currentUserProvider = Provider<User?>((ref) {
 
 final hasCoupleProvider = Provider<bool>((ref) {
   final user = ref.watch(authProvider).user;
-  return (user?.isCoupleComplete ?? false) ||
+  return user?.coupleId != null ||
+      (user?.isCoupleComplete ?? false) ||
       (user?.hasExistingCoupleData ?? false);
+});
+
+/// 상대가 아직 연결되지 않은 상태인지(먼저 시작했거나 상대가 나간 뒤). 상대가 필요한 기능을 숨기는 데 쓴다.
+final isSoloProvider = Provider<bool>((ref) {
+  final user = ref.watch(authProvider).user;
+  if (user == null) return false;
+  // 커플은 있지만 상대가 아직 없는 상태(먼저 시작 / 만들기만 한 대기 / 상대 이탈).
+  return user.coupleId != null && !user.isCoupleComplete;
 });

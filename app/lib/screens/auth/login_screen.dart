@@ -3,11 +3,12 @@ import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:icons_plus/icons_plus.dart';
 
 import '../../core/social_auth_service.dart';
 import '../../core/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/cute/motion.dart';
+import 'widgets/auth_widgets.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -30,8 +31,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // why they're being asked to log in again.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final reason =
-          ref.read(authProvider.notifier).consumeForceLogoutReason();
+      final reason = ref.read(authProvider.notifier).consumeForceLogoutReason();
       if (reason != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -55,7 +55,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final success = await ref.read(authProvider.notifier).login(
+    final success = await ref
+        .read(authProvider.notifier)
+        .login(
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
@@ -151,40 +153,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 60),
-                // Logo area
-                const Icon(
-                  Icons.favorite,
-                  size: 64,
-                  color: AppTheme.primaryColor,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  '우리연애',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.primaryColor,
-                    letterSpacing: 2,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  '로그인하고 사랑을 시작하세요',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
+              children: staggered([
                 const SizedBox(height: 48),
+                const AuthHero(title: '우리연애', subtitle: '로그인하고 둘만의 이야기를 시작하세요'),
+                const SizedBox(height: 40),
 
                 // Email field
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  autofillHints: const [AutofillHints.email],
                   decoration: const InputDecoration(
                     labelText: '이메일',
                     hintText: 'example@email.com',
@@ -194,8 +173,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     if (value == null || value.trim().isEmpty) {
                       return '이메일을 입력해주세요';
                     }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                        .hasMatch(value.trim())) {
+                    if (!RegExp(
+                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                    ).hasMatch(value.trim())) {
                       return '올바른 이메일 형식이 아닙니다';
                     }
                     return null;
@@ -207,6 +187,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
+                  textInputAction: TextInputAction.done,
+                  autofillHints: const [AutofillHints.password],
+                  onFieldSubmitted: (_) {
+                    if (!authState.isLoading) _handleLogin();
+                  },
                   decoration: InputDecoration(
                     labelText: '비밀번호',
                     hintText: '비밀번호를 입력하세요',
@@ -234,44 +219,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // Error message
                 if (authState.error != null)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(
-                      authState.error!,
-                      style: const TextStyle(
-                        color: AppTheme.errorColor,
-                        fontSize: 13,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: ErrorBanner(message: authState.error!),
                   ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
                 // Login button
-                SizedBox(
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: authState.isLoading ? null : _handleLogin,
-                    style: ElevatedButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      textStyle: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    child: authState.isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text('로그인'),
-                  ),
+                AuthPrimaryButton(
+                  label: '로그인',
+                  loading: authState.isLoading,
+                  onPressed: authState.isLoading ? null : _handleLogin,
                 ),
                 const SizedBox(height: 12),
 
@@ -310,7 +268,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 20),
                 _buildSocialButtons(disabled: authState.isLoading),
                 const SizedBox(height: 32),
-              ],
+              ]),
             ),
           ),
         ),
@@ -322,7 +280,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Row(
       children: [
         const Expanded(
-          child: Divider(thickness: 0.6, color: Color(0xFFE0E0E0)),
+          child: Divider(thickness: 0.6, color: AppTheme.borderColor),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -337,7 +295,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
         const Expanded(
-          child: Divider(thickness: 0.6, color: Color(0xFFE0E0E0)),
+          child: Divider(thickness: 0.6, color: AppTheme.borderColor),
         ),
       ],
     );
@@ -349,11 +307,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       children: [
         _SocialCircleButton(
           backgroundColor: Colors.white,
-          borderColor: const Color(0xFFE0E0E0),
+          borderColor: AppTheme.borderColor,
           semanticLabel: '구글 로그인',
           disabled: disabled,
           onPressed: () => _handleSocialLogin(SocialProvider.google),
-          child: Brand(Brands.google, size: 28),
+          child: const _GoogleLogo(size: 26),
         ),
         const SizedBox(width: 20),
         _SocialCircleButton(
@@ -361,7 +319,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           semanticLabel: '카카오 로그인',
           disabled: disabled,
           onPressed: () => _handleSocialLogin(SocialProvider.kakao),
-          child: Brand(Brands.kakaotalk, size: 28),
+          child: const _KakaoLogo(size: 28),
         ),
         if (Platform.isIOS) ...[
           const SizedBox(width: 20),
@@ -403,25 +361,124 @@ class _SocialCircleButton extends StatelessWidget {
       enabled: !disabled,
       child: Opacity(
         opacity: disabled ? 0.5 : 1.0,
-        child: Material(
-          color: backgroundColor,
-          shape: CircleBorder(
-            side: borderColor != null
-                ? BorderSide(color: borderColor!, width: 1)
-                : BorderSide.none,
-          ),
-          elevation: 0,
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: disabled ? null : onPressed,
-            child: SizedBox(
-              width: 56,
-              height: 56,
-              child: Center(child: child),
+        child: Bouncy(
+          onTap: disabled ? null : onPressed,
+          pressedScale: 0.88,
+          child: Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppTheme.ink,
+                width: AppTheme.outlineWidth,
+              ),
+              boxShadow: AppTheme.cartoonShadow,
             ),
+            child: Center(child: child),
           ),
         ),
       ),
     );
   }
+}
+
+/// 구글 'G' 로고. 외부 아이콘 패키지 없이 4색 호로 직접 그린다.
+class _GoogleLogo extends StatelessWidget {
+  final double size;
+  const _GoogleLogo({required this.size});
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: size,
+    height: size,
+    child: CustomPaint(painter: _GoogleLogoPainter()),
+  );
+}
+
+class _GoogleLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width;
+    final stroke = s * 0.2;
+    final rect = Rect.fromCircle(
+      center: Offset(s / 2, s / 2),
+      radius: s / 2 - stroke / 2,
+    );
+    Paint arc(Color c) => Paint()
+      ..color = c
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.butt;
+    const pi = 3.141592653589793;
+    // 시계 방향: 파랑(오른쪽 위) → 초록(아래) → 노랑(왼쪽) → 빨강(위)
+    canvas.drawArc(
+      rect,
+      -0.1 * pi,
+      0.5 * pi,
+      false,
+      arc(const Color(0xFF4285F4)),
+    );
+    canvas.drawArc(
+      rect,
+      0.4 * pi,
+      0.45 * pi,
+      false,
+      arc(const Color(0xFF34A853)),
+    );
+    canvas.drawArc(
+      rect,
+      0.85 * pi,
+      0.4 * pi,
+      false,
+      arc(const Color(0xFFFBBC05)),
+    );
+    canvas.drawArc(
+      rect,
+      1.25 * pi,
+      0.65 * pi,
+      false,
+      arc(const Color(0xFFEA4335)),
+    );
+    // 가로 막대
+    canvas.drawRect(
+      Rect.fromLTWH(s * 0.5, s * 0.42, s * 0.45, stroke * 0.9),
+      Paint()..color = const Color(0xFF4285F4),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// 카카오톡 말풍선 로고.
+class _KakaoLogo extends StatelessWidget {
+  final double size;
+  const _KakaoLogo({required this.size});
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: size,
+    height: size,
+    child: CustomPaint(painter: _KakaoLogoPainter()),
+  );
+}
+
+class _KakaoLogoPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width;
+    final ink = Paint()..color = const Color(0xFF191919);
+    canvas.drawOval(Rect.fromLTWH(s * 0.06, s * 0.12, s * 0.88, s * 0.7), ink);
+    final tail = Path()
+      ..moveTo(s * 0.3, s * 0.72)
+      ..lineTo(s * 0.26, s * 0.94)
+      ..lineTo(s * 0.5, s * 0.8)
+      ..close();
+    canvas.drawPath(tail, ink);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

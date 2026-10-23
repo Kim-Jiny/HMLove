@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Light gray rounded panel behind the color swatch grid so white/ivory
-    swatches are visually distinguishable on the white dialog card.
+    Soft pastel rounded panel behind the color swatch grid so white/ivory
+    swatches are visually distinguishable on the dialog card.
 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="#F5F5F5" />
-    <corners android:radius="10dp" />
+    <solid android:color="#FFEAF1" />
+    <stroke android:width="1dp" android:color="#F6E7ED" />
+    <corners android:radius="16dp" />
 </shape>

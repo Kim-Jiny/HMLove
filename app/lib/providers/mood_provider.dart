@@ -79,7 +79,7 @@ class MoodState {
 
 // Mood Notifier
 class MoodNotifier extends Notifier<MoodState> {
-  late final Dio _dio;
+  late Dio _dio;
 
   @override
   MoodState build() {

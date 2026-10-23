@@ -5,7 +5,10 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
     android:orientation="vertical"
-    android:padding="10dp">
+    android:paddingStart="12dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="14dp">
 
     <!-- Top bar: couple name + D-Day -->
     <LinearLayout
@@ -19,7 +22,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:textColor="#E91E63"
+            android:textColor="#EC5F8E"
             android:textSize="11sp"
             android:textStyle="bold"
             android:singleLine="true" />
@@ -28,7 +31,7 @@
             android:id="@+id/cal_dday_info"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#C2185B"
+            android:textColor="#EC5F8E"
             android:textSize="11sp"
             android:textStyle="bold"
             android:singleLine="true" />
@@ -40,7 +43,7 @@
             android:layout_marginStart="6dp"
             android:gravity="center"
             android:text="⚙"
-            android:textColor="#9E9E9E"
+            android:textColor="#7A7480"
             android:textSize="14sp"
             android:background="@drawable/widget_calendar_nav_btn_bg" />
     </LinearLayout>
@@ -56,11 +59,11 @@
 
         <TextView
             android:id="@+id/cal_prev_month"
-            android:layout_width="28dp"
+            android:layout_width="30dp"
             android:layout_height="24dp"
             android:gravity="center"
             android:text="◀"
-            android:textColor="#E91E63"
+            android:textColor="#EC5F8E"
             android:textSize="12sp"
             android:textStyle="bold"
             android:background="@drawable/widget_calendar_nav_btn_bg" />
@@ -71,8 +74,9 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:gravity="center"
-            android:textColor="#424242"
-            android:textSize="13sp"
+            android:fontFamily="sans-serif-black"
+            android:textColor="#2E2A33"
+            android:textSize="14sp"
             android:textStyle="bold" />
 
         <TextView
@@ -81,7 +85,7 @@
             android:layout_height="24dp"
             android:gravity="center"
             android:text="오늘"
-            android:textColor="#E91E63"
+            android:textColor="#EC5F8E"
             android:textSize="10sp"
             android:textStyle="bold"
             android:paddingLeft="8dp"
@@ -90,11 +94,11 @@
 
         <TextView
             android:id="@+id/cal_next_month"
-            android:layout_width="28dp"
+            android:layout_width="30dp"
             android:layout_height="24dp"
             android:gravity="center"
             android:text="▶"
-            android:textColor="#E91E63"
+            android:textColor="#EC5F8E"
             android:textSize="12sp"
             android:textStyle="bold"
             android:layout_marginStart="4dp"
@@ -115,7 +119,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="일"
-            android:textColor="#E91E63"
+            android:textColor="#EC5F8E"
             android:textSize="10sp"
             android:textStyle="bold" />
         <TextView
@@ -125,7 +129,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="월"
-            android:textColor="#9E9E9E"
+            android:textColor="#7A7480"
             android:textSize="10sp"
             android:textStyle="bold" />
         <TextView
@@ -135,7 +139,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="화"
-            android:textColor="#9E9E9E"
+            android:textColor="#7A7480"
             android:textSize="10sp"
             android:textStyle="bold" />
         <TextView
@@ -145,7 +149,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="수"
-            android:textColor="#9E9E9E"
+            android:textColor="#7A7480"
             android:textSize="10sp"
             android:textStyle="bold" />
         <TextView
@@ -155,7 +159,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="목"
-            android:textColor="#9E9E9E"
+            android:textColor="#7A7480"
             android:textSize="10sp"
             android:textStyle="bold" />
         <TextView
@@ -165,7 +169,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="금"
-            android:textColor="#9E9E9E"
+            android:textColor="#7A7480"
             android:textSize="10sp"
             android:textStyle="bold" />
         <TextView
@@ -175,7 +179,7 @@
             android:layout_weight="1"
             android:gravity="center"
             android:text="토"
-            android:textColor="#9E9E9E"
+            android:textColor="#7A7480"
             android:textSize="10sp"
             android:textStyle="bold" />
     </LinearLayout>

@@ -11,6 +11,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../core/theme.dart';
 import '../../providers/photo_provider.dart';
+import '../../widgets/cute/loader.dart';
 
 class PhotoMapScreen extends ConsumerStatefulWidget {
   const PhotoMapScreen({super.key});
@@ -42,7 +43,8 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
   Future<void> _checkLocationPermission() async {
     try {
       final perm = await Geolocator.checkPermission();
-      final granted = perm == LocationPermission.always ||
+      final granted =
+          perm == LocationPermission.always ||
           perm == LocationPermission.whileInUse;
       if (mounted && granted != _hasLocationPermission) {
         setState(() => _hasLocationPermission = granted);
@@ -76,9 +78,6 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
   void _showPhotoBottomSheet(dynamic photo) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (context) => Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -90,7 +89,7 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: AppTheme.ink.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -217,47 +216,44 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
     final String? caption;
     try {
       caption = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('사진 설명'),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        content: TextField(
-          controller: captionController,
-          decoration: const InputDecoration(
-            hintText: '이 순간을 설명해주세요...',
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('사진 설명'),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-          maxLines: 2,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
+          content: TextField(
+            controller: captionController,
+            decoration: const InputDecoration(hintText: '이 순간을 설명해주세요...'),
+            maxLines: 2,
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, captionController.text),
-            child: const Text(
-              '업로드',
-              style: TextStyle(
-                color: AppTheme.primaryColor,
-                fontWeight: FontWeight.w600,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, captionController.text),
+              child: const Text(
+                '업로드',
+                style: TextStyle(
+                  color: AppTheme.primaryColor,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
     } finally {
       captionController.dispose();
     }
 
     if (caption == null) return;
 
-    await ref.read(photoProvider.notifier).uploadPhoto(
-          imageFile: File(image.path),
-          caption: caption,
-        );
+    await ref
+        .read(photoProvider.notifier)
+        .uploadPhoto(imageFile: File(image.path), caption: caption);
   }
 
   @override
@@ -268,8 +264,10 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
         .where((photo) => photo.latitude != null && photo.longitude != null)
         .toList();
     final markerSignature = markerPhotos
-        .map((photo) =>
-            '${photo.id}:${photo.latitude}:${photo.longitude}:${photo.imageUrl}')
+        .map(
+          (photo) =>
+              '${photo.id}:${photo.latitude}:${photo.longitude}:${photo.imageUrl}',
+        )
         .join('|');
 
     // Rebuild markers whenever the underlying map photo set changes.
@@ -313,14 +311,10 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
         ],
       ),
       body: photoState.isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: AppTheme.primaryColor,
-              ),
-            )
+          ? const Center(child: CuteLoader())
           : _isMapView
-              ? _buildMapView(photos)
-              : _buildGridView(photos),
+          ? _buildMapView(photos)
+          : _buildGridView(photos),
       floatingActionButton: FloatingActionButton(
         onPressed: _uploadPhoto,
         child: const Icon(Icons.add_a_photo),
@@ -335,7 +329,8 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
 
     return GoogleMap(
       initialCameraPosition: CameraPosition(
-        target: photos.isNotEmpty &&
+        target:
+            photos.isNotEmpty &&
                 photos.first.latitude != null &&
                 photos.first.longitude != null
             ? LatLng(photos.first.latitude!, photos.first.longitude!)
@@ -399,10 +394,7 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
                 )
               : Container(
                   color: AppTheme.primaryLight.withValues(alpha: 0.1),
-                  child: const Icon(
-                    Icons.photo,
-                    color: AppTheme.textHint,
-                  ),
+                  child: const Icon(Icons.photo, color: AppTheme.textHint),
                 ),
         );
       },
@@ -434,11 +426,7 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
                         ),
                       ),
                     )
-                  : const Icon(
-                      Icons.photo,
-                      size: 64,
-                      color: Colors.white54,
-                    ),
+                  : const Icon(Icons.photo, size: 64, color: Colors.white54),
             ),
           ),
         ),
@@ -476,10 +464,7 @@ class _PhotoMapScreenState extends ConsumerState<PhotoMapScreen> {
           const SizedBox(height: 8),
           const Text(
             '사진을 올려 우리만의 지도를 채워보세요',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppTheme.textSecondary,
-            ),
+            style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
           ),
         ],
       ),

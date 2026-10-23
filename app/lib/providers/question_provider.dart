@@ -50,7 +50,7 @@ class QuestionState {
 }
 
 class QuestionNotifier extends Notifier<QuestionState> {
-  late final Dio _dio;
+  late Dio _dio;
 
   @override
   QuestionState build() {

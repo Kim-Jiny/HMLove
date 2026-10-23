@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
 import '../../providers/fight_provider.dart';
+import '../../widgets/soft_ui.dart';
 
 class FightWriteScreen extends ConsumerStatefulWidget {
   final Fight? fight; // Optional fight data for edit mode
@@ -60,9 +61,9 @@ class _FightWriteScreenState extends ConsumerState<FightWriteScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-                  primary: AppTheme.primaryColor,
-                ),
+            colorScheme: Theme.of(
+              context,
+            ).colorScheme.copyWith(primary: AppTheme.primaryColor),
           ),
           child: child!,
         );
@@ -82,7 +83,9 @@ class _FightWriteScreenState extends ConsumerState<FightWriteScreen> {
 
     try {
       if (_isEditMode) {
-        await ref.read(fightProvider.notifier).updateFight(
+        await ref
+            .read(fightProvider.notifier)
+            .updateFight(
               id: widget.fight!.id,
               date: _selectedDate,
               reason: _reasonController.text.trim(),
@@ -95,7 +98,9 @@ class _FightWriteScreenState extends ConsumerState<FightWriteScreen> {
               isResolved: _isResolved,
             );
       } else {
-        await ref.read(fightProvider.notifier).createFight(
+        await ref
+            .read(fightProvider.notifier)
+            .createFight(
               date: _selectedDate,
               reason: _reasonController.text.trim(),
               resolution: _resolutionController.text.trim().isEmpty
@@ -172,7 +177,7 @@ class _FightWriteScreenState extends ConsumerState<FightWriteScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE0E0E0)),
+                    border: Border.all(color: AppTheme.borderColor),
                   ),
                   child: Row(
                     children: [
@@ -183,8 +188,10 @@ class _FightWriteScreenState extends ConsumerState<FightWriteScreen> {
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        DateFormat('yyyy년 M월 d일 (E)', 'ko')
-                            .format(_selectedDate),
+                        DateFormat(
+                          'yyyy년 M월 d일 (E)',
+                          'ko',
+                        ).format(_selectedDate),
                         style: const TextStyle(
                           fontSize: 15,
                           color: AppTheme.textPrimary,
@@ -202,9 +209,7 @@ class _FightWriteScreenState extends ConsumerState<FightWriteScreen> {
               TextFormField(
                 controller: _reasonController,
                 maxLines: 4,
-                decoration: const InputDecoration(
-                  hintText: '어떤 일로 다투었나요?',
-                ),
+                decoration: const InputDecoration(hintText: '어떤 일로 다투었나요?'),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return '다툼 이유를 입력해주세요';
@@ -239,7 +244,7 @@ class _FightWriteScreenState extends ConsumerState<FightWriteScreen> {
               const SizedBox(height: 24),
 
               // Resolved toggle
-              Card(
+              CartoonCard(
                 margin: EdgeInsets.zero,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
@@ -313,10 +318,7 @@ class _FieldLabel extends StatelessWidget {
   final String label;
   final bool optional;
 
-  const _FieldLabel({
-    required this.label,
-    this.optional = false,
-  });
+  const _FieldLabel({required this.label, this.optional = false});
 
   @override
   Widget build(BuildContext context) {
@@ -334,10 +336,7 @@ class _FieldLabel extends StatelessWidget {
           const SizedBox(width: 4),
           const Text(
             '(선택)',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppTheme.textHint,
-            ),
+            style: TextStyle(fontSize: 12, color: AppTheme.textHint),
           ),
         ],
       ],
