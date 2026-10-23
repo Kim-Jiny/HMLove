@@ -57,6 +57,11 @@
                 android:resource="@xml/widget_couple_info" />
         </receiver>
 
+        <!-- 위젯의 콕 버튼 -->
+        <receiver
+            android:name=".PokeReceiver"
+            android:exported="false" />
+
         <!-- Home Widget: Small (2x2) - D-Day only -->
         <receiver
             android:name=".HMLoveSmallWidgetProvider"

@@ -937,7 +937,7 @@ struct MediumWidgetView: View {
                             .offset(x: 55, y: -30)
                         SparkleSticker(size: 10)
                             .offset(x: 66, y: -42)
-                        HeartSticker(size: 17)
+                        PokeHeartButton(size: 17)
                             .offset(x: -2, y: 36)
                         SparkleSticker(size: 12)
                             .offset(x: 62, y: 38)

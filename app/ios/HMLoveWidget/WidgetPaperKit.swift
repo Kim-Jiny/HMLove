@@ -5,7 +5,8 @@
 //  "종이 더미 + 폴라로이드" 스타일의 재사용 SwiftUI 조각들.
 //  블러 없이 단순한 도형만 사용한다(위젯 렌더링 예산).
 //
-
+import SwiftUI
+import AppIntents
 import SwiftUI
 
 // MARK: - Constants
@@ -233,5 +234,48 @@ struct AnniversaryProgress: View {
             .frame(height: geo.size.height)
         }
         .frame(height: heart)
+    }
+}
+
+// MARK: - 콕 (보고싶어)
+
+@available(iOS 17.0, *)
+struct PokeIntent: AppIntent {
+    static var title: LocalizedStringResource = "보고싶어 콕"
+    static var description = IntentDescription("상대에게 '보고싶어' 콕을 보냅니다.")
+
+    func perform() async throws -> some IntentResult {
+        guard let defaults = UserDefaults(suiteName: "group.com.jiny.hmlove"),
+              let token = defaults.string(forKey: "authToken"),
+              let baseUrl = defaults.string(forKey: "apiBaseUrl"),
+              let url = URL(string: "\(baseUrl)/poke") else {
+            return .result()
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 8
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = #"{"kind":"miss"}"#.data(using: .utf8)
+        _ = try? await URLSession.shared.data(for: request)
+        return .result()
+    }
+}
+
+/// 위젯 안의 하트. iOS 17+ 에서는 누르면 바로 콕이 가고, 그 아래 버전에서는 그림만 보인다.
+struct PokeHeartButton: View {
+    var size: CGFloat = 17
+
+    var body: some View {
+        if #available(iOS 17.0, *) {
+            Button(intent: PokeIntent()) {
+                HeartSticker(size: size)
+                    .padding(8)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        } else {
+            HeartSticker(size: size)
+        }
     }
 }

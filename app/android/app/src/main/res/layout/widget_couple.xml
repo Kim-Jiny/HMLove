@@ -212,12 +212,14 @@
                 </LinearLayout>
 
                 <!-- 스티커 -->
+                <!-- 누르면 '보고싶어' 콕 -->
                 <ImageView
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
+                    android:id="@+id/widget_poke_btn"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
                     android:layout_gravity="start|bottom"
-                    android:layout_marginStart="2dp"
-                    android:contentDescription="@null"
+                    android:contentDescription="보고싶어 콕 보내기"
+                    android:padding="8dp"
                     android:src="@drawable/ic_sticker_heart" />
 
                 <ImageView

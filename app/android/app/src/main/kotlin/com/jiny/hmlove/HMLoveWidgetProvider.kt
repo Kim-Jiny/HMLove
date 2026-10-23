@@ -347,6 +347,7 @@ class HMLoveWidgetProvider : AppWidgetProvider() {
         val views = RemoteViews(context.packageName, R.layout.widget_couple)
 
         views.setOnClickPendingIntent(R.id.widget_root, launchAppIntent(context))
+        views.setOnClickPendingIntent(R.id.widget_poke_btn, PokeReceiver.pendingIntent(context))
         views.setOnClickPendingIntent(
             R.id.widget_settings_btn,
             widgetSettingsPendingIntent(context)
