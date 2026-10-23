@@ -1,6 +1,7 @@
 import 'badge_provider.dart';
 import 'calendar_provider.dart';
 import 'couple_provider.dart';
+import 'diary_provider.dart';
 import 'doodle_provider.dart';
 import 'feed_provider.dart';
 import 'fight_provider.dart';
@@ -11,6 +12,7 @@ import 'mission_provider.dart';
 import 'mood_provider.dart';
 import 'notification_provider.dart';
 import 'photo_provider.dart';
+import 'poke_provider.dart';
 import 'question_provider.dart';
 import 'wishlist_provider.dart';
 
@@ -28,7 +30,9 @@ void resetFeatureProviders(dynamic ref) {
   ref.invalidate(badgeProvider);
   ref.invalidate(calendarProvider);
   ref.invalidate(coupleProvider);
+  ref.invalidate(diaryProvider);
   ref.invalidate(doodleProvider);
+  ref.invalidate(pokeProvider);
   ref.invalidate(feedProvider);
   ref.invalidate(fightProvider);
   ref.invalidate(fortuneProvider);

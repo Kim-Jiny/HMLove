@@ -26,6 +26,7 @@ const _typeToKeyPrefix = <String, String>{
   'anniversary': 'noti_anniversary',
   'anniversary_remind': 'noti_anniversary',
   'letter': 'noti_letter',
+  'diary': 'noti_letter',
   'doodle': 'noti_doodle',
   'mood': 'noti_mood',
   'fight': 'noti_fight',
@@ -191,6 +192,9 @@ class PushNotificationService {
         } else {
           GoRouter.of(context).push('/letter');
         }
+        break;
+      case 'diary':
+        GoRouter.of(context).push('/diary');
         break;
       case 'calendar':
         GoRouter.of(context).go('/calendar');

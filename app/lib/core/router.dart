@@ -27,6 +27,7 @@ import '../screens/fortune/fortune_screen.dart';
 import '../screens/home/anniversary_screen.dart';
 import '../screens/notification/notification_screen.dart';
 import '../screens/wishlist/wishlist_screen.dart';
+import '../screens/diary/diary_screen.dart';
 import '../screens/question/question_screen.dart';
 import '../screens/doodle/doodle_canvas_screen.dart';
 import '../screens/doodle/doodle_history_screen.dart';
@@ -96,6 +97,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           'letter' => '/letter',
           'question' => '/question',
           'wishlist' => '/wishlist',
+          'diary' => '/diary',
           'fortune' => '/fortune',
           'anniversary' => '/anniversary',
           'photo-map' => '/photo-map',
@@ -251,6 +253,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/wishlist',
         builder: (context, state) => const WishlistScreen(),
+      ),
+
+      // Diary
+      GoRoute(
+        path: '/diary',
+        builder: (context, state) => const DiaryScreen(),
       ),
 
       // Question

@@ -316,6 +316,8 @@ class _HMLoveAppState extends ConsumerState<HMLoveApp>
         return '/question';
       case 'wishlist':
         return '/wishlist';
+      case 'diary':
+        return '/diary';
       case 'fortune':
         return '/fortune';
       case 'anniversary':

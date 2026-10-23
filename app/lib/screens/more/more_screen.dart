@@ -686,6 +686,16 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                   onTap: () => context.push('/letter'),
                 ),
                 _GridTile(
+                  label: '일기',
+                  background: AppTheme.mintSoft,
+                  icon: const Icon(
+                    Icons.menu_book_rounded,
+                    color: AppTheme.mint,
+                    size: 30,
+                  ),
+                  onTap: () => context.push('/diary'),
+                ),
+                _GridTile(
                   label: '위시리스트',
                   background: AppTheme.peachSoft,
                   icon: const Sticker(StickerKind.heart, size: 32),
