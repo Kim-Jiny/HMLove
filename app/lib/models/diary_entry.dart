@@ -1,4 +1,4 @@
-/// 일기 종류. 교환일기는 둘이 같은 공책에 쓰고, 개인일기는 내 것을 공개 시각에 맞춰 보여준다.
+/// 일기 종류. 교환일기는 둘이 같은 공책에 쓰고, 개인일기는 쓴 사람만 본다.
 enum DiaryKind {
   shared('SHARED'),
   private('PRIVATE');
@@ -13,8 +13,7 @@ enum DiaryKind {
 /// 목록 탭. 서버의 scope 파라미터와 같다.
 enum DiaryScope {
   shared('shared'),
-  mine('mine'),
-  revealed('revealed');
+  mine('mine');
 
   final String value;
   const DiaryScope(this.value);
@@ -28,7 +27,6 @@ class DiaryEntry {
   final DateTime entryDate;
   final String? mood;
   final String content;
-  final DateTime? revealAt;
 
   const DiaryEntry({
     required this.id,
@@ -38,7 +36,6 @@ class DiaryEntry {
     required this.entryDate,
     required this.mood,
     required this.content,
-    required this.revealAt,
   });
 
   factory DiaryEntry.fromJson(Map<String, dynamic> json) {
@@ -51,13 +48,6 @@ class DiaryEntry {
       entryDate: DateTime.parse(json['entryDate'] as String).toLocal(),
       mood: json['mood'] as String?,
       content: json['content'] as String,
-      revealAt: json['revealAt'] == null
-          ? null
-          : DateTime.parse(json['revealAt'] as String).toLocal(),
     );
   }
-
-  /// 개인일기가 이미 상대에게 공개됐는지.
-  bool get isRevealed =>
-      revealAt != null && !revealAt!.isAfter(DateTime.now());
 }

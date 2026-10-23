@@ -439,8 +439,7 @@ model QuestionAnswer {
   @@unique([questionId, userId])
 }
 
-// 일기. SHARED = 교환일기(둘 다 언제든 쓰고 바로 함께 봄), PRIVATE = 개인일기(나만 보고,
-// revealAt 이 지나면 상대에게도 공개. null 이면 계속 비공개).
+// 일기. SHARED = 교환일기(둘 다 언제든 쓰고 함께 봄), PRIVATE = 개인일기(쓴 사람만 봄).
 model DiaryEntry {
   id        String    @id @default(uuid())
   coupleId  String
@@ -451,7 +450,6 @@ model DiaryEntry {
   entryDate DateTime  @default(now())
   mood      String?
   content   String
-  revealAt  DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 

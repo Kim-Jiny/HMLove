@@ -61,14 +61,11 @@ class DiaryNotifier extends Notifier<DiaryState> {
     required String content,
     required DateTime entryDate,
     String? mood,
-    DateTime? revealAt,
   }) async {
     final body = {
       'content': content,
       'entryDate': entryDate.toUtc().toIso8601String(),
       'mood': mood,
-      if (kind == DiaryKind.private)
-        'revealAt': revealAt?.toUtc().toIso8601String(),
     };
     try {
       if (id == null) {

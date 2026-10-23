@@ -23,14 +23,10 @@ class DiaryScreen extends ConsumerStatefulWidget {
 
 class _DiaryScreenState extends ConsumerState<DiaryScreen>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabs = TabController(length: 3, vsync: this)
+  late final TabController _tabs = TabController(length: 2, vsync: this)
     ..addListener(() => setState(() {}));
 
-  static const _scopes = [
-    DiaryScope.shared,
-    DiaryScope.mine,
-    DiaryScope.revealed,
-  ];
+  static const _scopes = [DiaryScope.shared, DiaryScope.mine];
 
   @override
   void initState() {
@@ -49,7 +45,8 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen>
   }
 
   void _write([DiaryEntry? existing]) {
-    final kind = existing?.kind ??
+    final kind =
+        existing?.kind ??
         (_tabs.index == 1 ? DiaryKind.private : DiaryKind.shared);
     Navigator.push(
       context,
@@ -71,17 +68,21 @@ class _DiaryScreenState extends ConsumerState<DiaryScreen>
           labelColor: AppTheme.primaryColor,
           indicatorColor: AppTheme.primaryColor,
           unselectedLabelColor: AppTheme.textSecondary,
-          tabs: const [Tab(text: '교환일기'), Tab(text: '내 일기'), Tab(text: '공개된 일기')],
+          tabs: const [
+            Tab(text: '교환일기'),
+            Tab(text: '내 일기'),
+          ],
         ),
       ),
-      floatingActionButton: _tabs.index == 2
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: () => _write(),
-              backgroundColor: AppTheme.primaryColor,
-              icon: const Icon(Icons.edit_rounded, color: Colors.white),
-              label: const Text('쓰기', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _write(),
+        backgroundColor: AppTheme.primaryColor,
+        icon: const Icon(Icons.edit_rounded, color: Colors.white),
+        label: const Text(
+          '쓰기',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+        ),
+      ),
       body: TabBarView(
         controller: _tabs,
         children: [
@@ -118,10 +119,9 @@ class _DiaryList extends ConsumerWidget {
   });
 
   String get _emptyText => switch (scope) {
-        DiaryScope.shared => '아직 교환일기가 비어 있어요\n먼저 한 장 써 볼까요?\n순서 상관없이 언제든 쓸 수 있어요',
-        DiaryScope.mine => '나만의 일기장이에요\n공개 날짜를 정해 두면\n그날 상대에게 짠! 하고 보여줄 수 있어요',
-        DiaryScope.revealed => '상대가 공개한 일기가 아직 없어요',
-      };
+    DiaryScope.shared => '아직 교환일기가 비어 있어요\n먼저 한 장 써 볼까요?\n순서 상관없이 언제든 쓸 수 있어요',
+    DiaryScope.mine => '나만 볼 수 있는 일기장이에요\n오늘 하루를 편하게 적어 보세요',
+  };
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -138,9 +138,15 @@ class _DiaryList extends ConsumerWidget {
                     const Sticker(StickerKind.heart, size: 64),
                     const SizedBox(height: 14),
                     Text(
-                      error != null ? '불러오지 못했어요\n아래로 당겨 다시 시도해 주세요' : _emptyText,
+                      error != null
+                          ? '불러오지 못했어요\n아래로 당겨 다시 시도해 주세요'
+                          : _emptyText,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 14, height: 1.6, color: AppTheme.textSecondary),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        height: 1.6,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ],
                 ),
@@ -175,16 +181,8 @@ class _DiaryCard extends StatelessWidget {
     required this.onTap,
   });
 
-  String? get _badge {
-    if (entry.kind != DiaryKind.private || !mine) return null;
-    if (entry.revealAt == null) return '나만 보기';
-    if (entry.isRevealed) return '공개됨';
-    return '${DateFormat('M월 d일').format(entry.revealAt!)} 공개 예정';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final badge = _badge;
     return Bouncy(
       onTap: mine ? onTap : null,
       pressedScale: 0.98,
@@ -206,32 +204,30 @@ class _DiaryCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          DateFormat('yyyy.MM.dd (E)', 'ko').format(entry.entryDate),
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                          DateFormat(
+                            'yyyy.MM.dd (E)',
+                            'ko',
+                          ).format(entry.entryDate),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                         if (showAuthor || entry.mood != null)
                           Text(
                             [
                               if (showAuthor) entry.authorName,
-                              if (entry.mood != null) moodLabels[entry.mood] ?? '',
+                              if (entry.mood != null)
+                                moodLabels[entry.mood] ?? '',
                             ].join(' · '),
-                            style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textSecondary,
+                            ),
                           ),
                       ],
                     ),
                   ),
-                  if (badge != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppTheme.lavenderSoft,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        badge,
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.lavender),
-                      ),
-                    ),
                 ],
               ),
               const SizedBox(height: 12),

@@ -17,25 +17,17 @@ function parseDate(v) {
   return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
-// 내가 볼 수 있는 일기인지: 교환일기는 모두, 개인일기는 내 것 + 상대가 공개 시각을 지난 것.
+// 교환일기는 둘 다, 개인일기는 쓴 사람만 볼 수 있다.
 function visibleWhere(req, kind) {
-  const base = { coupleId: req.user.coupleId };
-  if (kind === 'SHARED') return { ...base, kind: 'SHARED' };
-  if (kind === 'PRIVATE') return { ...base, kind: 'PRIVATE', authorId: req.user.id };
-  // 'REVEALED': 상대가 공개한 개인일기
-  return {
-    ...base,
-    kind: 'PRIVATE',
-    authorId: { not: req.user.id },
-    revealAt: { lte: new Date() },
-  };
+  const base = { coupleId: req.user.coupleId, kind };
+  return kind === 'PRIVATE' ? { ...base, authorId: req.user.id } : base;
 }
 
-// GET /diary?scope=shared|mine|revealed&cursor=&limit=
+// GET /diary?scope=shared|mine&cursor=&limit=
 router.get('/', async (req, res) => {
   try {
     const scope = req.query.scope;
-    const kind = { shared: 'SHARED', mine: 'PRIVATE', revealed: 'REVEALED' }[scope];
+    const kind = { shared: 'SHARED', mine: 'PRIVATE' }[scope];
     if (!kind) return res.status(400).json({ error: 'scope 가 올바르지 않습니다.' });
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
     const cursor = req.query.cursor;
@@ -60,7 +52,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /diary { kind, content, mood?, entryDate?, revealAt? }
+// POST /diary { kind, content, mood?, entryDate? }
 router.post('/', async (req, res) => {
   try {
     const { kind = 'SHARED', mood } = req.body ?? {};
@@ -71,8 +63,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: `일기는 ${MAX_CONTENT}자까지 쓸 수 있어요.` });
     }
     const entryDate = parseDate(req.body?.entryDate);
-    const revealAt = kind === 'PRIVATE' ? parseDate(req.body?.revealAt) : null;
-    if (entryDate === undefined || revealAt === undefined) {
+    if (entryDate === undefined) {
       return res.status(400).json({ error: '날짜가 올바르지 않습니다.' });
     }
 
@@ -84,7 +75,6 @@ router.post('/', async (req, res) => {
         content,
         mood: typeof mood === 'string' && mood.length <= 20 ? mood : null,
         ...(entryDate && { entryDate }),
-        revealAt,
       },
       include: { author: authorSelect },
     });
@@ -130,12 +120,6 @@ router.patch('/:id', async (req, res) => {
       if (!d) return res.status(400).json({ error: '날짜가 올바르지 않습니다.' });
       data.entryDate = d;
     }
-    if (existing.kind === 'PRIVATE' && req.body?.revealAt !== undefined) {
-      const d = parseDate(req.body.revealAt);
-      if (d === undefined) return res.status(400).json({ error: '날짜가 올바르지 않습니다.' });
-      data.revealAt = d;
-    }
-
     const entry = await prisma.diaryEntry.update({
       where: { id: existing.id },
       data,

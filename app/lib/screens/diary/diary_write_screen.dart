@@ -26,7 +26,6 @@ class _DiaryWriteScreenState extends ConsumerState<DiaryWriteScreen> {
   );
   late DateTime _date = widget.existing?.entryDate ?? DateTime.now();
   late String? _mood = widget.existing?.mood;
-  late DateTime? _revealAt = widget.existing?.revealAt;
   bool _saving = false;
 
   bool get _isPrivate => widget.kind == DiaryKind.private;
@@ -47,21 +46,6 @@ class _DiaryWriteScreenState extends ConsumerState<DiaryWriteScreen> {
     if (d != null) setState(() => _date = d);
   }
 
-  Future<void> _pickReveal() async {
-    final now = DateTime.now();
-    final d = await showDatePicker(
-      context: context,
-      initialDate: _revealAt != null && _revealAt!.isAfter(now)
-          ? _revealAt!
-          : now.add(const Duration(days: 1)),
-      firstDate: now,
-      lastDate: DateTime(now.year + 20),
-      helpText: '이 날 상대에게 공개돼요',
-    );
-    // 선택한 날 아침 9시에 열리게 한다.
-    if (d != null) setState(() => _revealAt = DateTime(d.year, d.month, d.day, 9));
-  }
-
   Future<void> _save() async {
     final content = _text.text.trim();
     if (content.isEmpty) {
@@ -69,13 +53,14 @@ class _DiaryWriteScreenState extends ConsumerState<DiaryWriteScreen> {
       return;
     }
     setState(() => _saving = true);
-    final error = await ref.read(diaryProvider.notifier).save(
+    final error = await ref
+        .read(diaryProvider.notifier)
+        .save(
           id: widget.existing?.id,
           kind: widget.kind,
           content: content,
           entryDate: _date,
           mood: _mood,
-          revealAt: _isPrivate ? _revealAt : null,
         );
     if (!mounted) return;
     if (error != null) {
@@ -105,7 +90,9 @@ class _DiaryWriteScreenState extends ConsumerState<DiaryWriteScreen> {
       ),
     );
     if (ok != true) return;
-    final error = await ref.read(diaryProvider.notifier).delete(widget.existing!);
+    final error = await ref
+        .read(diaryProvider.notifier)
+        .delete(widget.existing!);
     if (!mounted) return;
     if (error != null) {
       showTopSnackBar(context, error, isError: true);
@@ -117,11 +104,6 @@ class _DiaryWriteScreenState extends ConsumerState<DiaryWriteScreen> {
   @override
   Widget build(BuildContext context) {
     final fmt = DateFormat('yyyy.MM.dd (E)', 'ko');
-    final revealText = _revealAt == null
-        ? '나만 볼래요'
-        : _revealAt!.isAfter(DateTime.now())
-            ? '${DateFormat('yyyy.MM.dd').format(_revealAt!)} 에 공개'
-            : '상대에게 공개됨';
     return Scaffold(
       appBar: AppBar(
         title: Text(_isPrivate ? '내 일기' : '교환일기'),
@@ -147,11 +129,18 @@ class _DiaryWriteScreenState extends ConsumerState<DiaryWriteScreen> {
             onTap: _pickDate,
             child: Row(
               children: [
-                const Icon(Icons.calendar_today_rounded, size: 18, color: AppTheme.primaryColor),
+                const Icon(
+                  Icons.calendar_today_rounded,
+                  size: 18,
+                  color: AppTheme.primaryColor,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   fmt.format(_date),
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ],
             ),
@@ -171,15 +160,20 @@ class _DiaryWriteScreenState extends ConsumerState<DiaryWriteScreen> {
                   Padding(
                     padding: const EdgeInsets.only(right: 10),
                     child: Bouncy(
-                      onTap: () => setState(() => _mood = _mood == key ? null : key),
+                      onTap: () =>
+                          setState(() => _mood = _mood == key ? null : key),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 150),
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: _mood == key ? AppTheme.primarySoft : Colors.transparent,
+                          color: _mood == key
+                              ? AppTheme.primarySoft
+                              : Colors.transparent,
                           border: Border.all(
-                            color: _mood == key ? AppTheme.ink : Colors.transparent,
+                            color: _mood == key
+                                ? AppTheme.ink
+                                : Colors.transparent,
                             width: AppTheme.outlineWidth,
                           ),
                         ),
@@ -196,7 +190,10 @@ class _DiaryWriteScreenState extends ConsumerState<DiaryWriteScreen> {
             decoration: BoxDecoration(
               color: const Color(0xFFFFFBEF),
               borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-              border: Border.all(color: AppTheme.ink, width: AppTheme.outlineWidth),
+              border: Border.all(
+                color: AppTheme.ink,
+                width: AppTheme.outlineWidth,
+              ),
               boxShadow: AppTheme.cartoonShadow,
             ),
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -218,43 +215,20 @@ class _DiaryWriteScreenState extends ConsumerState<DiaryWriteScreen> {
             ),
           ),
           if (_isPrivate) ...[
-            const SizedBox(height: 20),
-            const Text(
-              '상대에게 보여주기',
-              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            const SizedBox(height: 12),
+            const Row(
               children: [
-                ChoiceChip(
-                  label: const Text('나만 볼래요'),
-                  selected: _revealAt == null,
-                  onSelected: (_) => setState(() => _revealAt = null),
+                Icon(
+                  Icons.lock_rounded,
+                  size: 14,
+                  color: AppTheme.textSecondary,
                 ),
-                ChoiceChip(
-                  label: Text(
-                    _revealAt != null && _revealAt!.isAfter(DateTime.now())
-                        ? revealText
-                        : '날짜를 정해 공개',
-                  ),
-                  selected: _revealAt != null && _revealAt!.isAfter(DateTime.now()),
-                  onSelected: (_) => _pickReveal(),
-                ),
-                ChoiceChip(
-                  label: const Text('지금 공개'),
-                  selected: _revealAt != null && !_revealAt!.isAfter(DateTime.now()),
-                  onSelected: (_) => setState(() => _revealAt = DateTime.now()),
+                SizedBox(width: 6),
+                Text(
+                  '나만 볼 수 있어요',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                 ),
               ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _revealAt == null
-                  ? '계속 나만 볼 수 있어요. 나중에 언제든 공개 날짜를 정할 수 있어요.'
-                  : '지금은 나만 보고, 정한 날이 되면 상대의 "공개된 일기"에 나타나요.',
-              style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
             ),
           ],
         ],

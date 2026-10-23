@@ -7,7 +7,6 @@ CREATE TABLE "DiaryEntry" (
     "entryDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "mood" TEXT,
     "content" TEXT NOT NULL,
-    "revealAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
