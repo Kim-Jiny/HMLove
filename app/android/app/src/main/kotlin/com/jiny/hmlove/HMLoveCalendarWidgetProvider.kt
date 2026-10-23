@@ -122,7 +122,7 @@ class HMLoveCalendarWidgetProvider : AppWidgetProvider() {
         views: RemoteViews,
         prefs: SharedPreferences
     ): Int? {
-        if (!prefs.contains(CalendarWidgetSettingsActivity.PREF_KEY_BG_ARGB)) return null
+        if (!hasCustomWidgetBackground(prefs)) return null
         val argb = prefs.getInt(
             CalendarWidgetSettingsActivity.PREF_KEY_BG_ARGB,
             0xFFFFFFFF.toInt()

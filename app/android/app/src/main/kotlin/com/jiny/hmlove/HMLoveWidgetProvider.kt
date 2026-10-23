@@ -59,11 +59,28 @@ internal fun selectedWidgetTheme(prefs: SharedPreferences): CalendarWidgetThemeO
     } ?: CalendarWidgetSettingsActivity.THEMES.first()
 }
 
+/**
+ * 사용자가 배경을 실제로 바꿨는지 여부.
+ *
+ * 위젯 설정 화면은 '적용'만 눌러도 기본 테마·불투명 값(widgetBgArgb)을 저장한다.
+ * 그 값으로 배경을 덮으면 기본 디자인(윤곽선·그라데이션·그림자 카드)이 납작한 단색으로
+ * 바뀌어 새 디자인이 보이지 않으므로, "기본 테마 + 불투명"은 사용자 지정으로 보지 않는다.
+ */
+internal fun hasCustomWidgetBackground(prefs: SharedPreferences): Boolean {
+    if (!prefs.contains(CalendarWidgetSettingsActivity.PREF_KEY_BG_ARGB)) return false
+    val argb = prefs.getInt(
+        CalendarWidgetSettingsActivity.PREF_KEY_BG_ARGB,
+        0xFFFFFFFF.toInt()
+    )
+    val opaque = Color.alpha(argb) == 255
+    return !(opaque && isDefaultWidgetTheme(selectedWidgetTheme(prefs)))
+}
+
 internal fun applyWidgetBackground(
     views: RemoteViews,
     prefs: SharedPreferences
 ) {
-    if (!prefs.contains(CalendarWidgetSettingsActivity.PREF_KEY_BG_ARGB)) return
+    if (!hasCustomWidgetBackground(prefs)) return
     val argb = prefs.getInt(
         CalendarWidgetSettingsActivity.PREF_KEY_BG_ARGB,
         0xFFFFFFFF.toInt()
