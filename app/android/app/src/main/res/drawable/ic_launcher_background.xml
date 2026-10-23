@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 어댑티브 아이콘 배경: 앱 아이콘과 같은 연분홍 → 연보라 그라데이션 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <gradient
+        android:angle="315"
+        android:startColor="#FFFFD6E4"
+        android:endColor="#FFE6DFFF" />
+</shape>
