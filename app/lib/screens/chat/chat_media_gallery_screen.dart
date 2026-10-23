@@ -65,18 +65,22 @@ class _ChatMediaGalleryScreenState extends State<ChatMediaGalleryScreen> {
         final urls = m['imageUrls'] as List?;
         if (urls != null) {
           for (final url in urls) {
-            messages.add(_MediaItem(
-              id: m['id'] as String,
-              imageUrl: url as String,
-              createdAt: createdAt,
-            ));
+            messages.add(
+              _MediaItem(
+                id: m['id'] as String,
+                imageUrl: url as String,
+                createdAt: createdAt,
+              ),
+            );
           }
         } else if (m['imageUrl'] != null) {
-          messages.add(_MediaItem(
-            id: m['id'] as String,
-            imageUrl: m['imageUrl'] as String,
-            createdAt: createdAt,
-          ));
+          messages.add(
+            _MediaItem(
+              id: m['id'] as String,
+              imageUrl: m['imageUrl'] as String,
+              createdAt: createdAt,
+            ),
+          );
         }
       }
       final cursor = data['nextCursor'] as String?;
@@ -96,20 +100,25 @@ class _ChatMediaGalleryScreenState extends State<ChatMediaGalleryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('사진/영상 (${_items.length})'),
-      ),
+      appBar: AppBar(title: Text('사진/영상 (${_items.length})')),
       body: _items.isEmpty && !_isLoading
           ? const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.photo_library_outlined,
-                      size: 64, color: AppTheme.textHint),
+                  Icon(
+                    Icons.photo_library_outlined,
+                    size: 64,
+                    color: AppTheme.textHint,
+                  ),
                   SizedBox(height: 16),
-                  Text('주고받은 사진이 없어요',
-                      style:
-                          TextStyle(fontSize: 15, color: AppTheme.textSecondary)),
+                  Text(
+                    '주고받은 사진이 없어요',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
                 ],
               ),
             )
@@ -136,9 +145,11 @@ class _ChatMediaGalleryScreenState extends State<ChatMediaGalleryScreen> {
                     imageUrl: item.imageUrl,
                     fit: BoxFit.cover,
                     errorWidget: (_, _, _) => Container(
-                      color: Colors.grey.shade200,
-                      child: const Icon(Icons.broken_image,
-                          color: AppTheme.textHint),
+                      color: AppTheme.lavenderSoft,
+                      child: const Icon(
+                        Icons.broken_image,
+                        color: AppTheme.textHint,
+                      ),
                     ),
                   ),
                 );

@@ -7,6 +7,8 @@ class User {
   final String? mood;
   final String? coupleId;
   final bool isCoupleComplete;
+  /// 상대가 아직 연결되기 전에 먼저 시작한 상태(멤버 1명짜리 커플). 상대가 합류하면 false.
+  final bool isSolo;
   final bool hasExistingCoupleData;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -20,6 +22,7 @@ class User {
     this.mood,
     this.coupleId,
     this.isCoupleComplete = false,
+    this.isSolo = false,
     this.hasExistingCoupleData = false,
     required this.createdAt,
     required this.updatedAt,
@@ -37,6 +40,7 @@ class User {
       mood: json['mood'] as String?,
       coupleId: json['coupleId'] as String?,
       isCoupleComplete: json['isCoupleComplete'] as bool? ?? false,
+      isSolo: json['isSolo'] as bool? ?? false,
       hasExistingCoupleData: json['hasExistingCoupleData'] as bool? ?? false,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
@@ -53,6 +57,7 @@ class User {
       'mood': mood,
       'coupleId': coupleId,
       'isCoupleComplete': isCoupleComplete,
+      'isSolo': isSolo,
       'hasExistingCoupleData': hasExistingCoupleData,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -68,6 +73,7 @@ class User {
     String? mood,
     Object? coupleId = _sentinel,
     bool? isCoupleComplete,
+    bool? isSolo,
     bool? hasExistingCoupleData,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -81,6 +87,7 @@ class User {
       mood: mood ?? this.mood,
       coupleId: coupleId == _sentinel ? this.coupleId : coupleId as String?,
       isCoupleComplete: isCoupleComplete ?? this.isCoupleComplete,
+      isSolo: isSolo ?? this.isSolo,
       hasExistingCoupleData: hasExistingCoupleData ?? this.hasExistingCoupleData,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

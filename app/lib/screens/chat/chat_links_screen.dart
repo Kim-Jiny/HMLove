@@ -59,8 +59,7 @@ class _ChatLinksScreenState extends State<ChatLinksScreen> {
         if (_nextCursor != null) 'cursor': _nextCursor,
       };
 
-      final response =
-          await _dio.get('/chat/links', queryParameters: params);
+      final response = await _dio.get('/chat/links', queryParameters: params);
       if (!mounted) return;
       final data = response.data as Map<String, dynamic>;
       final messages = data['messages'] as List;
@@ -70,7 +69,10 @@ class _ChatLinksScreenState extends State<ChatLinksScreen> {
       for (final m in messages) {
         final msg = m as Map<String, dynamic>;
         final content = msg['content'] as String? ?? '';
-        final urls = _urlRegex.allMatches(content).map((m) => m.group(0)!).toList();
+        final urls = _urlRegex
+            .allMatches(content)
+            .map((m) => m.group(0)!)
+            .toList();
         if (urls.isEmpty) continue;
 
         final sender = msg['sender'] as Map<String, dynamic>?;
@@ -78,12 +80,14 @@ class _ChatLinksScreenState extends State<ChatLinksScreen> {
         final createdAt = DateTime.parse(msg['createdAt'] as String);
 
         for (final url in urls) {
-          newItems.add(_LinkItem(
-            url: url,
-            senderName: senderName,
-            content: content,
-            createdAt: createdAt,
-          ));
+          newItems.add(
+            _LinkItem(
+              url: url,
+              senderName: senderName,
+              content: content,
+              createdAt: createdAt,
+            ),
+          );
         }
       }
 
@@ -117,9 +121,7 @@ class _ChatLinksScreenState extends State<ChatLinksScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('링크 모아보기 (${_items.length})'),
-      ),
+      appBar: AppBar(title: Text('링크 모아보기 (${_items.length})')),
       body: _items.isEmpty && !_isLoading
           ? const Center(
               child: Column(
@@ -129,8 +131,10 @@ class _ChatLinksScreenState extends State<ChatLinksScreen> {
                   SizedBox(height: 16),
                   Text(
                     '주고받은 링크가 없어요',
-                    style:
-                        TextStyle(fontSize: 15, color: AppTheme.textSecondary),
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -160,8 +164,11 @@ class _ChatLinksScreenState extends State<ChatLinksScreen> {
                       color: AppTheme.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.link,
-                        color: AppTheme.primaryColor, size: 20),
+                    child: const Icon(
+                      Icons.link,
+                      color: AppTheme.primaryColor,
+                      size: 20,
+                    ),
                   ),
                   title: Text(
                     _displayUrl(item.url),
@@ -176,7 +183,9 @@ class _ChatLinksScreenState extends State<ChatLinksScreen> {
                   subtitle: Text(
                     '${item.senderName} · ${DateFormat('M/d a h:mm', 'ko').format(item.createdAt)}',
                     style: const TextStyle(
-                        fontSize: 12, color: AppTheme.textHint),
+                      fontSize: 12,
+                      color: AppTheme.textHint,
+                    ),
                   ),
                   onTap: () => _openUrl(item.url),
                 );

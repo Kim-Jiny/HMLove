@@ -10,6 +10,9 @@ import '../../providers/ad_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
 import '../../providers/fortune_provider.dart';
+import '../../widgets/cute/loader.dart';
+import '../../widgets/cute/mood_face.dart';
+import '../../widgets/soft_ui.dart';
 
 class FortuneScreen extends ConsumerStatefulWidget {
   const FortuneScreen({super.key});
@@ -24,6 +27,10 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
   late Animation<double> _scaleAnimation;
   RewardedAd? _rewardedAd;
   bool _isAdLoading = false;
+
+  /// 광고를 보고(또는 광고 제거 유저가) 운세 생성을 요청한 상태.
+  /// 생성이 실패해도 이미 광고 보상을 받았으므로 재시도는 광고 없이 바로 생성한다.
+  bool _pendingGenerate = false;
 
   @override
   void initState() {
@@ -114,10 +121,18 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
   }
 
   Future<void> _generateFortune() async {
+    setState(() => _pendingGenerate = true);
     await ref.read(fortuneProvider.notifier).generateFortune();
-    if (mounted) {
+    if (!mounted) return;
+    if (ref.read(fortuneProvider).fortune != null) {
+      _pendingGenerate = false;
       _animController.forward(from: 0);
     }
+  }
+
+  /// 에러 화면의 "다시 시도": 보상을 이미 받았다면 광고 없이 생성부터 다시.
+  Future<void> _retry() {
+    return _pendingGenerate ? _generateFortune() : _checkFortune();
   }
 
   Future<void> _checkFortune() async {
@@ -138,19 +153,19 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
     final fortune = fortuneState.fortune;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('오늘의 커플 운세'),
-      ),
+      appBar: AppBar(title: const Text('오늘의 커플 운세')),
       body: RefreshIndicator(
         color: AppTheme.primaryColor,
-        onRefresh: _checkFortune,
+        onRefresh: _retry,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: fortuneState.isLoading
               ? _buildLoadingState()
-              : fortune == null
-                  ? _buildInitialState(fortuneState)
-                  : _buildFortuneContent(fortune),
+              : fortune != null
+              ? _buildFortuneContent(fortune)
+              : fortuneState.error != null
+              ? _buildErrorState(fortuneState.error!)
+              : _buildInitialState(fortuneState),
         ),
       ),
     );
@@ -177,21 +192,75 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
                   ],
                 ),
               ),
-              child: const Center(
-                child: CircularProgressIndicator(
-                  color: AppTheme.primaryColor,
-                ),
-              ),
+              child: const Center(child: CuteLoader()),
             ),
             const SizedBox(height: 24),
-            const Text(
-              '운세를 확인하고 있어요...',
-              style: TextStyle(
-                fontSize: 16,
-                color: AppTheme.textSecondary,
+            Text(
+              _pendingGenerate ? '오늘의 운세를 만들고 있어요' : '운세를 확인하고 있어요',
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
               ),
             ),
+            if (_pendingGenerate) ...[
+              const SizedBox(height: 8),
+              const Text(
+                '처음 만들 땐 10초 정도 걸릴 수 있어요',
+                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+              ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+
+  /// 운세 조회/생성이 실패했을 때. 처음 화면(광고 버튼)으로 되돌리지 않고
+  /// 실패했다는 사실과 재시도를 분명히 보여준다.
+  Widget _buildErrorState(String message) {
+    return SizedBox(
+      height: MediaQuery.of(context).size.height - 200,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const MoodFace(moodKey: 'sad', size: 96, pop: true),
+              const SizedBox(height: 20),
+              const Text(
+                '운세를 불러오지 못했어요',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 13,
+                  height: 1.5,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              if (_pendingGenerate) ...[
+                const SizedBox(height: 6),
+                const Text(
+                  '광고는 이미 보셨으니 다시 보지 않아도 돼요',
+                  style: TextStyle(fontSize: 12, color: AppTheme.mint),
+                ),
+              ],
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _retry,
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                label: const Text('다시 시도'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.lavender,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -214,8 +283,8 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFF9C27B0).withValues(alpha: 0.1),
-                    const Color(0xFF9C27B0).withValues(alpha: 0.03),
+                    AppTheme.lavender.withValues(alpha: 0.1),
+                    AppTheme.lavender.withValues(alpha: 0.03),
                     Colors.transparent,
                   ],
                 ),
@@ -224,7 +293,7 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
                 child: Icon(
                   Icons.auto_awesome,
                   size: 56,
-                  color: Color(0xFF9C27B0),
+                  color: AppTheme.lavender,
                 ),
               ),
             ),
@@ -239,9 +308,7 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              adsRemoved
-                  ? '둘만의 특별한 운세가 기다리고 있어요'
-                  : '짧은 광고를 보고 오늘의 운세를 확인하세요',
+              adsRemoved ? '둘만의 특별한 운세가 기다리고 있어요' : '짧은 광고를 보고 오늘의 운세를 확인하세요',
               style: const TextStyle(
                 fontSize: 14,
                 color: AppTheme.textSecondary,
@@ -255,7 +322,7 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
                 icon: const Icon(Icons.auto_awesome, size: 20),
                 label: const Text('운세 확인하기'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF9C27B0),
+                  backgroundColor: AppTheme.lavender,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 32,
@@ -266,24 +333,25 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
             else
               // 광고 시청 필요
               ElevatedButton.icon(
-                onPressed:
-                    (_rewardedAd != null) ? _showRewardedAd : null,
+                onPressed: (_rewardedAd != null) ? _showRewardedAd : null,
                 icon: Icon(
-                  _isAdLoading ? Icons.hourglass_top : Icons.play_circle_outline,
+                  _isAdLoading
+                      ? Icons.hourglass_top
+                      : Icons.play_circle_outline,
                   size: 20,
                 ),
                 label: Text(
                   _isAdLoading
                       ? '광고 준비 중...'
                       : _rewardedAd != null
-                          ? '광고 보고 운세 확인하기'
-                          : '광고를 불러오지 못했어요',
+                      ? '광고 보고 운세 확인하기'
+                      : '광고를 불러오지 못했어요',
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF9C27B0),
+                  backgroundColor: AppTheme.lavender,
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.grey.shade300,
-                  disabledForegroundColor: Colors.grey.shade500,
+                  disabledBackgroundColor: AppTheme.borderColor,
+                  disabledForegroundColor: AppTheme.textHint,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 32,
                     vertical: 14,
@@ -298,18 +366,7 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
                   onPressed: _loadRewardedAd,
                   child: const Text(
                     '다시 시도',
-                    style: TextStyle(color: Color(0xFF9C27B0)),
-                  ),
-                ),
-              ),
-            if (fortuneState.error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: Text(
-                  fortuneState.error!,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppTheme.errorColor,
+                    style: TextStyle(color: AppTheme.lavender),
                   ),
                 ),
               ),
@@ -329,14 +386,14 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
         child: Column(
           children: [
             // Lucky Score Card
-            Card(
+            CartoonCard(
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF9C27B0), Color(0xFFCE93D8)],
+                    colors: [AppTheme.lavender, AppTheme.lavender],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -396,7 +453,7 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
             // General Luck
             _FortuneCard(
               icon: Icons.stars_outlined,
-              iconColor: const Color(0xFFFF9800),
+              iconColor: AppTheme.peach,
               title: '종합 운세',
               content: fortune.generalLuck ?? '정보를 불러올 수 없습니다',
             ),
@@ -414,7 +471,7 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
             // Date Tip
             _FortuneCard(
               icon: Icons.restaurant_outlined,
-              iconColor: const Color(0xFF4CAF50),
+              iconColor: AppTheme.mint,
               title: '데이트 팁',
               content: fortune.dateTip ?? '정보를 불러올 수 없습니다',
             ),
@@ -430,7 +487,7 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
             // Caution
             _FortuneCard(
               icon: Icons.warning_amber_outlined,
-              iconColor: const Color(0xFFF44336),
+              iconColor: AppTheme.errorColor,
               title: '주의사항',
               content: fortune.caution ?? '정보를 불러올 수 없습니다',
             ),
@@ -474,16 +531,15 @@ class _FortuneScreenState extends ConsumerState<FortuneScreen>
         if (myLuck != null)
           _FortuneCard(
             icon: Icons.person,
-            iconColor: const Color(0xFF2196F3),
+            iconColor: AppTheme.sky,
             title: '$myName의 오늘 운세',
             content: myLuck,
           ),
-        if (myLuck != null && partnerLuck != null)
-          const SizedBox(height: 8),
+        if (myLuck != null && partnerLuck != null) const SizedBox(height: 8),
         if (partnerLuck != null)
           _FortuneCard(
             icon: Icons.person_outline,
-            iconColor: const Color(0xFFE91E63),
+            iconColor: AppTheme.primaryColor,
             title: '$partnerName의 오늘 운세',
             content: partnerLuck,
           ),
@@ -515,7 +571,7 @@ class _FortuneCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
@@ -528,11 +584,7 @@ class _FortuneCard extends StatelessWidget {
                 color: iconColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                icon,
-                color: iconColor,
-                size: 22,
-              ),
+              child: Icon(icon, color: iconColor, size: 22),
             ),
             const SizedBox(width: 14),
             Expanded(

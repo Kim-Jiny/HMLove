@@ -165,7 +165,7 @@ class CalendarState {
 
 // Calendar Notifier
 class CalendarNotifier extends Notifier<CalendarState> {
-  late final Dio _dio;
+  late Dio _dio;
   String _currentYearMonth = '';
 
   @override

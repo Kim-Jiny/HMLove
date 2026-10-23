@@ -45,7 +45,7 @@ class DoodleState {
 }
 
 class DoodleNotifier extends Notifier<DoodleState> {
-  late final Dio _dio;
+  late Dio _dio;
 
   @override
   DoodleState build() {

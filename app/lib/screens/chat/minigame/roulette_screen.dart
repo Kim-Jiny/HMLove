@@ -29,14 +29,14 @@ class _RouletteScreenState extends State<RouletteScreen>
   List<String> _spinOptions = []; // spin 시점의 옵션 스냅샷
 
   static const _colors = [
-    Color(0xFFE91E63),
-    Color(0xFF9C27B0),
-    Color(0xFF3F51B5),
-    Color(0xFF03A9F4),
-    Color(0xFF009688),
-    Color(0xFF4CAF50),
-    Color(0xFFFF9800),
-    Color(0xFFFF5722),
+    AppTheme.primaryColor,
+    AppTheme.lavender,
+    AppTheme.lavender,
+    AppTheme.sky,
+    AppTheme.mint,
+    AppTheme.mint,
+    AppTheme.peach,
+    AppTheme.peach,
   ];
 
   @override
@@ -60,8 +60,9 @@ class _RouletteScreenState extends State<RouletteScreen>
   void _addOption() {
     if (_controllers.length >= 8) return;
     setState(() {
-      _controllers
-          .add(TextEditingController(text: '옵션 ${_controllers.length + 1}'));
+      _controllers.add(
+        TextEditingController(text: '옵션 ${_controllers.length + 1}'),
+      );
     });
   }
 
@@ -117,7 +118,7 @@ class _RouletteScreenState extends State<RouletteScreen>
     // 화살표는 12시 방향(= -pi/2). 섹터 i 중심을 거기에 맞춤.
     final targetAngle =
         (-pi / 2 - (_resultIndex * sectorAngle + sectorAngle / 2)) +
-            6 * 2 * pi; // 6바퀴 + 정확한 위치
+        6 * 2 * pi; // 6바퀴 + 정확한 위치
 
     _animation = Tween<double>(begin: 0, end: targetAngle).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
@@ -135,10 +136,7 @@ class _RouletteScreenState extends State<RouletteScreen>
 
   void _sendResult() {
     final result = _spinOptions[_resultIndex];
-    final payload = jsonEncode({
-      'options': _spinOptions,
-      'result': result,
-    });
+    final payload = jsonEncode({'options': _spinOptions, 'result': result});
     Navigator.pop(context, '__GAME_ROULETTE__:$payload');
   }
 
@@ -178,9 +176,10 @@ class _RouletteScreenState extends State<RouletteScreen>
                           child: Text(
                             '${i + 1}',
                             style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold),
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
@@ -191,7 +190,9 @@ class _RouletteScreenState extends State<RouletteScreen>
                           decoration: InputDecoration(
                             hintText: '옵션 ${i + 1}',
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -200,8 +201,11 @@ class _RouletteScreenState extends State<RouletteScreen>
                       ),
                       if (_controllers.length > 2)
                         IconButton(
-                          icon: const Icon(Icons.remove_circle_outline,
-                              color: Colors.red, size: 22),
+                          icon: const Icon(
+                            Icons.remove_circle_outline,
+                            color: Colors.red,
+                            size: 22,
+                          ),
                           onPressed: () => _removeOption(i),
                         ),
                     ],
@@ -247,8 +251,11 @@ class _RouletteScreenState extends State<RouletteScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Arrow
-                  const Icon(Icons.arrow_drop_down,
-                      size: 40, color: AppTheme.primaryColor),
+                  const Icon(
+                    Icons.arrow_drop_down,
+                    size: 40,
+                    color: AppTheme.primaryColor,
+                  ),
                   // Wheel
                   AspectRatio(
                     aspectRatio: 1,
@@ -267,9 +274,13 @@ class _RouletteScreenState extends State<RouletteScreen>
                   ),
                   const SizedBox(height: 24),
                   if (_phase == _RoulettePhase.result) ...[
-                    const Text('결과는...',
-                        style: TextStyle(
-                            fontSize: 14, color: AppTheme.textSecondary)),
+                    const Text(
+                      '결과는...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Text(
                       result,
@@ -352,21 +363,14 @@ class _WheelPainter extends CustomPainter {
         ),
         textDirection: TextDirection.ltr,
       )..layout(maxWidth: radius * 0.6);
-      textPainter.paint(
-        canvas,
-        Offset(radius * 0.3, -textPainter.height / 2),
-      );
+      textPainter.paint(canvas, Offset(radius * 0.3, -textPainter.height / 2));
       canvas.restore();
     }
 
     canvas.restore();
 
     // Center circle
-    canvas.drawCircle(
-      center,
-      radius * 0.12,
-      Paint()..color = Colors.white,
-    );
+    canvas.drawCircle(center, radius * 0.12, Paint()..color = Colors.white);
     canvas.drawCircle(
       center,
       radius * 0.12,
@@ -382,4 +386,3 @@ class _WheelPainter extends CustomPainter {
     return oldDelegate.rotation != rotation;
   }
 }
-

@@ -5,6 +5,9 @@ import 'package:intl/intl.dart';
 
 import '../../core/theme.dart';
 import '../../providers/fight_provider.dart';
+import '../../widgets/cute/loader.dart';
+import '../../widgets/soft_ui.dart';
+import '../../widgets/cute/mood_face.dart';
 
 enum FightFilter { all, unresolved, resolved }
 
@@ -78,81 +81,74 @@ class _FightListScreenState extends ConsumerState<FightListScreen> {
         ),
       ),
       body: fightState.isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: AppTheme.primaryColor,
-              ),
-            )
+          ? const Center(child: CuteLoader())
           : fights.isEmpty
-              ? _buildEmptyState()
-              : RefreshIndicator(
-                  color: AppTheme.primaryColor,
-                  onRefresh: () async {
-                    await ref.read(fightProvider.notifier).fetchFights();
-                  },
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    itemCount: fights.length,
-                    itemBuilder: (context, index) {
-                      final fight = fights[index];
-                      final isExpanded = _expandedIds.contains(fight.id);
-
-                      return _FightCard(
-                        fight: fight,
-                        isExpanded: isExpanded,
-                        onTap: () {
-                          setState(() {
-                            if (isExpanded) {
-                              _expandedIds.remove(fight.id);
-                            } else {
-                              _expandedIds.add(fight.id);
-                            }
-                          });
-                        },
-                        onEdit: () async {
-                          await context.push('/fight/write', extra: fight);
-                          setState(() => _expandedIds.clear());
-                        },
-                        onDelete: () async {
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('삭제 확인'),
-                              content: const Text('이 기록을 삭제하시겠습니까?'),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.pop(context, false),
-                                  child: const Text('취소'),
-                                ),
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.pop(context, true),
-                                  child: const Text(
-                                    '삭제',
-                                    style:
-                                        TextStyle(color: AppTheme.errorColor),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (confirm == true) {
-                            await ref
-                                .read(fightProvider.notifier)
-                                .deleteFight(fight.id);
-                          }
-                        },
-                      );
-                    },
-                  ),
+          ? _buildEmptyState()
+          : RefreshIndicator(
+              color: AppTheme.primaryColor,
+              onRefresh: () async {
+                await ref.read(fightProvider.notifier).fetchFights();
+              },
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
                 ),
+                itemCount: fights.length,
+                itemBuilder: (context, index) {
+                  final fight = fights[index];
+                  final isExpanded = _expandedIds.contains(fight.id);
+
+                  return _FightCard(
+                    fight: fight,
+                    isExpanded: isExpanded,
+                    onTap: () {
+                      setState(() {
+                        if (isExpanded) {
+                          _expandedIds.remove(fight.id);
+                        } else {
+                          _expandedIds.add(fight.id);
+                        }
+                      });
+                    },
+                    onEdit: () async {
+                      await context.push('/fight/write', extra: fight);
+                      setState(() => _expandedIds.clear());
+                    },
+                    onDelete: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('삭제 확인'),
+                          content: const Text('이 기록을 삭제하시겠습니까?'),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('취소'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text(
+                                '삭제',
+                                style: TextStyle(color: AppTheme.errorColor),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        await ref
+                            .read(fightProvider.notifier)
+                            .deleteFight(fight.id);
+                      }
+                    },
+                  );
+                },
+              ),
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           context.push('/fight/write');
@@ -202,10 +198,7 @@ class _FightListScreenState extends ConsumerState<FightListScreen> {
           const SizedBox(height: 8),
           const Text(
             '다툼을 기록하고 함께 성장해요',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppTheme.textSecondary,
-            ),
+            style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
           ),
         ],
       ),
@@ -272,7 +265,7 @@ class _FightCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isResolved = fight.isResolved;
 
-    return Card(
+    return CartoonCard(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: onTap,
@@ -311,16 +304,14 @@ class _FightCard extends StatelessWidget {
                           ? AppTheme.successColor.withValues(alpha: 0.1)
                           : AppTheme.errorColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.ink, width: 1.2),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          isResolved ? Icons.check_circle : Icons.cancel,
-                          size: 14,
-                          color: isResolved
-                              ? AppTheme.successColor
-                              : AppTheme.errorColor,
+                        MoodFace(
+                          moodKey: isResolved ? 'peaceful' : 'angry',
+                          size: 18,
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -360,10 +351,7 @@ class _FightCard extends StatelessWidget {
                 // Resolution
                 if (fight.resolution != null &&
                     fight.resolution!.isNotEmpty) ...[
-                  _SectionLabel(
-                    icon: Icons.handshake_outlined,
-                    label: '해결 방법',
-                  ),
+                  _SectionLabel(icon: Icons.handshake_outlined, label: '해결 방법'),
                   const SizedBox(height: 6),
                   Text(
                     fight.resolution!,
@@ -444,10 +432,7 @@ class _SectionLabel extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _SectionLabel({
-    required this.icon,
-    required this.label,
-  });
+  const _SectionLabel({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {

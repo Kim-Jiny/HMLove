@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
+import '../../widgets/cute/motion.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/couple_provider.dart';
 import 'camera_preview_screen.dart';
@@ -45,7 +46,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   final Set<String> _selectedForDelete = {};
   int? _captureStartIndex;
   int? _captureEndIndex;
-
 
   @override
   void initState() {
@@ -186,22 +186,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final dio = ApiClient.createDio();
       final formData = FormData();
       for (final file in files) {
-        formData.files.add(MapEntry(
-          'images',
-          await MultipartFile.fromFile(file.path, filename: file.name),
-        ));
+        formData.files.add(
+          MapEntry(
+            'images',
+            await MultipartFile.fromFile(file.path, filename: file.name),
+          ),
+        );
       }
       final response = await dio.post('/chat/upload', data: formData);
       final imageUrls = (response.data['imageUrls'] as List).cast<String>();
 
-      ref.read(chatProvider.notifier).sendMessage(
-        content: '',
-        imageUrls: imageUrls,
-      );
+      ref
+          .read(chatProvider.notifier)
+          .sendMessage(content: '', imageUrls: imageUrls);
 
       Future.delayed(const Duration(milliseconds: 100), () {
         if (_scrollController.hasClients) {
-          _scrollController.animateTo(0,
+          _scrollController.animateTo(
+            0,
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOut,
           );
@@ -268,19 +270,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       }
 
       if (mounted) {
-        showTopSnackBar(context, '위치 정보를 가져오는 중...', duration: const Duration(seconds: 1));
+        showTopSnackBar(
+          context,
+          '위치 정보를 가져오는 중...',
+          duration: const Duration(seconds: 1),
+        );
       }
 
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
 
-      final locationContent = '__LOC__:${position.latitude},${position.longitude}:내 위치';
+      final locationContent =
+          '__LOC__:${position.latitude},${position.longitude}:내 위치';
       ref.read(chatProvider.notifier).sendMessage(content: locationContent);
 
       Future.delayed(const Duration(milliseconds: 100), () {
         if (_scrollController.hasClients) {
-          _scrollController.animateTo(0,
+          _scrollController.animateTo(
+            0,
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOut,
           );
@@ -303,12 +313,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
     if (result == null) return;
 
-    final locationContent = '__LOC__:${result.latitude},${result.longitude}:${result.label}';
+    final locationContent =
+        '__LOC__:${result.latitude},${result.longitude}:${result.label}';
     ref.read(chatProvider.notifier).sendMessage(content: locationContent);
 
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(0,
+        _scrollController.animateTo(
+          0,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
@@ -339,7 +351,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     // Inject senderName
     final currentUserId = ApiClient.getUserId() ?? '';
     final couple = ref.read(coupleProvider).couple;
-    final myName = couple?.users
+    final myName =
+        couple?.users
             .where((u) => u.id == currentUserId)
             .firstOrNull
             ?.nickname ??
@@ -359,7 +372,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
     final currentUserId = ApiClient.getUserId() ?? '';
     final couple = ref.read(coupleProvider).couple;
-    final myName = couple?.users
+    final myName =
+        couple?.users
             .where((u) => u.id == currentUserId)
             .firstOrNull
             ?.nickname ??
@@ -388,7 +402,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   void _scrollToNewest() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(0,
+        _scrollController.animateTo(
+          0,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
@@ -399,9 +414,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   void _showChatMenu() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -411,7 +423,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               height: 4,
               margin: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: AppTheme.ink.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -443,9 +455,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const ChatLinksScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const ChatLinksScreen()),
                 );
               },
             ),
@@ -552,7 +562,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             child: Text(
               '${chatState.currentSearchIndex + 1}/${chatState.searchResults.length}',
               style: const TextStyle(
-                  fontSize: 13, color: AppTheme.textSecondary),
+                fontSize: 13,
+                color: AppTheme.textSecondary,
+              ),
             ),
           ),
           IconButton(
@@ -573,15 +585,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               _scrollToTarget(idx);
             },
           ),
-        ] else if (_searchController.text.isNotEmpty &&
-            !chatState.isSearching)
+        ] else if (_searchController.text.isNotEmpty && !chatState.isSearching)
           const Center(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 12),
               child: Text(
                 '0건',
-                style: TextStyle(
-                    fontSize: 13, color: AppTheme.textSecondary),
+                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
               ),
             ),
           ),
@@ -637,51 +647,58 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
     // 복사 (모든 메시지)
     if (message.content.isNotEmpty) {
-      actions.add(ListTile(
-        leading: const Icon(Icons.copy),
-        title: const Text('복사'),
-        onTap: () {
-          Clipboard.setData(ClipboardData(text: message.content));
-          Navigator.pop(context);
-          showTopSnackBar(context, '메시지가 복사되었습니다', duration: const Duration(seconds: 1));
-        },
-      ));
+      actions.add(
+        ListTile(
+          leading: const Icon(Icons.copy),
+          title: const Text('복사'),
+          onTap: () {
+            Clipboard.setData(ClipboardData(text: message.content));
+            Navigator.pop(context);
+            showTopSnackBar(
+              context,
+              '메시지가 복사되었습니다',
+              duration: const Duration(seconds: 1),
+            );
+          },
+        ),
+      );
     }
 
     // 수정/삭제 (내 메시지만)
     if (isMe) {
       if (message.content.isNotEmpty &&
           !message.content.startsWith('__GAME_')) {
-        actions.add(ListTile(
-          leading: const Icon(Icons.edit),
-          title: const Text('수정'),
+        actions.add(
+          ListTile(
+            leading: const Icon(Icons.edit),
+            title: const Text('수정'),
+            onTap: () {
+              Navigator.pop(context);
+              _showEditDialog(message);
+            },
+          ),
+        );
+      }
+      actions.add(
+        ListTile(
+          leading: const Icon(Icons.delete_outline, color: Colors.red),
+          title: const Text('삭제', style: TextStyle(color: Colors.red)),
           onTap: () {
             Navigator.pop(context);
-            _showEditDialog(message);
+            setState(() {
+              _deleteMode = true;
+              _selectedForDelete.clear();
+              _selectedForDelete.add(message.id);
+            });
           },
-        ));
-      }
-      actions.add(ListTile(
-        leading: const Icon(Icons.delete_outline, color: Colors.red),
-        title: const Text('삭제', style: TextStyle(color: Colors.red)),
-        onTap: () {
-          Navigator.pop(context);
-          setState(() {
-            _deleteMode = true;
-            _selectedForDelete.clear();
-            _selectedForDelete.add(message.id);
-          });
-        },
-      ));
+        ),
+      );
     }
 
     if (actions.isEmpty) return;
 
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -691,7 +708,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               height: 4,
               margin: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: AppTheme.ink.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -728,10 +745,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             onPressed: () {
               final newContent = editController.text.trim();
               if (newContent.isNotEmpty && newContent != message.content) {
-                ref.read(chatProvider.notifier).editMessage(
-                  messageId: message.id,
-                  content: newContent,
-                );
+                ref
+                    .read(chatProvider.notifier)
+                    .editMessage(messageId: message.id, content: newContent);
               }
               Navigator.pop(context);
             },
@@ -805,7 +821,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     final isPartnerTyping = ref.watch(isPartnerTypingProvider);
     final isPartnerOnline = ref.watch(isPartnerOnlineProvider);
     final coupleState = ref.watch(coupleProvider);
-    final partnerName = coupleState.couple?.getPartner(currentUserId)?.nickname ?? '채팅';
+    final partnerName =
+        coupleState.couple?.getPartner(currentUserId)?.nickname ?? '채팅';
 
     return Scaffold(
       appBar: _deleteMode
@@ -848,8 +865,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 _captureStartIndex == null
                     ? '시작 메시지를 선택하세요'
                     : _captureEndIndex == _captureStartIndex
-                        ? '끝 메시지를 선택하세요'
-                        : '캡처 범위 선택됨',
+                    ? '끝 메시지를 선택하세요'
+                    : '캡처 범위 선택됨',
                 style: const TextStyle(fontSize: 15),
               ),
               actions: [
@@ -858,15 +875,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     _captureEndIndex != _captureStartIndex)
                   TextButton(
                     onPressed: _doCaptureAndSave,
-                    child: const Text('캡처',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 15)),
+                    child: const Text(
+                      '캡처',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
                   ),
               ],
             )
           : chatState.isSearchMode
-              ? _buildSearchAppBar(chatState)
-              : AppBar(
+          ? _buildSearchAppBar(chatState)
+          : AppBar(
               title: Column(
                 children: [
                   Text(partnerName),
@@ -930,7 +951,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     controller: _scrollController,
                     reverse: true,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     itemCount: messages.length + (chatState.isLoading ? 1 : 0),
                     itemBuilder: (context, index) {
                       // Loading indicator at the end (oldest messages)
@@ -950,7 +973,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       final isMe = message.senderId == currentUserId;
 
                       // Show date separator
-                      final showDateHeader = index == messages.length - 1 ||
+                      final showDateHeader =
+                          index == messages.length - 1 ||
                           !_isSameDay(
                             messages[index + 1].createdAt,
                             message.createdAt,
@@ -958,25 +982,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
                       final isCaptureSelected =
                           _captureMode && _isInCaptureRange(index);
-                      final isHighlighted = chatState.isSearchMode &&
+                      final isHighlighted =
+                          chatState.isSearchMode &&
                           message.id == chatState.highlightedMessageId;
                       final isDeleteSelected =
-                          _deleteMode && _selectedForDelete.contains(message.id);
+                          _deleteMode &&
+                          _selectedForDelete.contains(message.id);
 
                       return GestureDetector(
                         onTap: _captureMode
                             ? () => _onCaptureTap(index)
                             : _deleteMode
-                                ? () => _toggleDeleteSelection(message, isMe)
-                                : null,
+                            ? () => _toggleDeleteSelection(message, isMe)
+                            : null,
                         child: Container(
                           color: isCaptureSelected
                               ? AppTheme.primaryColor.withValues(alpha: 0.1)
                               : isDeleteSelected
-                                  ? Colors.red.withValues(alpha: 0.08)
-                                  : isHighlighted
-                                      ? Colors.amber.withValues(alpha: 0.25)
-                                      : null,
+                              ? Colors.red.withValues(alpha: 0.08)
+                              : isHighlighted
+                              ? Colors.amber.withValues(alpha: 0.25)
+                              : null,
                           child: Row(
                             children: [
                               if (_deleteMode)
@@ -989,7 +1015,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                                               : Icons.radio_button_unchecked,
                                           color: isDeleteSelected
                                               ? Colors.red
-                                              : Colors.grey.shade400,
+                                              : AppTheme.textHint,
                                           size: 22,
                                         )
                                       : const SizedBox(width: 22),
@@ -1002,13 +1028,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                                     MessageBubble(
                                       message: message,
                                       isMe: isMe,
-                                      interactive: !_captureMode && !_deleteMode,
+                                      interactive:
+                                          !_captureMode && !_deleteMode,
                                       onLongPress: (_captureMode || _deleteMode)
                                           ? null
-                                          : () =>
-                                              _onLongPressMessage(message, isMe),
-                                      onRetry: message.status == MessageStatus.failed
-                                          ? () => ref.read(chatProvider.notifier).retryMessage(message.id)
+                                          : () => _onLongPressMessage(
+                                              message,
+                                              isMe,
+                                            ),
+                                      onRetry:
+                                          message.status == MessageStatus.failed
+                                          ? () => ref
+                                                .read(chatProvider.notifier)
+                                                .retryMessage(message.id)
                                           : null,
                                     ),
                                   ],
@@ -1051,148 +1083,150 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
           // Input area (hidden in search/delete mode)
           if (!chatState.isSearchMode && !_deleteMode)
-          Column(
-            children: [
-              Container(
-                padding: EdgeInsets.only(
-                  left: 12,
-                  right: 8,
-                  top: 8,
-                  bottom: _showAttachPanel ? 8 : MediaQuery.of(context).padding.bottom + 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, -1),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: AnimatedRotation(
-                        turns: _showAttachPanel ? 0.125 : 0,
-                        duration: const Duration(milliseconds: 200),
-                        child: Icon(
-                          Icons.add,
-                          color: _showAttachPanel
-                              ? AppTheme.primaryColor
-                              : AppTheme.textSecondary,
-                          size: 28,
-                        ),
+            Column(
+              children: [
+                Container(
+                  padding: EdgeInsets.only(
+                    left: 12,
+                    right: 8,
+                    top: 8,
+                    bottom: _showAttachPanel
+                        ? 8
+                        : MediaQuery.of(context).padding.bottom + 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: const Border(
+                      top: BorderSide(
+                        color: AppTheme.ink,
+                        width: AppTheme.outlineWidth,
                       ),
-                      onPressed: _toggleAttachPanel,
                     ),
-                    Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: AppTheme.backgroundColor,
-                          borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: AnimatedRotation(
+                          turns: _showAttachPanel ? 0.125 : 0,
+                          duration: const Duration(milliseconds: 200),
+                          child: Icon(
+                            Icons.add,
+                            color: _showAttachPanel
+                                ? AppTheme.primaryColor
+                                : AppTheme.textSecondary,
+                            size: 28,
+                          ),
                         ),
-                        child: TextField(
-                          controller: _messageController,
-                          focusNode: _focusNode,
-                          maxLines: 4,
-                          minLines: 1,
-                          textInputAction: TextInputAction.newline,
-                          onChanged: _onTextChanged,
-                          decoration: const InputDecoration(
-                            hintText: '메시지를 입력하세요...',
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
+                        onPressed: _toggleAttachPanel,
+                      ),
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppTheme.backgroundColor,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: AppTheme.ink, width: 1.3),
+                          ),
+                          child: TextField(
+                            controller: _messageController,
+                            focusNode: _focusNode,
+                            maxLines: 4,
+                            minLines: 1,
+                            textInputAction: TextInputAction.newline,
+                            onChanged: _onTextChanged,
+                            decoration: const InputDecoration(
+                              hintText: '메시지를 입력하세요...',
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.send_rounded,
-                        color: AppTheme.primaryColor,
-                      ),
-                      onPressed: _sendMessage,
-                    ),
-                  ],
-                ),
-              ),
-              // Attach panel
-              if (_showAttachPanel)
-                Container(
-                  padding: EdgeInsets.only(
-                    left: 0,
-                    right: 0,
-                    top: 16,
-                    bottom: MediaQuery.of(context).padding.bottom + 16,
-                  ),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          _AttachButtonExpanded(
-                            icon: Icons.photo_library,
-                            label: '사진',
-                            color: const Color(0xFF4CAF50),
-                            onTap: () => _pickAndSendImage(ImageSource.gallery),
-                          ),
-                          _AttachButtonExpanded(
-                            icon: Icons.camera_alt,
-                            label: '카메라',
-                            color: const Color(0xFF2196F3),
-                            onTap: () => _pickAndSendImage(ImageSource.camera),
-                          ),
-                          _AttachButtonExpanded(
-                            icon: Icons.my_location,
-                            label: '내 위치',
-                            color: const Color(0xFFFF9800),
-                            onTap: () {
-                              setState(() => _showAttachPanel = false);
-                              _sendLocation();
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          _AttachButtonExpanded(
-                            icon: Icons.map_outlined,
-                            label: '지도',
-                            color: const Color(0xFFE91E63),
-                            onTap: _openLocationPicker,
-                          ),
-                          _AttachButtonExpanded(
-                            icon: Icons.screenshot_outlined,
-                            label: '캡처',
-                            color: const Color(0xFF9C27B0),
-                            onTap: () {
-                              setState(() {
-                                _showAttachPanel = false;
-                                _captureMode = true;
-                              });
-                            },
-                          ),
-                          _AttachButtonExpanded(
-                            icon: Icons.casino,
-                            label: '미니게임',
-                            color: const Color(0xFF673AB7),
-                            onTap: _openMiniGameSelect,
-                          ),
-                        ],
+                      const SizedBox(width: 4),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.send_rounded,
+                          color: AppTheme.primaryColor,
+                        ),
+                        onPressed: _sendMessage,
                       ),
                     ],
                   ),
                 ),
-            ],
-          ),
+                // Attach panel
+                if (_showAttachPanel)
+                  Container(
+                    padding: EdgeInsets.only(
+                      left: 0,
+                      right: 0,
+                      top: 16,
+                      bottom: MediaQuery.of(context).padding.bottom + 16,
+                    ),
+                    decoration: const BoxDecoration(color: Colors.white),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            _AttachButtonExpanded(
+                              icon: Icons.photo_library,
+                              label: '사진',
+                              color: AppTheme.mint,
+                              onTap: () =>
+                                  _pickAndSendImage(ImageSource.gallery),
+                            ),
+                            _AttachButtonExpanded(
+                              icon: Icons.camera_alt,
+                              label: '카메라',
+                              color: AppTheme.sky,
+                              onTap: () =>
+                                  _pickAndSendImage(ImageSource.camera),
+                            ),
+                            _AttachButtonExpanded(
+                              icon: Icons.my_location,
+                              label: '내 위치',
+                              color: AppTheme.peach,
+                              onTap: () {
+                                setState(() => _showAttachPanel = false);
+                                _sendLocation();
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            _AttachButtonExpanded(
+                              icon: Icons.map_outlined,
+                              label: '지도',
+                              color: AppTheme.primaryColor,
+                              onTap: _openLocationPicker,
+                            ),
+                            _AttachButtonExpanded(
+                              icon: Icons.screenshot_outlined,
+                              label: '캡처',
+                              color: AppTheme.lavender,
+                              onTap: () {
+                                setState(() {
+                                  _showAttachPanel = false;
+                                  _captureMode = true;
+                                });
+                              },
+                            ),
+                            _AttachButtonExpanded(
+                              icon: Icons.casino,
+                              label: '미니게임',
+                              color: AppTheme.lavender,
+                              onTap: _openMiniGameSelect,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
         ],
       ),
     );
@@ -1219,8 +1253,7 @@ class _AttachButtonExpanded extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: Bouncy(
         onTap: onTap,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1229,8 +1262,9 @@ class _AttachButtonExpanded extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
+                color: color.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.ink, width: 1.3),
               ),
               child: Icon(icon, color: color, size: 26),
             ),

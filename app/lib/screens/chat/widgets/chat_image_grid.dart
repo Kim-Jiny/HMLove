@@ -22,7 +22,12 @@ class ChatImageGrid extends StatelessWidget {
     final urls = message.imageUrls;
     if (urls.isEmpty) return const SizedBox.shrink();
 
-    Widget imageWidget(String url, {double? width, double? height, int? overlayCount}) {
+    Widget imageWidget(
+      String url, {
+      double? width,
+      double? height,
+      int? overlayCount,
+    }) {
       return GestureDetector(
         onTap: interactive
             ? () {
@@ -44,7 +49,7 @@ class ChatImageGrid extends StatelessWidget {
               placeholder: (_, _) => Container(
                 color: isMe
                     ? Colors.pink.shade200.withValues(alpha: 0.3)
-                    : const Color(0xFFF0F0F0),
+                    : AppTheme.borderColor,
                 child: const Center(
                   child: SizedBox(
                     width: 24,
@@ -57,7 +62,7 @@ class ChatImageGrid extends StatelessWidget {
                 ),
               ),
               errorWidget: (_, _, _) => Container(
-                color: const Color(0xFFF0F0F0),
+                color: AppTheme.borderColor,
                 child: const Center(
                   child: Icon(Icons.broken_image, color: AppTheme.textHint),
                 ),
@@ -88,18 +93,25 @@ class ChatImageGrid extends StatelessWidget {
         if (urls.length == 1) {
           return SizedBox(
             width: double.infinity,
-            child: AspectRatio(
-              aspectRatio: 1.2,
-              child: imageWidget(urls[0]),
-            ),
+            child: AspectRatio(aspectRatio: 1.2, child: imageWidget(urls[0])),
           );
         }
         if (urls.length == 2) {
           return Row(
             children: [
-              Expanded(child: AspectRatio(aspectRatio: 0.8, child: imageWidget(urls[0]))),
+              Expanded(
+                child: AspectRatio(
+                  aspectRatio: 0.8,
+                  child: imageWidget(urls[0]),
+                ),
+              ),
               const SizedBox(width: 2),
-              Expanded(child: AspectRatio(aspectRatio: 0.8, child: imageWidget(urls[1]))),
+              Expanded(
+                child: AspectRatio(
+                  aspectRatio: 0.8,
+                  child: imageWidget(urls[1]),
+                ),
+              ),
             ],
           );
         }
@@ -110,9 +122,19 @@ class ChatImageGrid extends StatelessWidget {
               const SizedBox(height: 2),
               Row(
                 children: [
-                  Expanded(child: AspectRatio(aspectRatio: 1.0, child: imageWidget(urls[1]))),
+                  Expanded(
+                    child: AspectRatio(
+                      aspectRatio: 1.0,
+                      child: imageWidget(urls[1]),
+                    ),
+                  ),
                   const SizedBox(width: 2),
-                  Expanded(child: AspectRatio(aspectRatio: 1.0, child: imageWidget(urls[2]))),
+                  Expanded(
+                    child: AspectRatio(
+                      aspectRatio: 1.0,
+                      child: imageWidget(urls[2]),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -124,15 +146,30 @@ class ChatImageGrid extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(child: AspectRatio(aspectRatio: 1.0, child: imageWidget(urls[0]))),
+                Expanded(
+                  child: AspectRatio(
+                    aspectRatio: 1.0,
+                    child: imageWidget(urls[0]),
+                  ),
+                ),
                 const SizedBox(width: 2),
-                Expanded(child: AspectRatio(aspectRatio: 1.0, child: imageWidget(urls[1]))),
+                Expanded(
+                  child: AspectRatio(
+                    aspectRatio: 1.0,
+                    child: imageWidget(urls[1]),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 2),
             Row(
               children: [
-                Expanded(child: AspectRatio(aspectRatio: 1.0, child: imageWidget(urls[2]))),
+                Expanded(
+                  child: AspectRatio(
+                    aspectRatio: 1.0,
+                    child: imageWidget(urls[2]),
+                  ),
+                ),
                 const SizedBox(width: 2),
                 Expanded(
                   child: AspectRatio(

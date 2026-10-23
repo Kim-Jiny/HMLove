@@ -278,7 +278,10 @@ class NotificationService: UNNotificationServiceExtension {
         }
 
         var imageRequest = URLRequest(url: img)
-        if let token = defaults.string(forKey: "authToken"), !token.isEmpty {
+        // 토큰은 API 와 같은 호스트일 때만 보낸다(이미지가 다른 도메인이면 토큰이 새지 않게).
+        let apiHost = defaults.string(forKey: "apiBaseUrl").flatMap { URL(string: $0)?.host }
+        if apiHost != nil, apiHost == img.host,
+           let token = defaults.string(forKey: "authToken"), !token.isEmpty {
             imageRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         imageRequest.timeoutInterval = 12

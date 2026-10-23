@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import '../../models/doodle.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/doodle_provider.dart';
+import '../../widgets/cute/loader.dart';
 
 class DoodleHistoryScreen extends ConsumerStatefulWidget {
   const DoodleHistoryScreen({super.key});
@@ -88,8 +89,7 @@ class _DoodleHistoryScreenState extends ConsumerState<DoodleHistoryScreen>
     final me = ref.watch(currentUserProvider);
     final myId = me?.id ?? '';
 
-    final received =
-        state.doodles.where((d) => d.senderId != myId).toList();
+    final received = state.doodles.where((d) => d.senderId != myId).toList();
     final sent = state.doodles.where((d) => d.senderId == myId).toList();
 
     return Scaffold(
@@ -167,37 +167,36 @@ class _DoodleGrid extends StatelessWidget {
       color: AppTheme.primaryColor,
       onRefresh: onRefresh,
       child: isLoading && doodles.isEmpty
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CuteLoader())
           : doodles.isEmpty
-              ? ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    const SizedBox(height: 120),
-                    _EmptyState(kind: kind),
-                  ],
-                )
-              : GridView.builder(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    mainAxisSpacing: 8,
-                    crossAxisSpacing: 8,
-                    childAspectRatio: 1,
-                  ),
-                  itemCount: doodles.length,
-                  itemBuilder: (context, i) {
-                    final d = doodles[i];
-                    return _DoodleGridTile(
-                      doodle: d,
-                      onTap: () => onTap(d),
-                      onLongPress: onLongPress == null
-                          ? null
-                          : () => onLongPress!(d),
-                    );
-                  },
-                ),
+          ? ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                const SizedBox(height: 120),
+                _EmptyState(kind: kind),
+              ],
+            )
+          : GridView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 1,
+              ),
+              itemCount: doodles.length,
+              itemBuilder: (context, i) {
+                final d = doodles[i];
+                return _DoodleGridTile(
+                  doodle: d,
+                  onTap: () => onTap(d),
+                  onLongPress: onLongPress == null
+                      ? null
+                      : () => onLongPress!(d),
+                );
+              },
+            ),
     );
   }
 }
@@ -229,7 +228,7 @@ class _DoodleGridTile extends StatelessWidget {
               imageUrl: doodle.imageUrl,
               fit: BoxFit.cover,
               placeholder: (_, _) => Container(
-                color: const Color(0xFFF8F1EC),
+                color: AppTheme.backgroundColor,
                 child: const Center(
                   child: SizedBox(
                     width: 16,
@@ -239,7 +238,7 @@ class _DoodleGridTile extends StatelessWidget {
                 ),
               ),
               errorWidget: (_, _, _) => Container(
-                color: const Color(0xFFF8F1EC),
+                color: AppTheme.backgroundColor,
                 child: const Icon(
                   Icons.broken_image_outlined,
                   color: AppTheme.textHint,
@@ -288,11 +287,15 @@ class _DoodleViewer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateText =
-        DateFormat('yyyy.MM.dd HH:mm').format(doodle.createdAt.toLocal());
-    final sender = doodle.senderNickname.isEmpty ? '상대방' : doodle.senderNickname;
-    final receiver =
-        doodle.receiverNickname.isEmpty ? '상대방' : doodle.receiverNickname;
+    final dateText = DateFormat(
+      'yyyy.MM.dd HH:mm',
+    ).format(doodle.createdAt.toLocal());
+    final sender = doodle.senderNickname.isEmpty
+        ? '상대방'
+        : doodle.senderNickname;
+    final receiver = doodle.receiverNickname.isEmpty
+        ? '상대방'
+        : doodle.receiverNickname;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -337,10 +340,7 @@ class _DoodleViewer extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 dateText,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
               ),
             ],
           ),
@@ -391,10 +391,7 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 18),
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 6),
           Text(

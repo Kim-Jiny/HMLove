@@ -43,9 +43,7 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
     final feeds = ref.watch(feedProvider).feeds;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('게시물'),
-      ),
+      appBar: AppBar(title: const Text('게시물')),
       body: PageView.builder(
         controller: controller,
         scrollDirection: Axis.vertical,
@@ -54,48 +52,46 @@ class _FeedDetailScreenState extends ConsumerState<FeedDetailScreen> {
           final feed = feeds[index];
           return SingleChildScrollView(
             child: FeedCard(
-                feed: feed,
-                onLike: () =>
-                    ref.read(feedProvider.notifier).toggleLike(feed.id),
-                onComment: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => CommentsScreen(feed: feed),
+              feed: feed,
+              onLike: () => ref.read(feedProvider.notifier).toggleLike(feed.id),
+              onComment: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => CommentsScreen(feed: feed)),
+                );
+              },
+              onDelete: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('게시물 삭제', style: TextStyle(fontSize: 16)),
+                    content: const Text('이 게시물을 삭제하시겠습니까?'),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                  );
-                },
-                onDelete: () {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('게시물 삭제',
-                          style: TextStyle(fontSize: 16)),
-                      content: const Text('이 게시물을 삭제하시겠습니까?'),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16)),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('취소'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('취소'),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          Navigator.pop(ctx);
+                          await ref
+                              .read(feedProvider.notifier)
+                              .deleteFeed(feed.id);
+                          if (context.mounted) Navigator.pop(context);
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
                         ),
-                        TextButton(
-                          onPressed: () async {
-                            Navigator.pop(ctx);
-                            await ref
-                                .read(feedProvider.notifier)
-                                .deleteFeed(feed.id);
-                            if (context.mounted) Navigator.pop(context);
-                          },
-                          style: TextButton.styleFrom(
-                              foregroundColor: Colors.red),
-                          child: const Text('삭제'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+                        child: const Text('삭제'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           );
         },
       ),

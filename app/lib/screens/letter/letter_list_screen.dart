@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../providers/letter_provider.dart';
+import '../../widgets/cute/loader.dart';
+import '../../widgets/soft_ui.dart';
 
 class LetterListScreen extends ConsumerStatefulWidget {
   const LetterListScreen({super.key});
@@ -40,8 +42,9 @@ class _LetterListScreenState extends ConsumerState<LetterListScreen>
     final allLetters = letterState.letters;
 
     // 보낸 편지: 내가 쓴 모든 편지 (SCHEDULED 포함)
-    final sentLetters =
-        allLetters.where((l) => l.writerId == currentUserId).toList();
+    final sentLetters = allLetters
+        .where((l) => l.writerId == currentUserId)
+        .toList();
 
     // 받은 편지: 배달 완료된 편지만
     final receivedLetters = allLetters
@@ -125,11 +128,7 @@ class _LetterListScreenState extends ConsumerState<LetterListScreen>
         ),
       ),
       body: letterState.isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: AppTheme.primaryColor,
-              ),
-            )
+          ? const Center(child: CuteLoader())
           : TabBarView(
               controller: _tabController,
               children: [
@@ -232,10 +231,7 @@ class _LetterListTab extends StatelessWidget {
         itemCount: letters.length,
         itemBuilder: (context, index) {
           final letter = letters[index];
-          return _LetterCard(
-            letter: letter,
-            isSent: isSent,
-          );
+          return _LetterCard(letter: letter, isSent: isSent);
         },
       ),
     );
@@ -246,10 +242,7 @@ class _LetterCard extends StatelessWidget {
   final Letter letter;
   final bool isSent;
 
-  const _LetterCard({
-    required this.letter,
-    required this.isSent,
-  });
+  const _LetterCard({required this.letter, required this.isSent});
 
   Color _getStatusColor(String status) {
     switch (status) {
@@ -280,9 +273,7 @@ class _LetterCard extends StatelessWidget {
   IconData _getEnvelopeIcon() {
     if (!isSent) {
       final isRead = letter.isRead;
-      return isRead
-          ? Icons.drafts_outlined
-          : Icons.mark_email_unread_outlined;
+      return isRead ? Icons.drafts_outlined : Icons.mark_email_unread_outlined;
     }
     // Sent letter
     if (letter.isScheduled) {
@@ -295,8 +286,11 @@ class _LetterCard extends StatelessWidget {
     if (!letter.isScheduled) return null;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final delivery =
-        DateTime(letter.deliveryDate.year, letter.deliveryDate.month, letter.deliveryDate.day);
+    final delivery = DateTime(
+      letter.deliveryDate.year,
+      letter.deliveryDate.month,
+      letter.deliveryDate.day,
+    );
     final diff = delivery.difference(today).inDays;
     if (diff <= 0) return 'D-Day';
     return 'D-$diff';
@@ -308,7 +302,7 @@ class _LetterCard extends StatelessWidget {
     final isUnreadDelivered = !isSent && letter.isDelivered && !letter.isRead;
     final ddayText = isSent ? _getDdayText() : null;
 
-    return Card(
+    return CartoonCard(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: () {
@@ -324,10 +318,7 @@ class _LetterCard extends StatelessWidget {
           decoration: isUnreadDelivered
               ? BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                    width: 1.5,
-                  ),
+                  border: Border.all(color: AppTheme.primaryColor, width: 1.5),
                 )
               : null,
           child: Row(
@@ -340,17 +331,18 @@ class _LetterCard extends StatelessWidget {
                   color: letter.isScheduled
                       ? AppTheme.warningColor.withValues(alpha: 0.1)
                       : isUnreadDelivered
-                          ? AppTheme.primaryColor.withValues(alpha: 0.1)
-                          : AppTheme.primaryLight.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+                      ? AppTheme.primaryColor.withValues(alpha: 0.1)
+                      : AppTheme.primaryLight.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppTheme.ink, width: 1.2),
                 ),
                 child: Icon(
                   _getEnvelopeIcon(),
                   color: letter.isScheduled
                       ? AppTheme.warningColor
                       : isUnreadDelivered
-                          ? AppTheme.primaryColor
-                          : AppTheme.textSecondary,
+                      ? AppTheme.primaryColor
+                      : AppTheme.textSecondary,
                   size: 24,
                 ),
               ),
@@ -377,8 +369,9 @@ class _LetterCard extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          DateFormat('yyyy년 M월 d일 HH:mm')
-                              .format(letter.deliveryDate.toLocal()),
+                          DateFormat(
+                            'yyyy년 M월 d일 HH:mm',
+                          ).format(letter.deliveryDate.toLocal()),
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppTheme.textSecondary,
@@ -392,8 +385,9 @@ class _LetterCard extends StatelessWidget {
                               vertical: 1,
                             ),
                             decoration: BoxDecoration(
-                              color: AppTheme.warningColor
-                                  .withValues(alpha: 0.1),
+                              color: AppTheme.warningColor.withValues(
+                                alpha: 0.1,
+                              ),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
@@ -413,6 +407,17 @@ class _LetterCard extends StatelessWidget {
               ),
 
               // Status badge
+              if (isUnreadDelivered) ...[
+                Container(
+                  width: 9,
+                  height: 9,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: const BoxDecoration(
+                    color: AppTheme.primaryColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,

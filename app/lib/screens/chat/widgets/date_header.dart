@@ -17,15 +17,13 @@ class DateHeader extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.grey.shade200,
-            borderRadius: BorderRadius.circular(12),
+            color: AppTheme.butterSoft,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.ink, width: 1.2),
           ),
           child: Text(
             DateFormat('yyyy년 M월 d일 EEEE', 'ko').format(date),
-            style: const TextStyle(
-              fontSize: 11,
-              color: AppTheme.textSecondary,
-            ),
+            style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
           ),
         ),
       ),

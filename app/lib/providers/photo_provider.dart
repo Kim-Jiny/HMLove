@@ -108,7 +108,7 @@ class PhotoState {
 
 // Photo Notifier
 class PhotoNotifier extends Notifier<PhotoState> {
-  late final Dio _dio;
+  late Dio _dio;
 
   @override
   PhotoState build() {

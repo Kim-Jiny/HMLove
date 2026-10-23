@@ -1,8 +1,15 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/api_client.dart';
+import '../core/store_mode.dart';
 import '../core/theme.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/cute/loader.dart';
+import '../widgets/cute/mood_face.dart';
+import '../widgets/cute/motion.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -13,39 +20,39 @@ class SplashScreen extends ConsumerStatefulWidget {
 
 class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
-  late AnimationController _animController;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
+  late final AnimationController _float = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2600),
+  )..repeat();
 
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeIn),
-    );
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.elasticOut),
-    );
-
-    _animController.forward();
     _checkAuth();
   }
 
   Future<void> _checkAuth() async {
-    await Future.delayed(const Duration(seconds: 2));
+    // 애니메이션이 한 번 보일 만큼만 기다린 뒤 인증을 확인한다.
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
 
     if (!mounted) return;
+
+    // 스토어 촬영 모드: 토큰이 없으면 데모 계정으로 자동 로그인 (일반 빌드에선 비활성)
+    if (storeModeEnabled && ApiClient.getAccessToken() == null) {
+      final c = storeCredentials;
+      await ref
+          .read(authProvider.notifier)
+          .login(email: c.email, password: c.password);
+      if (!mounted) return;
+    }
 
     try {
       // This will update authProvider state, which triggers
       // GoRouter's refreshListenable → redirect handles navigation
-      await ref.read(authProvider.notifier).checkAuthStatus().timeout(
-            const Duration(seconds: 10),
-          );
+      await ref
+          .read(authProvider.notifier)
+          .checkAuthStatus()
+          .timeout(const Duration(seconds: 10));
     } catch (_) {
       // Safety net: if checkAuthStatus throws or times out,
       // force unauthenticated so the splash never gets stuck.
@@ -56,9 +63,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   @override
   void dispose() {
-    _animController.dispose();
+    _float.dispose();
     super.dispose();
   }
+
+  double _bob(double phase) =>
+      math.sin((_float.value + phase) * 2 * math.pi) * 8;
 
   @override
   Widget build(BuildContext context) {
@@ -66,63 +76,88 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: AppTheme.primaryGradient,
-        ),
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: ScaleTransition(
-            scale: _scaleAnimation,
+        // 네이티브 스플래시(iOS LaunchScreen / Android launch_background)와 같은 단색.
+        // 두 화면이 이어져 보이도록 색을 맞춰 둔다.
+        color: const Color(0xFFFBE4F0),
+        child: SafeArea(
+          child: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.favorite,
-                    size: 56,
-                    color: AppTheme.primaryColor,
+                SizedBox(
+                  height: 150,
+                  child: AnimatedBuilder(
+                    animation: _float,
+                    builder: (_, _) => Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Transform.translate(
+                          offset: Offset(0, _bob(0)),
+                          child: Transform.rotate(
+                            angle: -0.1,
+                            child: const MoodFace(
+                              moodKey: 'love',
+                              size: 96,
+                              pop: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Transform.translate(
+                          offset: Offset(0, _bob(0.5) - 24),
+                          child: const Heartbeat(
+                            child: Icon(
+                              Icons.favorite_rounded,
+                              color: AppTheme.primaryColor,
+                              size: 34,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Transform.translate(
+                          offset: Offset(0, _bob(0.5)),
+                          child: Transform.rotate(
+                            angle: 0.1,
+                            child: const MoodFace(
+                              moodKey: 'happy',
+                              size: 96,
+                              pop: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 24),
-                const Text(
-                  '우리연애',
-                  style: TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 2,
+                const SizedBox(height: 16),
+                FadeSlideIn(
+                  index: 1,
+                  child: const Text(
+                    '우리연애',
+                    style: TextStyle(
+                      fontSize: 38,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.primaryColor,
+                      letterSpacing: 2,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  '우리만의 사랑 이야기',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white.withValues(alpha: 0.9),
-                    letterSpacing: 1,
+                FadeSlideIn(
+                  index: 2,
+                  child: const Text(
+                    '우리만의 사랑 이야기',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: AppTheme.textSecondary,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 48),
-                const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
+                const SizedBox(height: 56),
+                const FadeSlideIn(
+                  index: 4,
+                  child: CuteLoader(message: '불러오는 중이에요', size: 22),
                 ),
               ],
             ),

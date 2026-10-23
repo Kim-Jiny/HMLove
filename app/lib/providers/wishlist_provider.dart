@@ -44,7 +44,7 @@ class WishlistState {
 }
 
 class WishlistNotifier extends Notifier<WishlistState> {
-  late final Dio _dio;
+  late Dio _dio;
 
   List<WishItem> _sortItems(List<WishItem> items) {
     final sorted = [...items];

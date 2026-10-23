@@ -19,19 +19,6 @@ enum WishCategory {
         return '기타';
     }
   }
-
-  String get emoji {
-    switch (this) {
-      case PLACE:
-        return '📍';
-      case FOOD:
-        return '🍽️';
-      case ACTIVITY:
-        return '🎯';
-      case OTHER:
-        return '💫';
-    }
-  }
 }
 
 class WishItem {

@@ -9,6 +9,9 @@ import '../../core/api_client.dart';
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
 import '../../providers/inquiry_provider.dart';
+import '../../widgets/cute/loader.dart';
+import '../../widgets/cute/sticker.dart';
+import '../../widgets/soft_ui.dart';
 
 class InquiryScreen extends ConsumerStatefulWidget {
   const InquiryScreen({super.key});
@@ -52,9 +55,11 @@ class _InquiryScreenState extends ConsumerState<InquiryScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _InquiryForm(onSubmitted: () {
-            _tabController.animateTo(1);
-          }),
+          _InquiryForm(
+            onSubmitted: () {
+              _tabController.animateTo(1);
+            },
+          ),
           const _InquiryList(),
         ],
       ),
@@ -149,7 +154,8 @@ class _InquiryFormState extends ConsumerState<_InquiryForm> {
       if (Platform.isAndroid) {
         final info = await devicePlugin.androidInfo;
         deviceModel = '${info.brand} ${info.model}';
-        osVersion = 'Android ${info.version.release} (SDK ${info.version.sdkInt})';
+        osVersion =
+            'Android ${info.version.release} (SDK ${info.version.sdkInt})';
       } else if (Platform.isIOS) {
         final info = await devicePlugin.iosInfo;
         deviceModel = '${info.name} (${info.utsname.machine})';
@@ -159,14 +165,17 @@ class _InquiryFormState extends ConsumerState<_InquiryForm> {
       final packageInfo = await PackageInfo.fromPlatform();
 
       final dio = ref.read(dioProvider);
-      await dio.post('/inquiry', data: {
-        'category': _category,
-        'title': title,
-        'content': content,
-        'appVersion': '${packageInfo.version}+${packageInfo.buildNumber}',
-        'deviceModel': deviceModel,
-        'osVersion': osVersion,
-      });
+      await dio.post(
+        '/inquiry',
+        data: {
+          'category': _category,
+          'title': title,
+          'content': content,
+          'appVersion': '${packageInfo.version}+${packageInfo.buildNumber}',
+          'deviceModel': deviceModel,
+          'osVersion': osVersion,
+        },
+      );
 
       if (mounted) {
         _titleController.clear();
@@ -214,7 +223,8 @@ class _InquiryFormState extends ConsumerState<_InquiryForm> {
                   color: selected ? Colors.white : AppTheme.textPrimary,
                   fontSize: 13,
                 ),
-                onSelected: (_) => setState(() => _category = cat['value'] as String),
+                onSelected: (_) =>
+                    setState(() => _category = cat['value'] as String),
               );
             }).toList(),
           ),
@@ -228,9 +238,7 @@ class _InquiryFormState extends ConsumerState<_InquiryForm> {
           const SizedBox(height: 8),
           TextField(
             controller: _titleController,
-            decoration: const InputDecoration(
-              hintText: '문의 제목을 입력하세요',
-            ),
+            decoration: const InputDecoration(hintText: '문의 제목을 입력하세요'),
             maxLength: 100,
           ),
           const SizedBox(height: 16),
@@ -258,9 +266,9 @@ class _InquiryFormState extends ConsumerState<_InquiryForm> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade200),
+                color: AppTheme.butterSoft,
+                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                border: Border.all(color: AppTheme.ink, width: 1.2),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -276,12 +284,18 @@ class _InquiryFormState extends ConsumerState<_InquiryForm> {
                   const SizedBox(height: 6),
                   Text(
                     '앱 버전: $_appVersion',
-                    style: const TextStyle(fontSize: 12, color: AppTheme.textHint),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textHint,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '기기: $_deviceInfo',
-                    style: const TextStyle(fontSize: 12, color: AppTheme.textHint),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textHint,
+                    ),
                   ),
                 ],
               ),
@@ -348,15 +362,15 @@ class _InquiryListState extends ConsumerState<_InquiryList> {
   Color _statusColor(String status) {
     switch (status) {
       case 'PENDING':
-        return Colors.orange;
+        return AppTheme.peach;
       case 'IN_PROGRESS':
-        return Colors.blue;
+        return AppTheme.sky;
       case 'RESOLVED':
-        return Colors.green;
+        return AppTheme.successColor;
       case 'CLOSED':
-        return Colors.grey;
+        return AppTheme.textHint;
       default:
-        return Colors.grey;
+        return AppTheme.textHint;
     }
   }
 
@@ -392,17 +406,17 @@ class _InquiryListState extends ConsumerState<_InquiryList> {
     // 답변이 있고 읽지 않은 경우 읽음 처리
     if (inq['adminReply'] != null && inq['isReplyRead'] == false) {
       final dio = ref.read(dioProvider);
-      dio.patch('/inquiry/${inq['id']}/read').then((_) {
-        ref.read(unreadInquiryCountProvider.notifier).fetch();
-      }).catchError((_) {});
+      dio
+          .patch('/inquiry/${inq['id']}/read')
+          .then((_) {
+            ref.read(unreadInquiryCountProvider.notifier).fetch();
+          })
+          .catchError((_) {});
     }
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (ctx) => DraggableScrollableSheet(
         initialChildSize: 0.7,
         minChildSize: 0.4,
@@ -420,7 +434,7 @@ class _InquiryListState extends ConsumerState<_InquiryList> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: AppTheme.borderColor,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -429,7 +443,10 @@ class _InquiryListState extends ConsumerState<_InquiryList> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: _statusColor(inq['status']).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
@@ -445,14 +462,20 @@ class _InquiryListState extends ConsumerState<_InquiryList> {
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
+                      color: AppTheme.lavenderSoft,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       _categoryLabel(inq['category'] ?? ''),
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
                     ),
                   ),
                 ],
@@ -461,7 +484,10 @@ class _InquiryListState extends ConsumerState<_InquiryList> {
               // 제목
               Text(
                 inq['title'] ?? '',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
@@ -494,7 +520,11 @@ class _InquiryListState extends ConsumerState<_InquiryList> {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.support_agent, size: 18, color: AppTheme.primaryColor),
+                          Icon(
+                            Icons.support_agent,
+                            size: 18,
+                            color: AppTheme.primaryColor,
+                          ),
                           SizedBox(width: 6),
                           Text(
                             '관리자 답변',
@@ -515,7 +545,10 @@ class _InquiryListState extends ConsumerState<_InquiryList> {
                         const SizedBox(height: 8),
                         Text(
                           _formatDate(inq['repliedAt']),
-                          style: const TextStyle(fontSize: 11, color: AppTheme.textHint),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textHint,
+                          ),
                         ),
                       ],
                     ],
@@ -540,7 +573,7 @@ class _InquiryListState extends ConsumerState<_InquiryList> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CuteLoader());
     }
 
     if (_inquiries.isEmpty) {
@@ -548,11 +581,16 @@ class _InquiryListState extends ConsumerState<_InquiryList> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.inbox_outlined, size: 64, color: Colors.grey.shade300),
+            const Sticker(StickerKind.gift, size: 72),
             const SizedBox(height: 12),
             const Text(
               '문의 내역이 없습니다',
               style: TextStyle(color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              '궁금한 점은 언제든 남겨주세요',
+              style: TextStyle(fontSize: 12, color: AppTheme.textHint),
             ),
           ],
         ),
@@ -567,7 +605,7 @@ class _InquiryListState extends ConsumerState<_InquiryList> {
         separatorBuilder: (_, _) => const SizedBox(height: 8),
         itemBuilder: (context, index) {
           final inq = _inquiries[index] as Map<String, dynamic>;
-          return Card(
+          return CartoonCard(
             child: InkWell(
               onTap: () => _showDetail(inq),
               borderRadius: BorderRadius.circular(12),
@@ -582,9 +620,14 @@ class _InquiryListState extends ConsumerState<_InquiryList> {
                           Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: _statusColor(inq['status']).withValues(alpha: 0.1),
+                                  color: _statusColor(
+                                    inq['status'],
+                                  ).withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(

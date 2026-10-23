@@ -5,22 +5,18 @@ import 'package:intl/intl.dart';
 
 import '../../core/constants.dart';
 import '../../core/mood_emojis.dart';
+import '../../widgets/cute/mood_face.dart';
+import '../../widgets/cute/motion.dart';
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
 import '../../core/widget_service.dart';
 import '../../widgets/banner_ad_widget.dart';
-import 'widgets/anniversary_card.dart';
-import 'widgets/dday_card.dart';
-import 'widgets/doodle_card.dart';
-import 'widgets/fortune_card.dart';
-import 'widgets/mission_card.dart';
-import 'widgets/mood_card.dart';
-import 'widgets/question_mini_card.dart';
-import 'widgets/wishlist_preview_card.dart';
+import '../couple/invite_code_dialog.dart';
+import 'widgets/home_sections.dart';
+import '../../widgets/cute/sticker.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
 import '../../providers/mood_provider.dart';
-import '../../providers/fortune_provider.dart';
 import '../../providers/letter_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/mission_provider.dart';
@@ -68,6 +64,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     // Fetch data on load
+
     Future.microtask(() async {
       if (!mounted) return;
       await fetchAndApplyHomeSummary(ref);
@@ -104,11 +101,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       return;
     }
     final u = ref.read(currentUserProvider);
-    final partner = couple.getPartner(u?.id ?? '');
     final anniversary = _getNextAnniversary(couple.startDate);
     WidgetService.updateCoupleData(
       myName: u?.nickname ?? '나',
-      partnerName: partner?.nickname ?? '상대방',
+      partnerName: couple.partnerDisplayName(u?.id ?? ''),
       daysTogether: couple.daysTogether,
       startDate:
           '${couple.startDate.year}.${couple.startDate.month.toString().padLeft(2, '0')}.${couple.startDate.day.toString().padLeft(2, '0')}',
@@ -194,60 +190,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   void _showMoodPicker() {
-    final moods = [
-      for (final entry in moodEmojis.entries)
-        {
-          'key': entry.key,
-          'emoji': entry.value,
-          'label': moodLabels[entry.key] ?? '',
-        },
-    ];
-
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text(
-          '오늘의 기분을 선택하세요',
+          '오늘의 기분을 골라주세요',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
         ),
-        content: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          alignment: WrapAlignment.center,
-          children: moods.map((mood) {
-            return InkWell(
-              onTap: () async {
-                Navigator.pop(context);
-                await ref
-                    .read(moodProvider.notifier)
-                    .setMood(emoji: mood['key'] as String);
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: 72,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade200),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      mood['emoji'] as String,
-                      style: const TextStyle(fontSize: 28),
+        content: SingleChildScrollView(
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 12,
+            alignment: WrapAlignment.center,
+            children: [
+              for (final entry in moodLabels.entries.indexed)
+                FadeSlideIn(
+                  index: entry.$1 ~/ 3,
+                  child: Bouncy(
+                    pressedScale: 0.85,
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await ref
+                          .read(moodProvider.notifier)
+                          .setMood(emoji: entry.$2.key);
+                    },
+                    child: SizedBox(
+                      width: 72,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          MoodFace(moodKey: entry.$2.key, size: 54),
+                          const SizedBox(height: 4),
+                          Text(
+                            entry.$2.value,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      mood['label'] as String,
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            );
-          }).toList(),
+            ],
+          ),
         ),
       ),
     );
@@ -256,223 +244,177 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
+    final isSolo = ref.watch(isSoloProvider);
     final coupleState = ref.watch(coupleProvider);
     final daysTogether = ref.watch(daysSinceStartProvider);
     final moodState = ref.watch(moodProvider);
-    final fortuneState = ref.watch(fortuneProvider);
     final unreadLetters = ref.watch(unreadLettersCountProvider);
     final unreadNotifications = ref.watch(unreadNotificationCountProvider);
     final missionState = ref.watch(missionProvider);
     final questionState = ref.watch(questionProvider);
     final wishlistState = ref.watch(wishlistProvider);
-    final doodleState = ref.watch(doodleProvider);
 
     // Sync widget data when couple/mood/doodle changes
     ref.listen(coupleProvider, (_, next) => _syncWidgetCouple(next));
     ref.listen(moodProvider, (_, next) => _syncWidgetMood(next));
     ref.listen(doodleProvider, (_, next) => _syncWidgetDoodle(next));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('우리연애'),
-        actions: [
-          if (unreadLetters > 0)
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.mail_outlined),
-                  onPressed: () => context.push('/letter'),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: const BoxDecoration(
-                      color: AppTheme.errorColor,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
-                    child: Text(
-                      unreadLetters > 9 ? '9+' : '$unreadLetters',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-              ],
+    final couple = coupleState.couple;
+    final anniversary = _getNextAnniversary(couple?.startDate);
+
+    Future<void> onCompleteMission(String id) async {
+      final success = await ref
+          .read(missionProvider.notifier)
+          .completeMission(id);
+      if (!context.mounted) return;
+      showTopSnackBar(
+        context,
+        success ? '미션 완료!' : '미션 완료에 실패했습니다.',
+        isError: !success,
+      );
+    }
+
+    Future<void> onCancelMission(String id) async {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('미션 취소'),
+          content: const Text('미션 완료를 취소하시겠어요?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('아니오'),
             ),
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined),
-                onPressed: () => context.push('/notifications'),
-              ),
-              if (unreadNotifications > 0)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: const BoxDecoration(
-                      color: AppTheme.errorColor,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
-                    child: Text(
-                      unreadNotifications > 9 ? '9+' : '$unreadNotifications',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('취소하기'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+      final success = await ref
+          .read(missionProvider.notifier)
+          .cancelMission(id);
+      if (!context.mounted) return;
+      showTopSnackBar(
+        context,
+        success ? '미션 완료가 취소되었습니다.' : '취소에 실패했습니다.',
+        isError: !success,
+      );
+    }
+
+    return Scaffold(
       body: RefreshIndicator(
         color: AppTheme.primaryColor,
+        edgeOffset: MediaQuery.paddingOf(context).top,
         onRefresh: () async {
           await fetchAndApplyHomeSummary(ref);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Column(
-            children: [
-              // D-Day Card
-              DdayCard(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: staggered([
+              HomeHero(
+                myName: user?.nickname ?? '나',
+                partnerName:
+                    couple?.partnerDisplayName(user?.id ?? '') ?? '상대방',
+                myMood: moodState.myMood?.emoji,
+                partnerMood: moodState.partnerMood?.emoji,
                 daysTogether: daysTogether,
-                startDate: coupleState.couple?.startDate,
-                user1Name: user?.nickname ?? '나',
-                user2Name:
-                    coupleState.couple?.getPartner(user?.id ?? '')?.nickname ??
-                    '상대방',
-                onEditDate: () =>
-                    _showEditStartDate(coupleState.couple?.startDate),
+                startDate: couple?.startDate,
+                waitingForPartner: isSolo && couple != null,
+                nextAnniversaryName: anniversary?['name'] as String?,
+                nextAnniversaryDaysLeft: anniversary?['daysLeft'] as int?,
+                actions: HeroIconButton(
+                  icon: Icons.notifications_none_rounded,
+                  badge: unreadNotifications,
+                  onTap: () => context.push('/notifications'),
+                ),
+                onEditDate: () => _showEditStartDate(couple?.startDate),
+                onPickMood: _showMoodPicker,
+                onInvite: () {
+                  if (couple != null) {
+                    showInviteCodeDialog(context, couple.inviteCode);
+                  }
+                },
+                onAnniversary: () => context.push('/anniversary'),
               ),
-              const SizedBox(height: 12),
 
-              // Next Anniversary Card
-              AnniversaryCard(
-                startDate: coupleState.couple?.startDate,
-                onTap: () => context.push('/anniversary'),
+              ShortcutRow(
+                items: [
+                  ShortcutItem(
+                    label: '기념일',
+                    icon: const Icon(
+                      Icons.celebration_rounded,
+                      color: AppTheme.primaryColor,
+                    ),
+                    background: AppTheme.primarySoft,
+                    onTap: () => context.push('/anniversary'),
+                  ),
+                  ShortcutItem(
+                    label: '편지',
+                    icon: const Sticker(StickerKind.gift, size: 30),
+                    background: AppTheme.lavenderSoft,
+                    badge: unreadLetters,
+                    onTap: () => context.push('/letter'),
+                  ),
+                  ShortcutItem(
+                    label: '위시',
+                    icon: const Sticker(StickerKind.heart, size: 28),
+                    background: AppTheme.peachSoft,
+                    onTap: () => context.push('/wishlist'),
+                  ),
+                  ShortcutItem(
+                    label: '운세',
+                    icon: const Sticker(StickerKind.sparkle, size: 30),
+                    background: AppTheme.butterSoft,
+                    onTap: () => context.push('/fortune'),
+                  ),
+                  if (!isSolo)
+                    ShortcutItem(
+                      label: '그림',
+                      icon: const Icon(
+                        Icons.brush_rounded,
+                        color: AppTheme.mint,
+                      ),
+                      background: AppTheme.mintSoft,
+                      onTap: () => context.push('/doodle'),
+                    ),
+                ],
               ),
-              const SizedBox(height: 12),
 
-              // Question Card
-              QuestionMiniCard(
+              const SectionHeader(title: '오늘의 질문'),
+              QuestionBubble(
                 question: questionState.today,
+                waitingForPartner: isSolo,
                 onTap: () => context.push('/question'),
               ),
-              const SizedBox(height: 12),
 
-              WishlistPreviewCard(
-                state: wishlistState,
-                onTap: () => context.push('/wishlist'),
-              ),
-              const SizedBox(height: 12),
-
-              // Doodle Card (그림 보내기)
-              DoodleCard(
-                latest: doodleState.latestReceived,
-                onTap: () => context.push('/doodle'),
-              ),
-              const SizedBox(height: 12),
-
-              // Banner Ad
-              BannerAdWidget(adUnitId: AppConstants.adMobHomeBanner),
-              const SizedBox(height: 12),
-
-              // Mission Card
-              MissionCard(
+              const SectionHeader(title: '커플 미션'),
+              MissionSection(
                 daily: missionState.daily,
                 weekly: missionState.weekly,
                 isLoading: missionState.isLoading,
-                onComplete: (id) async {
-                  final success = await ref
-                      .read(missionProvider.notifier)
-                      .completeMission(id);
-                  if (!context.mounted) return;
-                  showTopSnackBar(
-                    context,
-                    success ? '미션 완료!' : '미션 완료에 실패했습니다.',
-                    isError: !success,
-                  );
-                },
-                onCancel: (id) async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('미션 취소'),
-                      content: const Text('미션 완료를 취소하시겠어요?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('아니오'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('취소하기'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirm == true) {
-                    final success = await ref
-                        .read(missionProvider.notifier)
-                        .cancelMission(id);
-                    if (!context.mounted) return;
-                    showTopSnackBar(
-                      context,
-                      success ? '미션 완료가 취소되었습니다.' : '취소에 실패했습니다.',
-                      isError: !success,
-                    );
-                  }
-                },
+                onComplete: onCompleteMission,
+                onCancel: onCancelMission,
               ),
-              const SizedBox(height: 12),
 
-              // Mood Card
-              MoodCard(
-                myMoodEmoji: moodState.myMood?.emoji,
-                partnerMoodEmoji: moodState.partnerMood?.emoji,
-                myName: user?.nickname ?? '나',
-                partnerName:
-                    coupleState.couple?.getPartner(user?.id ?? '')?.nickname ??
-                    '상대방',
-                onTap: _showMoodPicker,
+              SectionHeader(
+                title: '위시리스트',
+                actionLabel: '전체보기',
+                onAction: () => context.push('/wishlist'),
               ),
-              const SizedBox(height: 12),
+              WishStrip(
+                state: wishlistState,
+                onTap: () => context.push('/wishlist'),
+              ),
 
-              // Today's Fortune Card
-              FortuneCard(
-                luckyScore: fortuneState.fortune?.luckyScore,
-                coupleLuck: fortuneState.fortune?.coupleLuck,
-                isLoading: fortuneState.isLoading,
-                exists: fortuneState.exists,
-                onTap: () {
-                  context.push('/fortune');
-                },
-              ),
-              const SizedBox(height: 24),
-            ],
+              const SizedBox(height: 20),
+              BannerAdWidget(adUnitId: AppConstants.adMobHomeBanner),
+              const SizedBox(height: 28),
+            ]),
           ),
         ),
       ),

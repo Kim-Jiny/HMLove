@@ -74,9 +74,9 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _processing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('인증마크 적용 실패: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('인증마크 적용 실패: $e')));
       }
     }
   }
@@ -111,18 +111,30 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     double maxTextWidth = 0;
     final paragraphs = <ui.Paragraph>[];
     for (final line in lines) {
-      final builder = ui.ParagraphBuilder(
-        ui.ParagraphStyle(textAlign: TextAlign.left, fontSize: fontSize),
-      )..pushStyle(ui.TextStyle(
-          color: const Color(0xFFFFFFFF),
-          fontSize: fontSize,
-          fontWeight: FontWeight.w600,
-          shadows: const [
-            Shadow(color: Color(0xCC000000), blurRadius: 6, offset: Offset(1, 1)),
-            Shadow(color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 0)),
-          ],
-        ))
-        ..addText(line);
+      final builder =
+          ui.ParagraphBuilder(
+              ui.ParagraphStyle(textAlign: TextAlign.left, fontSize: fontSize),
+            )
+            ..pushStyle(
+              ui.TextStyle(
+                color: const Color(0xFFFFFFFF),
+                fontSize: fontSize,
+                fontWeight: FontWeight.w600,
+                shadows: const [
+                  Shadow(
+                    color: Color(0xCC000000),
+                    blurRadius: 6,
+                    offset: Offset(1, 1),
+                  ),
+                  Shadow(
+                    color: Color(0x66000000),
+                    blurRadius: 2,
+                    offset: Offset(0, 0),
+                  ),
+                ],
+              ),
+            )
+            ..addText(line);
       final paragraph = builder.build();
       paragraph.layout(ui.ParagraphConstraints(width: w * 0.8));
       if (paragraph.longestLine > maxTextWidth) {
@@ -154,9 +166,13 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
     final picture = recorder.endRecording();
     final resultImage = await picture.toImage(w.toInt(), h.toInt());
-    final pngBytes = await resultImage.toByteData(format: ui.ImageByteFormat.png);
+    final pngBytes = await resultImage.toByteData(
+      format: ui.ImageByteFormat.png,
+    );
 
-    final tempFile = File('${Directory.systemTemp.path}/cert_${now.millisecondsSinceEpoch}.png');
+    final tempFile = File(
+      '${Directory.systemTemp.path}/cert_${now.millisecondsSinceEpoch}.png',
+    );
     await tempFile.writeAsBytes(pngBytes!.buffer.asUint8List());
     return tempFile.path;
   }
@@ -183,7 +199,11 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
                   const Spacer(),
                   const Text(
                     '사진 미리보기',
-                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const Spacer(),
                   const SizedBox(width: 48),
@@ -196,17 +216,17 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.file(
-                    File(widget.imagePath),
-                    fit: BoxFit.contain,
-                  ),
+                  Image.file(File(widget.imagePath), fit: BoxFit.contain),
                   // 인증마크 오버레이 미리보기
                   if (_certMark)
                     Positioned(
                       right: 16,
                       bottom: 16,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.black54,
                           borderRadius: BorderRadius.circular(8),
@@ -221,10 +241,13 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
                                 color: Colors.white,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                                shadows: [
+                                  Shadow(color: Colors.black, blurRadius: 4),
+                                ],
                               ),
                             ),
-                            if (_locationStr != null && _locationStr!.isNotEmpty) ...[
+                            if (_locationStr != null &&
+                                _locationStr!.isNotEmpty) ...[
                               const SizedBox(height: 2),
                               Text(
                                 '📍 $_locationStr',
@@ -232,7 +255,9 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
                                   color: Colors.white,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
-                                  shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                                  shadows: [
+                                    Shadow(color: Colors.black, blurRadius: 4),
+                                  ],
                                 ),
                               ),
                             ] else if (!_locationLoaded) ...[
@@ -241,13 +266,21 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   SizedBox(
-                                    width: 10, height: 10,
+                                    width: 10,
+                                    height: 10,
                                     child: CircularProgressIndicator(
-                                      strokeWidth: 1.5, color: Colors.white70,
+                                      strokeWidth: 1.5,
+                                      color: Colors.white70,
                                     ),
                                   ),
                                   SizedBox(width: 6),
-                                  Text('위치 확인 중...', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                                  Text(
+                                    '위치 확인 중...',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ],
@@ -269,23 +302,32 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
                   GestureDetector(
                     onTap: () => setState(() => _certMark = !_certMark),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         color: _certMark
                             ? AppTheme.primaryColor.withValues(alpha: 0.2)
                             : Colors.white12,
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: _certMark ? AppTheme.primaryColor : Colors.white24,
+                          color: _certMark
+                              ? AppTheme.primaryColor
+                              : Colors.white24,
                         ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            _certMark ? Icons.verified : Icons.verified_outlined,
+                            _certMark
+                                ? Icons.verified
+                                : Icons.verified_outlined,
                             size: 20,
-                            color: _certMark ? AppTheme.primaryColor : Colors.white54,
+                            color: _certMark
+                                ? AppTheme.primaryColor
+                                : Colors.white54,
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -293,7 +335,9 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: _certMark ? AppTheme.primaryColor : Colors.white70,
+                              color: _certMark
+                                  ? AppTheme.primaryColor
+                                  : Colors.white70,
                             ),
                           ),
                         ],
@@ -305,22 +349,31 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
                   GestureDetector(
                     onTap: _processing ? null : _confirm,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryColor,
                         borderRadius: BorderRadius.circular(24),
                       ),
                       child: _processing
                           ? const SizedBox(
-                              width: 20, height: 20,
+                              width: 20,
+                              height: 20,
                               child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white,
+                                strokeWidth: 2,
+                                color: Colors.white,
                               ),
                             )
                           : const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                                Icon(
+                                  Icons.send_rounded,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
                                 SizedBox(width: 6),
                                 Text(
                                   '전송',

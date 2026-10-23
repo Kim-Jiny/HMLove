@@ -79,7 +79,7 @@ class FightState {
 
 // Fight Notifier
 class FightNotifier extends Notifier<FightState> {
-  late final Dio _dio;
+  late Dio _dio;
 
   @override
   FightState build() {

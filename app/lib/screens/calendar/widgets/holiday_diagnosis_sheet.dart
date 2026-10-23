@@ -44,7 +44,7 @@ class HolidayDiagnosisSheet extends StatelessWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: AppTheme.ink.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -133,7 +133,7 @@ class HolidayDiagnosisSheet extends StatelessWidget {
                               '공휴일',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Color(0xFFD32F2F),
+                                color: AppTheme.errorColor,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -149,7 +149,7 @@ class HolidayDiagnosisSheet extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF3E0),
+                  color: AppTheme.peachSoft,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
@@ -182,7 +182,7 @@ class HolidayDiagnosisSheet extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF3E0),
+                  color: AppTheme.peachSoft,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(

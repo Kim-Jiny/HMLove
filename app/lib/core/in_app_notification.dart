@@ -7,15 +7,15 @@ import 'theme.dart';
 
 /// 알림 타입별 아이콘/색상 매핑
 const _typeConfig = <String, ({IconData icon, Color color})>{
-  'chat': (icon: Icons.chat_bubble, color: Color(0xFF2196F3)),
-  'feed': (icon: Icons.photo, color: Color(0xFF4CAF50)),
-  'feed_like': (icon: Icons.favorite, color: Color(0xFFE91E63)),
-  'feed_comment': (icon: Icons.comment, color: Color(0xFF4CAF50)),
-  'calendar': (icon: Icons.calendar_today, color: Color(0xFFFF9800)),
-  'anniversary': (icon: Icons.cake, color: Color(0xFFE91E63)),
-  'letter': (icon: Icons.mail, color: Color(0xFF9C27B0)),
-  'mood': (icon: Icons.emoji_emotions, color: Color(0xFFFF5722)),
-  'fight': (icon: Icons.thunderstorm, color: Color(0xFF607D8B)),
+  'chat': (icon: Icons.chat_bubble, color: AppTheme.sky),
+  'feed': (icon: Icons.photo, color: AppTheme.mint),
+  'feed_like': (icon: Icons.favorite, color: AppTheme.primaryColor),
+  'feed_comment': (icon: Icons.comment, color: AppTheme.mint),
+  'calendar': (icon: Icons.calendar_today, color: AppTheme.peach),
+  'anniversary': (icon: Icons.cake, color: AppTheme.primaryColor),
+  'letter': (icon: Icons.mail, color: AppTheme.lavender),
+  'mood': (icon: Icons.emoji_emotions, color: AppTheme.peach),
+  'fight': (icon: Icons.thunderstorm, color: AppTheme.ink),
 };
 
 OverlayEntry? _currentEntry;
@@ -59,7 +59,8 @@ void showInAppNotification({
       reverseCurve: Curves.easeInCubic,
     );
 
-    final config = _typeConfig[type] ??
+    final config =
+        _typeConfig[type] ??
         (icon: Icons.notifications, color: AppTheme.primaryColor);
 
     late OverlayEntry entry;
@@ -88,7 +89,8 @@ void showInAppNotification({
                 onTap?.call();
               },
               onVerticalDragUpdate: (details) {
-                if (details.primaryDelta != null && details.primaryDelta! < -5) {
+                if (details.primaryDelta != null &&
+                    details.primaryDelta! < -5) {
                   _dismiss();
                 }
               },
@@ -100,22 +102,18 @@ void showInAppNotification({
                     left: 12,
                     right: 12,
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
-                        blurRadius: 20,
-                        offset: const Offset(0, 6),
-                      ),
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                    border: Border.all(
+                      color: AppTheme.ink,
+                      width: AppTheme.outlineWidth,
+                    ),
+                    boxShadow: AppTheme.cartoonShadow,
                   ),
                   child: Row(
                     children: [
@@ -123,8 +121,9 @@ void showInAppNotification({
                         width: 38,
                         height: 38,
                         decoration: BoxDecoration(
-                          color: config.color.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
+                          color: config.color.withValues(alpha: 0.18),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppTheme.ink, width: 1.2),
                         ),
                         child: Icon(config.icon, color: config.color, size: 20),
                       ),
@@ -162,7 +161,7 @@ void showInAppNotification({
                         '지금',
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.grey.shade400,
+                          color: AppTheme.textHint,
                         ),
                       ),
                     ],
@@ -198,7 +197,9 @@ void _dismiss({bool immediate = false}) {
   _currentEntry = null;
   _currentController = null;
 
-  if (immediate || !controller.isAnimating && controller.status != AnimationStatus.completed) {
+  if (immediate ||
+      !controller.isAnimating &&
+          controller.status != AnimationStatus.completed) {
     try {
       entry.remove();
     } catch (_) {}

@@ -74,9 +74,9 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-                  primary: AppTheme.primaryColor,
-                ),
+            colorScheme: Theme.of(
+              context,
+            ).colorScheme.copyWith(primary: AppTheme.primaryColor),
           ),
           child: child!,
         );
@@ -98,9 +98,9 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-                  primary: AppTheme.primaryColor,
-                ),
+            colorScheme: Theme.of(
+              context,
+            ).colorScheme.copyWith(primary: AppTheme.primaryColor),
           ),
           child: child!,
         );
@@ -122,14 +122,18 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
     setState(() => _isSaving = true);
     try {
       if (_isEditMode) {
-        await ref.read(letterProvider.notifier).updateLetter(
+        await ref
+            .read(letterProvider.notifier)
+            .updateLetter(
               id: widget.letter!.id,
               title: _titleController.text.trim(),
               content: _contentController.text.trim(),
               deliveryDate: _combinedDeliveryUtc(),
             );
       } else {
-        await ref.read(letterProvider.notifier).createLetter(
+        await ref
+            .read(letterProvider.notifier)
+            .createLetter(
               title: _titleController.text.trim(),
               content: _contentController.text.trim(),
               deliveryDate: _combinedDeliveryUtc(),
@@ -166,14 +170,18 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
     setState(() => _isSaving = true);
     try {
       if (_isEditMode) {
-        await ref.read(letterProvider.notifier).updateLetter(
+        await ref
+            .read(letterProvider.notifier)
+            .updateLetter(
               id: widget.letter!.id,
               title: _titleController.text.trim(),
               content: _contentController.text.trim(),
               deliveryDate: deliveryUtc,
             );
       } else {
-        await ref.read(letterProvider.notifier).createLetter(
+        await ref
+            .read(letterProvider.notifier)
+            .createLetter(
               title: _titleController.text.trim(),
               content: _contentController.text.trim(),
               deliveryDate: deliveryUtc,
@@ -229,10 +237,7 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFFFF8F0),
-              Color(0xFFFFF5F7),
-            ],
+            colors: [AppTheme.backgroundColor, AppTheme.backgroundColor],
           ),
         ),
         child: SingleChildScrollView(
@@ -247,19 +252,13 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFFDF5),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.brown.withValues(alpha: 0.08),
-                        blurRadius: 20,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: const Color(0xFFE8DDD0),
-                      width: 0.5,
+                      color: AppTheme.ink,
+                      width: AppTheme.outlineWidth,
                     ),
+                    boxShadow: AppTheme.cartoonShadow,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,10 +290,7 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
                         },
                       ),
 
-                      const Divider(
-                        color: Color(0xFFE8DDD0),
-                        height: 24,
-                      ),
+                      const Divider(color: AppTheme.borderColor, height: 24),
 
                       // Content
                       TextFormField(
@@ -341,10 +337,7 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
                 const SizedBox(height: 4),
                 const Text(
                   '선택한 날짜와 시간에 상대방에게 편지가 전달됩니다',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                  ),
+                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -363,8 +356,7 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: const Color(0xFFE0E0E0)),
+                            border: Border.all(color: AppTheme.borderColor),
                           ),
                           child: Row(
                             children: [
@@ -376,8 +368,9 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
                               const SizedBox(width: 8),
                               Text(
                                 _deliveryDate != null
-                                    ? DateFormat('yyyy년 M월 d일')
-                                        .format(_deliveryDate!)
+                                    ? DateFormat(
+                                        'yyyy년 M월 d일',
+                                      ).format(_deliveryDate!)
                                     : '날짜 선택',
                                 style: TextStyle(
                                   fontSize: 14,
@@ -399,8 +392,7 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
                         onTap: _deliveryDate != null
                             ? _pickDeliveryTime
                             : () {
-                                showTopSnackBar(
-                                    context, '날짜를 먼저 선택해주세요');
+                                showTopSnackBar(context, '날짜를 먼저 선택해주세요');
                               },
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
@@ -411,8 +403,7 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: const Color(0xFFE0E0E0)),
+                            border: Border.all(color: AppTheme.borderColor),
                           ),
                           child: Row(
                             children: [
@@ -506,10 +497,7 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFFFF8F0),
-              Color(0xFFFFF5F7),
-            ],
+            colors: [AppTheme.backgroundColor, AppTheme.backgroundColor],
           ),
         ),
         child: SingleChildScrollView(
@@ -518,19 +506,13 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(28),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFFDF5),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.brown.withValues(alpha: 0.1),
-                  blurRadius: 24,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: const Color(0xFFE8DDD0),
-                width: 0.5,
+                color: AppTheme.ink,
+                width: AppTheme.outlineWidth,
               ),
+              boxShadow: AppTheme.cartoonShadow,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -550,8 +532,8 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
                 if (_deliveryDate != null)
                   Text(
                     () {
-                      final time = _deliveryTime ??
-                          const TimeOfDay(hour: 9, minute: 0);
+                      final time =
+                          _deliveryTime ?? const TimeOfDay(hour: 9, minute: 0);
                       return '${DateFormat('yyyy년 M월 d일').format(_deliveryDate!)} ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
                     }(),
                     style: const TextStyle(
@@ -559,10 +541,7 @@ class _LetterWriteScreenState extends ConsumerState<LetterWriteScreen> {
                       color: AppTheme.textSecondary,
                     ),
                   ),
-                const Divider(
-                  color: Color(0xFFE8DDD0),
-                  height: 32,
-                ),
+                const Divider(color: AppTheme.borderColor, height: 32),
                 // Content
                 Text(
                   _contentController.text.isNotEmpty

@@ -21,7 +21,7 @@ class BadgeState {
 }
 
 class BadgeNotifier extends Notifier<BadgeState> {
-  late final Dio _dio;
+  late Dio _dio;
 
   @override
   BadgeState build() {

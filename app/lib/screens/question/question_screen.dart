@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
 import '../../core/top_snackbar.dart';
+import '../../widgets/cute/loader.dart';
 import '../../models/daily_question.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/couple_provider.dart';
 import '../../providers/question_provider.dart';
+import '../../widgets/soft_ui.dart';
 
 class QuestionScreen extends ConsumerStatefulWidget {
   const QuestionScreen({super.key});
@@ -38,8 +40,9 @@ class _QuestionScreenState extends ConsumerState<QuestionScreen> {
     final answer = _answerController.text.trim();
     if (answer.isEmpty) return;
     setState(() => _isSubmitting = true);
-    final success =
-        await ref.read(questionProvider.notifier).submitAnswer(answer);
+    final success = await ref
+        .read(questionProvider.notifier)
+        .submitAnswer(answer);
     if (mounted) {
       setState(() => _isSubmitting = false);
       if (success) {
@@ -56,7 +59,6 @@ class _QuestionScreenState extends ConsumerState<QuestionScreen> {
     final state = ref.watch(questionProvider);
     final userId = ref.watch(currentUserProvider)?.id;
     final coupleState = ref.watch(coupleProvider);
-    final partner = coupleState.couple?.getPartner(userId ?? '');
 
     return Scaffold(
       appBar: AppBar(title: const Text('오늘의 질문')),
@@ -76,14 +78,16 @@ class _QuestionScreenState extends ConsumerState<QuestionScreen> {
               const Center(
                 child: Padding(
                   padding: EdgeInsets.all(32),
-                  child: CircularProgressIndicator(),
+                  child: CuteLoader(),
                 ),
               )
             else if (state.today != null)
               _TodayQuestionCard(
                 question: state.today!,
                 userId: userId ?? '',
-                partnerName: partner?.nickname ?? '상대방',
+                partnerName:
+                    coupleState.couple?.partnerDisplayName(userId ?? '') ??
+                    '상대방',
                 answerController: _answerController,
                 isSubmitting: _isSubmitting,
                 onSubmit: _submitAnswer,
@@ -94,10 +98,7 @@ class _QuestionScreenState extends ConsumerState<QuestionScreen> {
             // 히스토리
             const Text(
               '지난 질문',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
             if (state.history.isEmpty && !state.isHistoryLoading)
@@ -113,20 +114,24 @@ class _QuestionScreenState extends ConsumerState<QuestionScreen> {
                   ),
                 ),
               ),
-            ...state.history.map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _HistoryCard(
-                    item: item,
-                    userId: userId ?? '',
-                    partnerName: partner?.nickname ?? '상대방',
-                  ),
-                )),
+            ...state.history.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _HistoryCard(
+                  item: item,
+                  userId: userId ?? '',
+                  partnerName:
+                      coupleState.couple?.partnerDisplayName(userId ?? '') ??
+                      '상대방',
+                ),
+              ),
+            ),
             if (state.hasMore)
               Center(
                 child: state.isHistoryLoading
                     ? const Padding(
                         padding: EdgeInsets.all(16),
-                        child: CircularProgressIndicator(),
+                        child: CuteLoader(),
                       )
                     : TextButton(
                         onPressed: () =>
@@ -161,7 +166,7 @@ class _TodayQuestionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -174,22 +179,19 @@ class _TodayQuestionCard extends StatelessWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF3F51B5).withValues(alpha: 0.12),
+                    color: AppTheme.lavender.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(
                     Icons.quiz_outlined,
-                    color: Color(0xFF3F51B5),
+                    color: AppTheme.lavender,
                     size: 20,
                   ),
                 ),
                 const SizedBox(width: 10),
                 const Text(
                   '오늘의 질문',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                 ),
                 const Spacer(),
                 Text(
@@ -207,7 +209,7 @@ class _TodayQuestionCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFF3F51B5).withValues(alpha: 0.06),
+                color: AppTheme.lavender.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -236,19 +238,24 @@ class _TodayQuestionCard extends StatelessWidget {
               _AnswerBubble(
                 label: '$partnerName의 답변',
                 answer: question.partnerAnswer!.answer,
-                color: const Color(0xFF3F51B5),
+                color: AppTheme.lavender,
               ),
             ] else if (question.partnerAnswered) ...[
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppTheme.lavenderSoft,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppTheme.ink, width: 1.3),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.lock_outline, size: 16, color: AppTheme.textHint),
+                    const Icon(
+                      Icons.lock_outline,
+                      size: 16,
+                      color: AppTheme.textHint,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -267,8 +274,9 @@ class _TodayQuestionCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppTheme.lavenderSoft,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppTheme.ink, width: 1.3),
                 ),
                 child: Text(
                   '$partnerName의 답변을 기다리고 있어요...',
@@ -359,7 +367,7 @@ class _AnswerBubble extends StatelessWidget {
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withValues(alpha: 0.2)),
+            border: Border.all(color: AppTheme.ink, width: 1.3),
           ),
           child: Text(
             answer,
@@ -384,7 +392,7 @@ class _HistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return CartoonCard(
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -400,7 +408,7 @@ class _HistoryCard extends StatelessWidget {
         ),
         trailing: Icon(
           item.bothAnswered ? Icons.check_circle : Icons.radio_button_unchecked,
-          color: item.bothAnswered ? AppTheme.primaryColor : Colors.grey.shade400,
+          color: item.bothAnswered ? AppTheme.primaryColor : AppTheme.textHint,
           size: 20,
         ),
         children: [
@@ -416,17 +424,22 @@ class _HistoryCard extends StatelessWidget {
             _AnswerBubble(
               label: '$partnerName의 답변',
               answer: item.partnerAnswer!.answer,
-              color: const Color(0xFF3F51B5),
+              color: AppTheme.lavender,
             )
           else if (item.partnerAnswered)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 '$partnerName이(가) 답변했어요 (아직 미공개)',
-                style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textSecondary,
+                ),
               ),
             ),
-          if (item.myAnswer == null && item.partnerAnswer == null && !item.partnerAnswered)
+          if (item.myAnswer == null &&
+              item.partnerAnswer == null &&
+              !item.partnerAnswered)
             const Text(
               '답변 없음',
               style: TextStyle(fontSize: 13, color: AppTheme.textHint),

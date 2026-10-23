@@ -165,7 +165,7 @@ class ChatState {
 
 // Chat Notifier
 class ChatNotifier extends Notifier<ChatState> {
-  late final Dio _dio;
+  late Dio _dio;
   io.Socket? _socket;
   String? _socketToken;
   int _socketGeneration = 0;

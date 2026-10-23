@@ -39,7 +39,7 @@ class CoupleState {
 
 // Couple Notifier
 class CoupleNotifier extends Notifier<CoupleState> {
-  late final Dio _dio;
+  late Dio _dio;
 
   @override
   CoupleState build() {
@@ -70,8 +70,7 @@ class CoupleNotifier extends Notifier<CoupleState> {
       await ApiClient.saveCoupleId(couple.id);
       state = state.copyWith(couple: couple, isLoading: false);
     } on DioException catch (e) {
-      final message =
-          extractDioErrorMessage(e, fallback: '커플 정보를 불러오지 못했습니다');
+      final message = extractDioErrorMessage(e, fallback: '커플 정보를 불러오지 못했습니다');
       state = state.copyWith(isLoading: false, error: message);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
@@ -96,8 +95,14 @@ class CoupleNotifier extends Notifier<CoupleState> {
       final inviteCode = coupleData['inviteCode'] as String;
       final couple = Couple.fromJson(coupleData);
 
-      // Don't update auth user's coupleId yet — partner hasn't joined.
-      // Stay on couple-connect screen to show the invite code.
+      // 상대가 아직 합류하지 않았어도 커플이 생겼으므로 바로 메인에 들어간다.
+      // (router 가 coupleId 를 보고 /home 으로 보낸다. 초대 코드는 홈/더보기에서 확인)
+      final currentUser = ref.read(currentUserProvider);
+      if (currentUser != null) {
+        ref
+            .read(authProvider.notifier)
+            .updateUser(currentUser.copyWith(coupleId: couple.id));
+      }
       state = state.copyWith(
         couple: couple,
         generatedInviteCode: inviteCode,
@@ -105,12 +110,87 @@ class CoupleNotifier extends Notifier<CoupleState> {
       );
       return true;
     } on DioException catch (e) {
-      final message =
-          extractDioErrorMessage(e, fallback: '커플 생성에 실패했습니다');
+      final message = extractDioErrorMessage(e, fallback: '커플 생성에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
+      return false;
+    }
+  }
+
+  /// 상대가 아직 앱을 설치하기 전에 먼저 시작한다. 이후 초대 코드로 상대를 연결할 수 있다.
+  Future<bool> startWithoutPartner({
+    required DateTime startDate,
+    String? partnerName,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final response = await _dio.post(
+        '/couple/create',
+        data: {
+          'solo': true,
+          if (partnerName != null && partnerName.trim().isNotEmpty)
+            'partnerName': partnerName.trim(),
+          'startDate':
+              '${startDate.year}-${startDate.month.toString().padLeft(2, '0')}-${startDate.day.toString().padLeft(2, '0')}T00:00:00.000Z',
+        },
+      );
+      final coupleData =
+          (response.data as Map<String, dynamic>)['couple']
+              as Map<String, dynamic>;
+      final couple = Couple.fromJson(coupleData);
+      await ApiClient.saveCoupleId(couple.id);
+
+      final currentUser = ref.read(currentUserProvider);
+      if (currentUser != null) {
+        // router redirect 가 이 변경을 보고 /home 으로 보낸다.
+        ref
+            .read(authProvider.notifier)
+            .updateUser(
+              currentUser.copyWith(coupleId: couple.id, isSolo: true),
+            );
+      }
+
+      state = state.copyWith(couple: couple, isLoading: false);
+      return true;
+    } on DioException catch (e) {
+      final message = extractDioErrorMessage(e, fallback: '시작하지 못했습니다');
+      state = state.copyWith(isLoading: false, error: message);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '알 수 없는 오류가 발생했습니다');
+      return false;
+    }
+  }
+
+  /// 상대 연결 전 미리 적어둔 이름/애칭을 수정한다. 빈 문자열이면 지운다.
+  Future<bool> updatePartnerName(String name) async {
+    try {
+      final res = await _dio.patch(
+        '/couple/partner-name',
+        data: {'partnerName': name},
+      );
+      final saved =
+          (res.data as Map<String, dynamic>)['pendingPartnerName'] as String?;
+      final couple = state.couple;
+      if (couple != null) {
+        // copyWith 는 null 로 지우지 못하므로 새 인스턴스로 교체한다.
+        state = state.copyWith(
+          couple: Couple(
+            id: couple.id,
+            inviteCode: couple.inviteCode,
+            startDate: couple.startDate,
+            pendingPartnerName: saved,
+            users: couple.users,
+            createdAt: couple.createdAt,
+            updatedAt: couple.updatedAt,
+          ),
+        );
+      }
+      return true;
+    } on DioException {
       return false;
     }
   }
@@ -136,15 +216,18 @@ class CoupleNotifier extends Notifier<CoupleState> {
       final currentUser = ref.read(currentUserProvider);
       if (currentUser != null) {
         authNotifier.updateUser(
-          currentUser.copyWith(coupleId: couple.id, isCoupleComplete: true),
+          currentUser.copyWith(
+            coupleId: couple.id,
+            isCoupleComplete: true,
+            isSolo: false,
+          ),
         );
       }
 
       state = state.copyWith(couple: couple, isLoading: false);
       return true;
     } on DioException catch (e) {
-      final message =
-          extractDioErrorMessage(e, fallback: '커플 연결에 실패했습니다');
+      final message = extractDioErrorMessage(e, fallback: '커플 연결에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -170,8 +253,7 @@ class CoupleNotifier extends Notifier<CoupleState> {
       await fetchCouple();
       return true;
     } on DioException catch (e) {
-      final message =
-          extractDioErrorMessage(e, fallback: '날짜 수정에 실패했습니다');
+      final message = extractDioErrorMessage(e, fallback: '날짜 수정에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {
@@ -198,6 +280,7 @@ class CoupleNotifier extends Notifier<CoupleState> {
           currentUser.copyWith(
             coupleId: null,
             isCoupleComplete: false,
+            isSolo: false,
             hasExistingCoupleData: false,
           ),
         );
@@ -206,8 +289,7 @@ class CoupleNotifier extends Notifier<CoupleState> {
 
       return true;
     } on DioException catch (e) {
-      final message =
-          extractDioErrorMessage(e, fallback: '커플 해제에 실패했습니다');
+      final message = extractDioErrorMessage(e, fallback: '커플 해제에 실패했습니다');
       state = state.copyWith(isLoading: false, error: message);
       return false;
     } catch (e) {

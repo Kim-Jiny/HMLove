@@ -37,9 +37,10 @@ class FeedGridTile extends StatelessWidget {
               Text(
                 '${feed.likeCount}',
                 style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600),
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
             if (feed.likeCount > 0 && feed.commentCount > 0)
@@ -50,9 +51,10 @@ class FeedGridTile extends StatelessWidget {
               Text(
                 '${feed.commentCount}',
                 style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600),
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ],
@@ -71,9 +73,11 @@ class FeedGridTile extends StatelessWidget {
             imageUrl: feed.imageUrls.first,
             fit: BoxFit.cover,
             errorWidget: (_, _, _) => Container(
-              color: Colors.grey.shade200,
-              child: const Icon(Icons.image_not_supported_outlined,
-                  color: AppTheme.textHint),
+              color: AppTheme.primarySoft,
+              child: const Icon(
+                Icons.image_not_supported_outlined,
+                color: AppTheme.textHint,
+              ),
             ),
           ),
           if (feed.imageUrls.length > 1)

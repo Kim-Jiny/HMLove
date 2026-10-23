@@ -79,7 +79,7 @@ class MissionState {
 }
 
 class MissionNotifier extends Notifier<MissionState> {
-  late final Dio _dio;
+  late Dio _dio;
 
   @override
   MissionState build() {

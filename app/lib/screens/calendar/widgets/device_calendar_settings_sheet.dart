@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../../core/device_calendar_service.dart';
 import '../../../core/theme.dart';
 import '../../../providers/calendar_provider.dart';
+import '../../../widgets/cute/loader.dart';
 import 'holiday_diagnosis_sheet.dart';
 
 // 기기 캘린더 설정 바텀시트
@@ -116,9 +117,6 @@ class _DeviceCalendarSettingsSheetState
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (ctx) =>
           HolidayDiagnosisSheet(hasPermission: hasPerm, calendars: calendars),
     );
@@ -141,7 +139,7 @@ class _DeviceCalendarSettingsSheetState
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: AppTheme.ink.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -180,10 +178,10 @@ class _DeviceCalendarSettingsSheetState
               secondary: Icon(
                 Icons.flag_outlined,
                 color: _holidayEnabled
-                    ? const Color(0xFFD32F2F)
+                    ? AppTheme.errorColor
                     : AppTheme.textHint,
               ),
-              activeThumbColor: const Color(0xFFD32F2F),
+              activeThumbColor: AppTheme.errorColor,
               contentPadding: EdgeInsets.zero,
             ),
             // 공휴일이 안 보일 때 원인을 사용자가 직접 확인할 수 있는 진단.
@@ -254,10 +252,7 @@ class _DeviceCalendarSettingsSheetState
 
             // 캘린더 목록
             if (_isEnabled && _isLoading)
-              const Padding(
-                padding: EdgeInsets.all(20),
-                child: CircularProgressIndicator(),
-              ),
+              const Padding(padding: EdgeInsets.all(20), child: CuteLoader()),
             if (_isEnabled && !_isLoading && _calendars.isNotEmpty) ...[
               const Divider(),
               const SizedBox(height: 8),
@@ -288,8 +283,11 @@ class _DeviceCalendarSettingsSheetState
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppTheme.ink,
+                      width: AppTheme.outlineWidth,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
@@ -313,7 +311,7 @@ class _DeviceCalendarSettingsSheetState
                                 decoration: BoxDecoration(
                                   color: cal.color != null
                                       ? Color(cal.color!)
-                                      : const Color(0xFF4CAF50),
+                                      : AppTheme.mint,
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -421,7 +419,7 @@ class _DeviceCalendarSettingsSheetState
                         decoration: BoxDecoration(
                           color: cal.color != null
                               ? Color(cal.color!)
-                              : const Color(0xFF4CAF50),
+                              : AppTheme.mint,
                           shape: BoxShape.circle,
                         ),
                       ),
