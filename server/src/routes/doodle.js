@@ -5,6 +5,7 @@ import { authenticate, requireCouple } from '../middleware/auth.js';
 import prisma from '../utils/prisma.js';
 import { uploadFile, deleteFile } from '../utils/storage.js';
 import { notifyPartner, notifyPartnerSilent } from '../utils/firebase.js';
+import { doodleLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 router.use(authenticate, requireCouple);
@@ -78,6 +79,7 @@ router.get('/latest', async (req, res) => {
 // POST /doodle  (multipart: image)
 router.post(
   '/',
+  doodleLimiter,
   upload.fields([
     { name: 'image', maxCount: 1 },
     { name: 'doodle', maxCount: 1 },

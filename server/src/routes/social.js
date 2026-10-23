@@ -42,7 +42,7 @@ async function buildLoginResponse(userId) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
-      couple: { select: { inviteCode: true, _count: { select: { users: true } } } },
+      couple: { select: { inviteCode: true, isSolo: true, _count: { select: { users: true } } } },
     },
   });
 
@@ -50,6 +50,8 @@ async function buildLoginResponse(userId) {
   const refreshToken = generateRefreshToken(user.id);
 
   const isCoupleComplete = user.couple ? user.couple._count.users >= 2 : false;
+  // 상대가 아직 없는 커플(먼저 시작/만들기만 한 대기/상대 이탈)은 모두 메인에 들어갈 수 있다.
+  const isSolo = !!user.couple && !isCoupleComplete;
   const pendingInviteCode = user.couple && !isCoupleComplete ? user.couple.inviteCode : null;
 
   let hasExistingCoupleData = false;
@@ -72,6 +74,7 @@ async function buildLoginResponse(userId) {
       zodiacSign: user.zodiacSign,
       chineseZodiac: user.chineseZodiac,
       isCoupleComplete,
+      isSolo,
       hasExistingCoupleData,
       pendingInviteCode,
       createdAt: user.createdAt,

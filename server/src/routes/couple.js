@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import { authenticate, requireCouple } from '../middleware/auth.js';
 import prisma from '../utils/prisma.js';
 import { sendPushNotification } from '../utils/firebase.js';
+import { deleteFilesByUrls } from '../utils/storage.js';
+import { collectCoupleFileUrls } from '../utils/storageCleanup.js';
 
 const router = Router();
 router.use(authenticate);
@@ -18,6 +20,28 @@ function generateInviteCode() {
   return code;
 }
 
+// 상대 이름/애칭: 공백 정리 후 20자 이내, 비면 null
+function cleanPartnerName(value) {
+  if (typeof value !== 'string') return null;
+  const name = value.trim().slice(0, 20);
+  return name || null;
+}
+
+// PATCH /couple/partner-name — 상대 연결 전 미리 적어둔 이름 수정
+router.patch('/partner-name', requireCouple, async (req, res) => {
+  try {
+    const updated = await prisma.couple.update({
+      where: { id: req.user.coupleId },
+      data: { pendingPartnerName: cleanPartnerName(req.body.partnerName) },
+      select: { pendingPartnerName: true },
+    });
+    res.json(updated);
+  } catch (err) {
+    console.error('Update partner name error:', err);
+    res.status(500).json({ error: '이름 수정에 실패했습니다.' });
+  }
+});
+
 // POST /couple/create
 router.post('/create', async (req, res) => {
   try {
@@ -25,7 +49,9 @@ router.post('/create', async (req, res) => {
       return res.status(400).json({ error: '이미 커플이 연결되어 있습니다.' });
     }
 
-    const { startDate } = req.body;
+    const { startDate, solo, partnerName } = req.body;
+    const pendingPartnerName = cleanPartnerName(partnerName);
+    const isSolo = solo === true;
     if (!startDate) {
       return res.status(400).json({ error: '사귀기 시작한 날짜를 입력해주세요.' });
     }
@@ -40,6 +66,8 @@ router.post('/create', async (req, res) => {
       data: {
         inviteCode,
         startDate: new Date(startDate),
+        isSolo,
+        pendingPartnerName,
         users: { connect: { id: req.user.id } },
       },
     });
@@ -87,6 +115,11 @@ router.post('/join', async (req, res) => {
       });
       if (joinResult.count !== 1) {
         throw Object.assign(new Error('이미 커플이 연결되어 있습니다.'), { statusCode: 400 });
+      }
+
+      // 상대 없이 먼저 시작한 커플에 상대가 합류하면 대기 상태 해제.
+      if (couple.isSolo) {
+        await tx.couple.update({ where: { id: couple.id }, data: { isSolo: false } });
       }
 
       return tx.couple.findUnique({
@@ -159,7 +192,9 @@ router.delete('/leave', async (req, res) => {
     const remaining = couple.users.filter(u => u.id !== req.user.id);
 
     if (remaining.length === 0) {
-      // 마지막 멤버가 나감 → 모든 커플 데이터 삭제
+      // 마지막 멤버가 나감 → 모든 커플 데이터 삭제.
+      // 파일 URL 은 행이 지워지기 전에 모아두고, 삭제가 성공한 뒤에 스토리지에서 지운다.
+      const fileUrls = await collectCoupleFileUrls(coupleId);
       await prisma.$transaction([
         prisma.feedLike.deleteMany({ where: { feed: { coupleId } } }),
         prisma.feedComment.deleteMany({ where: { feed: { coupleId } } }),
@@ -177,6 +212,9 @@ router.delete('/leave', async (req, res) => {
         prisma.wishItem.deleteMany({ where: { coupleId } }),
         prisma.couple.delete({ where: { id: coupleId } }),
       ]);
+
+      // 응답을 막지 않도록 백그라운드로 정리 (실패해도 로그만 남김)
+      deleteFilesByUrls(fileUrls).catch((err) => console.error('[Couple] file cleanup error:', err));
 
       res.json({ message: '커플이 해제되었습니다. 모든 데이터가 삭제되었습니다.', dataDeleted: true });
     } else {

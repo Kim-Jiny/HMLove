@@ -68,6 +68,10 @@ model Couple {
   id         String   @id @default(uuid())
   inviteCode String   @unique
   startDate  DateTime
+  // 상대가 앱을 설치하기 전에 먼저 시작한 커플(멤버 1명). 상대가 초대 코드로 합류하면 false.
+  isSolo     Boolean  @default(false)
+  // 상대가 합류하기 전에 미리 적어둔 상대 이름/애칭. 합류하면 실제 닉네임이 우선한다.
+  pendingPartnerName String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
